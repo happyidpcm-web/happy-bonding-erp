@@ -16,7 +16,6 @@ app.use(helmet());
 app.use(cors({ origin: ["http://localhost:5173"], credentials: false }));
 app.use(express.json({ limit: "25mb" }));
 
-app.get("/", (_req, res) => res.json({ ok: true, service: "happy-bonding-api", health: "/api/health" }));
 app.get("/api/health", (_req, res) => res.json({ ok: true, service: "happy-bonding-api" }));
 
 app.post("/api/auth/login", async (req, res) => {
