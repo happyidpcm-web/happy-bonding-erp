@@ -192,5 +192,5 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(distPath, "index.html"));
 });
 
-const port = process.env.PORT || env.API_PORT || 4000;
-app.listen(port, () => console.log(`Happy Bonding API running at port ${port}`));
+const port = Number(process.env.PORT || env.API_PORT || 4000);
+app.listen(port, "0.0.0.0", () => console.log(`Happy Bonding API running on 0.0.0.0:${port}`));
