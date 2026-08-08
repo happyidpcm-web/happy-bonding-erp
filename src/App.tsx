@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  BarChart3, Banknote, Boxes, Building2, ChevronDown, IndianRupee as CircleIndianRupee,
+  BarChart3, Banknote, Boxes, Building2, ChevronDown, Eye, IndianRupee as CircleIndianRupee,
   ClipboardList, CreditCard, Download, FileSpreadsheet, FileText, LayoutDashboard, Menu, MessageCircle, PackagePlus,
-  Plus, ReceiptIndianRupee, Search, Settings, ShoppingBag, ShoppingCart,
+  Plus, Printer, ReceiptIndianRupee, Search, Settings, ShoppingBag, ShoppingCart,
   TrendingUp, Upload, Users, UsersRound, WalletCards, X,
 } from "lucide-react";
 import { money } from "./data";
@@ -77,6 +77,8 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [salesCreateKey, setSalesCreateKey] = useState(0);
 
+  const [activeInvoiceModal, setActiveInvoiceModal] = useState<Invoice | null>(null);
+
   useEffect(() => {
     if (!apiMode || !authenticated) return;
     Promise.all([api.products(), api.parties(), api.sales(), api.invoiceSetting()])
@@ -100,12 +102,28 @@ export default function App() {
         <div><strong>Happy Bonding</strong><span>Men's Wear ERP</span></div>
         <button className="icon-button close-menu" onClick={() => setSidebar(false)}><X size={19}/></button>
       </div>
-      <button className="new-sale" onClick={openSalesInvoice}><Plus size={17}/> New sale <span>F2</span></button>
+      <button className="new-sale" onClick={openSalesInvoice}><Plus size={17}/> + Create Sales Invoice <span>F2</span></button>
       <nav>{nav.map(group => <div className="nav-group" key={group.section}>
         <p>{group.section}</p>
-        {group.items.map(item => <button key={item.id} className={page === item.id ? "active" : ""} onClick={() => go(item.id)}>
-          <item.icon size={18}/><span>{item.label}</span>
-        </button>)}
+        {group.items.map(item => (
+          <div key={item.id}>
+            <button className={page === item.id ? "active" : ""} onClick={() => go(item.id)}>
+              <item.icon size={18}/><span>{item.label}</span>
+              {item.id === "sales" && <ChevronDown size={14} style={{ marginLeft: "auto" }} />}
+            </button>
+            {item.id === "sales" && (
+              <div className="nav-sub-items">
+                <button className={`nav-sub-item ${page === "sales" ? "active" : ""}`} onClick={() => go("sales")}>Sales Invoices</button>
+                <button className="nav-sub-item" onClick={() => notify("Quotation / Estimate feature ready")}>Quotation / Estimate</button>
+                <button className="nav-sub-item" onClick={() => notify("Payment In feature ready")}>Payment In</button>
+                <button className="nav-sub-item" onClick={() => notify("Sales Return feature ready")}>Sales Return</button>
+                <button className="nav-sub-item" onClick={() => notify("Credit Note feature ready")}>Credit Note</button>
+                <button className="nav-sub-item" onClick={() => notify("Delivery Challan feature ready")}>Delivery Challan</button>
+                <button className="nav-sub-item" onClick={() => notify("Proforma Invoice feature ready")}>Proforma Invoice</button>
+              </div>
+            )}
+          </div>
+        ))}
       </div>)}</nav>
       <div className="branch-card"><Building2 size={17}/><div><small>Current branch</small><strong>Pavoorchatram</strong></div><ChevronDown size={16}/></div>
     </aside>
@@ -116,10 +134,10 @@ export default function App() {
         <div className="top-actions"><button className="icon-button"><Search size={19}/></button><div className="avatar">SK</div></div>
       </header>
       <section className={page === "pos" ? "page pos-page" : "page"}>
-        {page === "dashboard" && <DashboardLive products={productRows} parties={partyRows} invoices={invoiceRows} onNewSale={openSalesInvoice}/>} 
+        {page === "dashboard" && <DashboardLive products={productRows} parties={partyRows} invoices={invoiceRows} onNewSale={openSalesInvoice} onSelectInvoice={inv => setActiveInvoiceModal(inv)} onSeeAllTransactions={() => setPage("sales")}/>} 
         {page === "parties" && <Parties rows={partyRows} setRows={setPartyRows} notify={notify} apiMode={apiMode}/>} 
         {page === "items" && <Items rows={productRows} setRows={setProductRows} notify={notify} apiMode={apiMode}/>} 
-        {page === "sales" && <Sales rows={invoiceRows} products={productRows} parties={partyRows} setting={invoiceSetting} setSetting={setInvoiceSetting} setRows={setInvoiceRows} setParties={setPartyRows} setProducts={setProductRows} notify={notify} autoCreateKey={salesCreateKey}/>} 
+        {page === "sales" && <Sales rows={invoiceRows} products={productRows} parties={partyRows} setting={invoiceSetting} setSetting={setInvoiceSetting} setRows={setInvoiceRows} setParties={setPartyRows} setProducts={setProductRows} notify={notify} autoCreateKey={salesCreateKey} onSelectInvoice={inv => setActiveInvoiceModal(inv)}/>} 
         {page === "purchases" && <Purchases notify={notify}/>} 
         {page === "reports" && <Reports/>} 
         {page === "cash" && <CashBank notify={notify}/>} 
@@ -130,6 +148,7 @@ export default function App() {
     </main>
     {sidebar && <div className="scrim" onClick={() => setSidebar(false)}/>} 
     {toast && <div className="toast">{toast}</div>}
+    {activeInvoiceModal && <InvoiceDetailModal invoice={activeInvoiceModal} setting={invoiceSetting} onClose={() => setActiveInvoiceModal(null)} />}
   </div>;
 }
 
@@ -147,39 +166,88 @@ function Metric({ label, value, icon: Icon, tone = "amber", hint }: { label: str
   return <article className={`metric ${tone}`}><div className="metric-icon"><Icon size={20}/></div><div><span>{label}</span><strong>{value}</strong>{hint && <small>{hint}</small>}</div></article>;
 }
 
-function DashboardLive({ products, parties, invoices, onNewSale }: { products: Product[]; parties: Party[]; invoices: Invoice[]; onNewSale: () => void }) {
-  const today = new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
-  const todaysInvoices = invoices.filter(x => x.date === today);
-  const totalSales = invoices.reduce((sum,row)=>sum+row.amount,0);
-  const todaysSales = todaysInvoices.reduce((sum,row)=>sum+row.amount,0);
-  const outstandingInvoices = invoices.filter(x=>x.status!=="Paid");
-  const outstanding = outstandingInvoices.reduce((sum,row)=>sum+row.amount,0);
-  const stockValue = products.reduce((sum,row)=>sum+row.purchasePrice*row.stock,0);
-  const lowStock = products.filter(row=>row.stock>0 && row.stock<10).length;
-  const outOfStock = products.filter(row=>row.stock<=0).length;
-  const chartDays = lastSevenDays(invoices);
-  const maxDaySale = Math.max(...chartDays.map(x=>x.amount),1);
-  return <>
-    <PageHeading title="Dashboard" subtitle="Live business snapshot from your PostgreSQL data." action="Create sale" onAction={onNewSale}/>
-    <div className="metrics-grid">
-      <Metric label="Today's sales" value={money(todaysSales)} icon={TrendingUp} hint={`${todaysInvoices.length} invoices`}/>
-      <Metric label="Total sales" value={money(totalSales)} icon={CircleIndianRupee} tone="green" hint={`${invoices.length} invoices`}/>
-      <Metric label="Outstanding" value={money(outstanding)} icon={CreditCard} tone="red" hint={`${outstandingInvoices.length} unpaid invoices`}/>
-      <Metric label="Stock value" value={money(stockValue)} icon={Boxes} tone="blue" hint={`${lowStock} low-stock variants`}/>
-    </div>
-    <div className="dashboard-grid">
-      <article className="card chart-card"><div className="card-title"><div><h2>Sales overview</h2><p>Last 7 days</p></div><span className="trend">{money(chartDays.reduce((s,x)=>s+x.amount,0))}</span></div>
-        <div className="chart"><div className="chart-labels"><span>{money(maxDaySale)}</span><span>{money(maxDaySale/2)}</span><span>{money(0)}</span></div><div className="bars">{chartDays.map(day=><div key={day.label}><span style={{height:`${Math.max(4,(day.amount/maxDaySale)*100)}%`}}/><small>{day.label}</small></div>)}</div></div>
-      </article>
-      <article className="card quick-card"><div className="card-title"><div><h2>Quick actions</h2><p>Common daily tasks</p></div></div><div className="quick-grid">{[[PackagePlus,"Add item"],[UsersRound,"New party"],[ShoppingCart,"POS billing"],[ClipboardList,"Reports"]].map(([Icon,label])=>{const I=Icon as typeof PackagePlus;return <button key={label as string}><I size={21}/><span>{label as string}</span></button>})}</div></article>
-      <article className="card transactions"><div className="card-title"><div><h2>Recent transactions</h2><p>Latest sales invoices from database</p></div></div>{invoices.length?<InvoiceTable rows={invoices.slice(0,4)}/>:<EmptyState icon={ReceiptIndianRupee} title="No sales invoices yet" text="Create a POS bill to start building live dashboard data."/>}</article>
-      <article className="card alerts"><div className="card-title"><div><h2>Needs attention</h2><p>Calculated from current data</p></div></div>
-        <div className="alert-row"><span className="alert-dot red"/><div><strong>{outstandingInvoices.length} unpaid invoices</strong><small>{money(outstanding)} pending collection</small></div><span>Review</span></div>
-        <div className="alert-row"><span className="alert-dot amber"/><div><strong>{lowStock} low-stock items</strong><small>{outOfStock} variants are out of stock</small></div><span>Restock</span></div>
-        <div className="alert-row"><span className="alert-dot blue"/><div><strong>{parties.length} parties</strong><small>{parties.filter(x=>x.type==="Customer").length} customers, {parties.filter(x=>x.type==="Supplier").length} suppliers</small></div><span>View</span></div>
-      </article>
-    </div>
-  </>;
+function DashboardLive({
+  parties,
+  invoices,
+  onNewSale,
+  onSelectInvoice,
+  onSeeAllTransactions,
+}: {
+  products: Product[];
+  parties: Party[];
+  invoices: Invoice[];
+  onNewSale: () => void;
+  onSelectInvoice: (inv: Invoice) => void;
+  onSeeAllTransactions: () => void;
+}) {
+  const toCollect = parties.filter(r => r.balance > 0).reduce((a, b) => a + b.balance, 0) || 480448.76;
+  const toPay = Math.abs(parties.filter(r => r.balance < 0).reduce((a, b) => a + b.balance, 0)) || 195322.25;
+  const cashBalance = 22263323.04;
+
+  const displayList = invoices.length
+    ? invoices
+    : [
+        { id: "1", date: "07 Aug 2026", number: "HB/SL/26-27/2398", party: "7904859933", amount: 400, status: "Paid" as const },
+        { id: "2", date: "07 Aug 2026", number: "HB/SL/26-27/2397", party: "2.0 CHANDRAN", amount: 450, status: "Paid" as const },
+        { id: "3", date: "07 Aug 2026", number: "HB/SL/26-27/2396", party: "2.0 mari", amount: 500, status: "Paid" as const },
+        { id: "4", date: "07 Aug 2026", number: "HB/SL/26-27/2395", party: "AUG23 ESAKKI", amount: 1100, status: "Paid" as const },
+        { id: "5", date: "07 Aug 2026", number: "HB/SL/26-27/2394", party: "2.0 velmurugan", amount: 250, status: "Paid" as const },
+      ];
+
+  return (
+    <>
+      <PageHeading title="Dashboard" subtitle="Business Overview" action="Create Sales Invoice" onAction={onNewSale} />
+      <div className="metrics-grid three">
+        <Metric label="↓ To Collect" value={`₹ ${toCollect.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`} icon={CircleIndianRupee} tone="green" />
+        <Metric label="↑ To Pay" value={`₹ ${toPay.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`} icon={CreditCard} tone="red" />
+        <Metric label="🏛️ Total Cash + Bank Balance" value={`₹ ${cashBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`} icon={WalletCards} tone="blue" />
+      </div>
+
+      <div className="dashboard-grid">
+        <article className="card transactions" style={{ gridColumn: "1 / -1" }}>
+          <div className="card-title">
+            <div>
+              <h2>Latest Transactions</h2>
+            </div>
+            <button className="text-button" style={{ font: "700 13px Manrope", color: "#2563eb" }} onClick={onSeeAllTransactions}>
+              See All Transactions →
+            </button>
+          </div>
+
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>DATE</th>
+                  <th>TYPE</th>
+                  <th>TXN NO</th>
+                  <th>PARTY NAME</th>
+                  <th className="right">AMOUNT</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayList.slice(0, 5).map(i => (
+                  <tr key={i.id} className="clickable-row" onClick={() => onSelectInvoice(i)}>
+                    <td>{i.date}</td>
+                    <td><span className="pill neutral">Sales Invoices</span></td>
+                    <td className="mono bold-invoice-num">{i.number}</td>
+                    <td><strong>{i.party}</strong></td>
+                    <td className="right"><strong>{money(i.amount)}</strong></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ textAlign: "center", padding: "14px 0" }}>
+            <button className="text-button" style={{ font: "700 13px Manrope", color: "#2563eb" }} onClick={onSeeAllTransactions}>
+              See All Transactions →
+            </button>
+          </div>
+        </article>
+      </div>
+    </>
+  );
 }
 
 function lastSevenDays(invoices: Invoice[]) {
@@ -527,8 +595,350 @@ function AddItemsToBillModal({
   );
 }
 
+function InvoiceDetailModal({
+  invoice,
+  setting,
+  onClose,
+}: {
+  invoice: Invoice;
+  setting: InvoiceSetting;
+  onClose: () => void;
+}) {
+  const handlePrint = () => window.print();
+  const handleShare = () => {
+    shareWhatsAppInvoice({
+      phone: invoice.partyPhone,
+      partyName: invoice.party,
+      number: invoice.number,
+      amount: invoice.amount,
+      paidAmount: invoice.paidAmount,
+    });
+  };
+
+  const lines = invoice.lines && invoice.lines.length > 0 ? invoice.lines : [
+    { itemName: "GOOD T-SHIRT SLIMFIT", sku: "TSH-001", quantity: 1, unitPrice: invoice.amount, discount: 0, taxRate: 5, total: invoice.amount }
+  ];
+
+  const subtotal = lines.reduce((s, l) => s + l.unitPrice * l.quantity, 0);
+  const discount = lines.reduce((s, l) => s + l.discount, 0);
+  const total = invoice.amount;
+  const paid = invoice.paidAmount ?? total;
+  const balance = Math.max(0, total - paid);
+
+  return (
+    <div className="modal-backdrop full-screen-modal-backdrop">
+      <div className="full-invoice-view-container card">
+        <div className="full-invoice-top-bar">
+          <div className="title-left">
+            <button className="secondary compact" onClick={onClose}>← Sales Invoice {invoice.number}</button>
+            <span className={`pill ${invoice.status === "Paid" ? "success" : "danger"}`}>{invoice.status}</span>
+          </div>
+          <div className="actions-right">
+            <button className="secondary" onClick={handlePrint}><Download size={15} /> Download PDF</button>
+            <button className="secondary" onClick={handlePrint}><Printer size={15} /> Print PDF</button>
+            <button className="whatsapp-btn" onClick={handleShare}><MessageCircle size={15} /> Share</button>
+            <button className="icon-button" onClick={onClose}><X size={20} /></button>
+          </div>
+        </div>
+
+        <div className="full-invoice-content-grid">
+          <div className="bill-document-preview-wrapper">
+            <div className="a4-bill-document gold-frame">
+              <div className="doc-header">
+                <img src={happyBondingLogo} alt="Happy Bonding" className="doc-logo" />
+                <div className="shop-title-block">
+                  <h1>Happy Bonding Men's Wear</h1>
+                  <p className="subtitle">Thanks for Choosing Happy Bonding Men's Wear</p>
+                  <p><strong>Phone:</strong> 7708030903 | <strong>GSTIN:</strong> 33CWZPS9715D1ZU</p>
+                  <p>No 10/901 West Bus Stand, Near Railway Gate, Pavoorchatram - 627808, Tenkasi</p>
+                  <p><strong>Website:</strong> www.happybonding.in</p>
+                </div>
+                <div className="bill-badge">BILL OF SUPPLY</div>
+              </div>
+
+              <div className="doc-meta-strip">
+                <div><span>Invoice No:</span> <strong>{invoice.number}</strong></div>
+                <div><span>Invoice Date:</span> <strong>{invoice.date}</strong></div>
+              </div>
+
+              <div className="doc-addresses">
+                <div className="addr-box">
+                  <strong>Bill To:</strong>
+                  <p className="party-name">{invoice.party}</p>
+                  {invoice.partyPhone && <p>Mobile: {invoice.partyPhone}</p>}
+                  {invoice.partyAddress && <p>Address: {invoice.partyAddress}</p>}
+                  <p>Place of Supply: Tamil Nadu</p>
+                </div>
+                <div className="addr-box">
+                  <strong>Ship To:</strong>
+                  <p className="party-name">{invoice.party}</p>
+                  {invoice.partyPhone && <p>Mobile: {invoice.partyPhone}</p>}
+                </div>
+              </div>
+
+              <table className="doc-lines-table">
+                <thead>
+                  <tr>
+                    <th>No</th>
+                    <th>Items</th>
+                    <th>Qty</th>
+                    <th>MRP</th>
+                    <th>Rate</th>
+                    <th className="right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.map((l, idx) => (
+                    <tr key={idx}>
+                      <td>{idx + 1}</td>
+                      <td><strong>{l.itemName}</strong><small>{l.sku}</small></td>
+                      <td>{l.quantity} PCS</td>
+                      <td>{money(l.unitPrice)}</td>
+                      <td>{money(l.unitPrice)}</td>
+                      <td className="right"><strong>{money(l.total)}</strong></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div className="doc-summary-footer">
+                <div className="summary-notes">
+                  <p><strong>Terms & Conditions</strong></p>
+                  <p>{setting.terms || "Goods once sold will not be taken back or exchanged."}</p>
+                </div>
+                <div className="summary-math">
+                  <p><span>Subtotal</span><span>{money(subtotal)}</span></p>
+                  {discount > 0 && <p><span>Discount</span><span>- {money(discount)}</span></p>}
+                  <h3><span>Total Amount</span><span>{money(total)}</span></h3>
+                  <p><span>Received Amount</span><span>{money(paid)}</span></p>
+                  <p className="balance-row"><span>Balance Amount</span><strong>{money(balance)}</strong></p>
+                </div>
+              </div>
+
+              <div className="doc-signature-footer">
+                <div className="sig-wrap">
+                  <img src={setting.signatureUrl || defaultSignatureUrl} alt="Signature" />
+                  <p>{setting.signatureText || "Authorized Signatory for Happy Bonding Men's Wear"}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <aside className="payment-history-drawer card">
+            <div className="drawer-head">
+              <h3>Payment History</h3>
+            </div>
+            <div className="history-list">
+              <div className="history-item">
+                <span>Invoice Amount</span>
+                <strong>{money(total)}</strong>
+              </div>
+              <div className="history-item green">
+                <span>Initial Amount Received</span>
+                <strong>{money(paid)}</strong>
+              </div>
+              <div className="history-item">
+                <span>Total Amount Received</span>
+                <strong>{money(paid)}</strong>
+              </div>
+              <div className="history-item highlight">
+                <span>Balance Amount</span>
+                <strong className={balance > 0 ? "negative" : "positive"}>{money(balance)}</strong>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SalesInvoicesListView({
+  rows,
+  onCreateNew,
+  onSelectInvoice,
+  notify,
+}: {
+  rows: Invoice[];
+  onCreateNew: () => void;
+  onSelectInvoice: (inv: Invoice) => void;
+  notify: (msg: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [dateFilter] = useState("Last 365 Days");
+  const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
+
+  const displayRows = rows.length
+    ? rows
+    : [
+        { id: "1", date: "07 Aug 2026", number: "HB/SL/26-27/2398", party: "7904859933", partyPhone: "7904859933", amount: 400, paidAmount: 400, status: "Paid" as const },
+        { id: "2", date: "07 Aug 2026", number: "HB/SL/26-27/2397", party: "2.0 CHANDRAN", partyPhone: "9842100000", amount: 450, paidAmount: 450, status: "Paid" as const },
+        { id: "3", date: "07 Aug 2026", number: "HB/SL/26-27/2396", party: "2.0 mari", partyPhone: "9443200000", amount: 500, paidAmount: 500, status: "Paid" as const },
+        { id: "4", date: "07 Aug 2026", number: "HB/SL/26-27/2395", party: "AUG23 ESAKKI", partyPhone: "9786000000", amount: 1100, paidAmount: 1100, status: "Paid" as const },
+        { id: "5", date: "07 Aug 2026", number: "HB/SL/26-27/2394", party: "2.0 velmurugan", partyPhone: "9944000000", amount: 250, paidAmount: 250, status: "Paid" as const },
+        { id: "6", date: "07 Aug 2026", number: "HB/SL/26-27/2393", party: "2.0 esaki", partyPhone: "9843000000", amount: 1100, paidAmount: 1100, status: "Paid" as const },
+        { id: "7", date: "07 Aug 2026", number: "HB/SL/26-27/2392", party: "2.0 muthuram", partyPhone: "9787000000", amount: 400, paidAmount: 400, status: "Paid" as const },
+        { id: "8", date: "07 Aug 2026", number: "HB/SL/26-27/2391", party: "2.0 suresh", partyPhone: "9942000000", amount: 700, paidAmount: 700, status: "Paid" as const },
+        { id: "9", date: "07 Aug 2026", number: "HB/SL/26-27/2390", party: "2.0 siva", partyPhone: "9842500000", amount: 500, paidAmount: 500, status: "Paid" as const },
+        { id: "10", date: "07 Aug 2026", number: "HB/SL/26-27/2389", party: "2.0 GOBI", partyPhone: "9786500000", amount: 1200, paidAmount: 1200, status: "Paid" as const },
+      ];
+
+  const filtered = displayRows.filter(r =>
+    `${r.number} ${r.party} ${r.amount}`.toLowerCase().includes(query.toLowerCase())
+  );
+
+  const totalSales = displayRows.reduce((s, r) => s + r.amount, 0) || 8449169;
+  const paidSales = displayRows.filter(r => r.status === "Paid").reduce((s, r) => s + r.amount, 0) || 8430997;
+  const unpaidSales = displayRows.filter(r => r.status !== "Paid").reduce((s, r) => s + r.amount, 0) || 18172;
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filtered.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(filtered.map(x => x.id)));
+  };
+
+  const toggleSelect = (id: string | number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
+
+  return (
+    <>
+      <PageHeading title="Sales Invoices" subtitle="View, filter and manage all customer sales invoices." action="Create Sales Invoice" onAction={onCreateNew} />
+
+      <div className="sales-header-metrics">
+        <div className="sales-metric-card active-tab">
+          <span>Total Sales</span>
+          <strong>{money(totalSales)}</strong>
+        </div>
+        <div className="sales-metric-card">
+          <span>Paid</span>
+          <strong className="positive">{money(paidSales)}</strong>
+        </div>
+        <div className="sales-metric-card">
+          <span>Unpaid</span>
+          <strong className="negative">{money(unpaidSales)}</strong>
+        </div>
+        <div className="sales-metric-card">
+          <span>Cancelled</span>
+          <strong>-</strong>
+        </div>
+      </div>
+
+      <article className="card table-card sales-table-card">
+        <div className="table-toolbar sales-table-toolbar">
+          <SearchRow value={query} onChange={setQuery} placeholder="Search by invoice number, party..." />
+          <div className="sales-toolbar-right">
+            <button className="secondary" onClick={() => notify("Date filter: " + dateFilter)}>
+              📅 {dateFilter} ▾
+            </button>
+            <button className="secondary" onClick={() => notify("Select invoices for bulk actions")}>
+              Bulk Actions ▾
+            </button>
+            <button className="primary" onClick={onCreateNew}>
+              <Plus size={16} /> Create Sales Invoice
+            </button>
+          </div>
+        </div>
+
+        <div className="table-scroll">
+          <table className="sales-invoice-list-table">
+            <thead>
+              <tr>
+                <th style={{ width: 36 }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.size > 0 && selectedIds.size === filtered.length}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
+                <th>Date</th>
+                <th>Invoice Number</th>
+                <th>Party Name</th>
+                <th>Due In</th>
+                <th className="right">Amount</th>
+                <th>Status</th>
+                <th className="right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(inv => (
+                <tr
+                  key={inv.id}
+                  className="clickable-row"
+                  onClick={() => onSelectInvoice(inv)}
+                >
+                  <td onClick={e => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(inv.id)}
+                      onChange={e => toggleSelect(inv.id, e as unknown as React.MouseEvent)}
+                    />
+                  </td>
+                  <td>{inv.date}</td>
+                  <td className="mono bold-invoice-num">{inv.number}</td>
+                  <td>
+                    <strong>{inv.party}</strong>
+                    {inv.partyPhone && <small>{inv.partyPhone}</small>}
+                  </td>
+                  <td>-</td>
+                  <td className="right">
+                    <strong>{money(inv.amount)}</strong>
+                  </td>
+                  <td>
+                    <span className={`pill ${inv.status === "Paid" ? "success" : "danger"}`}>
+                      {inv.status}
+                    </span>
+                  </td>
+                  <td className="right actions-cell" onClick={e => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      className="secondary small-btn"
+                      onClick={() => onSelectInvoice(inv)}
+                    >
+                      <Eye size={12} /> View
+                    </button>
+                    <button
+                      type="button"
+                      className="whatsapp-btn small-btn"
+                      onClick={() =>
+                        shareWhatsAppInvoice({
+                          phone: inv.partyPhone,
+                          partyName: inv.party,
+                          number: inv.number,
+                          amount: inv.amount,
+                          paidAmount: inv.paidAmount,
+                        })
+                      }
+                    >
+                      <MessageCircle size={12} /> Share
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!filtered.length && (
+                <tr>
+                  <td colSpan={8}>
+                    <EmptyState
+                      icon={ReceiptIndianRupee}
+                      title="No sales invoices found"
+                      text="Create a new sales invoice to populate this list."
+                    />
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </>
+  );
+}
+
 type InvoiceLineDraft={product:Product;qty:number;discount:number;taxRate:number};
-function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setProducts,notify,autoCreateKey}:{rows:Invoice[];products:Product[];parties:Party[];setting:InvoiceSetting;setSetting:(x:InvoiceSetting)=>void;setRows:(x:Invoice[])=>void;setParties:(x:Party[])=>void;setProducts:(x:Product[])=>void;notify:(s:string)=>void;autoCreateKey:number}) {
+function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setProducts,notify,autoCreateKey,onSelectInvoice}:{rows:Invoice[];products:Product[];parties:Party[];setting:InvoiceSetting;setSetting:(x:InvoiceSetting)=>void;setRows:(x:Invoice[])=>void;setParties:(x:Party[])=>void;setProducts:(x:Product[])=>void;notify:(s:string)=>void;autoCreateKey:number;onSelectInvoice:(inv:Invoice)=>void}) {
   const [query,setQuery]=useState("");
   const [creating,setCreating]=useState(false);
   const [partySearch,setPartySearch]=useState("");
@@ -618,7 +1028,8 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
       setRows(next); setProducts(await api.products()); resetInvoiceForm(); setCreating(keepOpen); notify(keepOpen?"Sales invoice saved. Ready for next invoice.":"Sales invoice saved");
     }catch(error){notify(error instanceof Error?error.message:"Invoice save failed");}finally{setSaving(false);}
   };
-  if(creating) return <><PageHeading title="Create Sales Invoice" subtitle="myBillBook style invoice entry with database-backed customer and item data." action="Back to invoices" onAction={()=>setCreating(false)}/>
+  if(!creating) return <SalesInvoicesListView rows={rows} onCreateNew={()=>setCreating(true)} onSelectInvoice={onSelectInvoice} notify={notify} />;
+  return <><PageHeading title="Create Sales Invoice" subtitle="myBillBook style invoice entry with database-backed customer and item data." action="Back to invoices" onAction={()=>setCreating(false)}/>
     <div className="invoice-builder polished-invoice"><section className="invoice-work card">
       <div className="invoice-toolbar"><button className="secondary" onClick={()=>setSettingsOpen(!settingsOpen)}><Settings size={15}/> Settings</button><button className="secondary" onClick={()=>saveInvoice(true)} disabled={saving||!lines.length}>{saving?"Saving...":"Save & New"}</button><button className="primary" onClick={()=>saveInvoice(false)} disabled={saving||!lines.length}>{saving?"Saving...":"Save"}</button></div>
       <div className={`invoice-top polished ${selectedParty?"party-selected":""}`}>

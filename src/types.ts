@@ -14,9 +14,30 @@ export interface Party {
   customBirthday?: string; customKovilThiruvila?: string;
 }
 
+export interface InvoiceLineItem {
+  itemName: string;
+  sku: string;
+  quantity: number;
+  unitPrice: number;
+  discount: number;
+  taxRate: number;
+  total: number;
+}
+
 export interface Invoice {
-  id: string | number; number: string; date: string; party: string; amount: number;
+  id: string | number;
+  number: string;
+  date: string;
+  party: string;
+  partyPhone?: string;
+  partyAddress?: string;
+  partyGstin?: string;
+  amount: number;
+  paidAmount?: number;
+  paymentMode?: string;
   status: "Paid" | "Partially paid" | "Unpaid";
+  dueDays?: number;
+  lines?: InvoiceLineItem[];
 }
 
 export interface InvoiceSetting {

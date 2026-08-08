@@ -18,7 +18,24 @@ type LoginResult = { token: string; branchIds: string[]; user: { id: string; nam
 type PartyRow = { id:string; name:string; phone:string|null; type:string; openingBalance:string; openingBalanceType?:string|null; email?:string|null; gstin?:string|null; pan?:string|null; category?:string|null; address?:string|null; shippingAddress?:string|null; sameAsBilling?:boolean|null; creditPeriodDays?:number|null; creditLimit?:string|null; contactPersonName?:string|null; contactPersonDob?:string|null; bankName?:string|null; bankAccountName?:string|null; bankAccountNumber?:string|null; bankIfsc?:string|null; bankBranch?:string|null; customBirthday?:string|null; customKovilThiruvila?:string|null };
 type PartyInput = Partial<Omit<Party, "id" | "balance">> & { name: string; phone?: string; type: Party["type"]; openingBalance?: number };
 type ProductRow = { id:string;sku:string;size:string|null;purchasePrice:string;sellingPrice:string;mrp:string;product:{name:string;category:string;hsnCode:string;taxRate:{rate:string}};balances:Array<{quantity:string}> };
-type SalesRow = {id:string;invoiceNumber:string;invoiceDate:string;party:{name:string}|null;grandTotal:string;paymentStatus:string};
+type SalesRow = {
+  id: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  party: { name: string; phone?: string | null; address?: string | null; gstin?: string | null } | null;
+  grandTotal: string;
+  paidAmount?: string;
+  paymentStatus: string;
+  lines?: Array<{
+    itemName: string;
+    sku: string;
+    quantity: number;
+    unitPrice: string;
+    discount: string;
+    taxRate: string;
+    total: string;
+  }>;
+};
 
 async function request<T>(path: string, options?: RequestInit, isRetry = false): Promise<T> {
   const token = localStorage.getItem(TOKEN_KEY);
@@ -83,7 +100,29 @@ export const api = {
 
 function partyFromApi(x: PartyRow): Party { return { id:x.id,name:x.name,phone:x.phone??"",type:x.type==="SUPPLIER"?"Supplier":"Customer",balance:Number(x.openingBalance),openingBalanceType:x.openingBalanceType==="TO_PAY"?"TO_PAY":"TO_COLLECT",email:x.email??"",gstin:x.gstin??"",pan:x.pan??"",category:x.category??"",address:x.address??"",shippingAddress:x.shippingAddress??"",sameAsBilling:x.sameAsBilling??true,creditPeriodDays:x.creditPeriodDays??30,creditLimit:Number(x.creditLimit??0),contactPersonName:x.contactPersonName??"",contactPersonDob:x.contactPersonDob??"",bankName:x.bankName??"",bankAccountName:x.bankAccountName??"",bankAccountNumber:x.bankAccountNumber??"",bankIfsc:x.bankIfsc??"",bankBranch:x.bankBranch??"",customBirthday:x.customBirthday??"",customKovilThiruvila:x.customKovilThiruvila??""}; }
 function productFromApi(x: ProductRow): Product { return {id:x.id,name:x.product.name,sku:x.sku,category:x.product.category,size:x.size??"-",stock:Number(x.balances[0]?.quantity??0),purchasePrice:Number(x.purchasePrice),sellingPrice:Number(x.sellingPrice),mrp:Number(x.mrp),hsnCode:x.product.hsnCode,taxRate:Number(x.product.taxRate.rate)}; }
-function saleFromApi(x: SalesRow): Invoice { return {id:x.id,number:x.invoiceNumber,date:new Date(x.invoiceDate).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}),party:x.party?.name??"Cash Sale",amount:Number(x.grandTotal),status:x.paymentStatus==="PAID"?"Paid":x.paymentStatus==="UNPAID"?"Unpaid":"Partially paid"}; }
+function saleFromApi(x: SalesRow): Invoice {
+  return {
+    id: x.id,
+    number: x.invoiceNumber,
+    date: new Date(x.invoiceDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+    party: x.party?.name ?? "Cash Sale",
+    partyPhone: x.party?.phone ?? "",
+    partyAddress: x.party?.address ?? "",
+    partyGstin: x.party?.gstin ?? "",
+    amount: Number(x.grandTotal),
+    paidAmount: Number(x.paidAmount ?? x.grandTotal),
+    status: x.paymentStatus === "PAID" ? "Paid" : x.paymentStatus === "UNPAID" ? "Unpaid" : "Partially paid",
+    lines: (x.lines ?? []).map(l => ({
+      itemName: l.itemName,
+      sku: l.sku,
+      quantity: Number(l.quantity),
+      unitPrice: Number(l.unitPrice),
+      discount: Number(l.discount),
+      taxRate: Number(l.taxRate),
+      total: Number(l.total),
+    })),
+  };
+}
 function formatApiError(body: unknown) {
   if (body && typeof body === "object" && "details" in body && Array.isArray((body as { details: unknown }).details)) {
     const issue = (body as { details: Array<{ path?: Array<string | number>; message?: string }> }).details[0];
