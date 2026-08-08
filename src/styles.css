@@ -690,83 +690,56 @@ body{background:#fffdf7;color:#140d08}.sidebar{background:linear-gradient(180deg
   border: 1px solid #facc15;
 }
 
-/* Print-specific Styles for Clean A4 Bill Output (Matching User Image 2) */
+/* Print-specific Styles for Guaranteed Single Page A4 Output */
 @media print {
-  /* Hide all app chrome, sidebars, topbars, buttons, drawers, and toasts */
-  .sidebar,
-  .topbar,
-  .full-invoice-top-bar,
-  .payment-history-drawer,
-  .modal-backdrop:not(.full-screen-modal-backdrop),
-  .scrim,
-  .toast,
-  .sales-header-metrics,
-  .page-heading,
-  header,
-  aside,
-  nav {
-    display: none !important;
+  @page {
+    size: A4 portrait;
+    margin: 0mm;
   }
 
-  /* Reset document body and app shell for printing */
-  html, body, .app-shell, main, .page {
-    background: #ffffff !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-    height: auto !important;
-    min-height: auto !important;
-    overflow: visible !important;
+  /* Hide entire page DOM by default to prevent page breaks or extra pages */
+  body * {
+    visibility: hidden !important;
   }
 
-  /* Expand full invoice view container */
-  .full-screen-modal-backdrop {
-    position: static !important;
-    background: transparent !important;
-    padding: 0 !important;
-    inset: auto !important;
-    display: block !important;
-    width: 100% !important;
+  /* Show ONLY the A4 Bill Document and its contents */
+  .a4-bill-document,
+  .a4-bill-document * {
+    visibility: visible !important;
   }
 
-  .full-invoice-view-container {
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    background: #ffffff !important;
-    height: auto !important;
-    max-width: 100% !important;
-    width: 100% !important;
-    display: block !important;
-  }
-
-  .full-invoice-content-grid {
-    display: block !important;
-    width: 100% !important;
-  }
-
-  .bill-document-preview-wrapper {
-    background: #ffffff !important;
-    padding: 0 !important;
-    display: block !important;
-    overflow: visible !important;
-  }
-
+  /* Position A4 Bill Document cleanly on Page 1 */
   .a4-bill-document {
-    width: 100% !important;
-    max-width: 100% !important;
+    position: absolute !important;
+    left: 10mm !important;
+    top: 8mm !important;
+    right: 10mm !important;
+    width: calc(100% - 20mm) !important;
+    max-width: none !important;
     min-height: auto !important;
+    margin: 0 !important;
+    padding: 20px !important;
     box-shadow: none !important;
-    margin: 0 auto !important;
-    padding: 24px !important;
     box-sizing: border-box !important;
+    background: #ffffff !important;
     page-break-inside: avoid !important;
+    page-break-before: avoid !important;
+    page-break-after: avoid !important;
   }
 
   .a4-bill-document.gold-frame {
-    border: 6px double #d4af37 !important;
+    border: 5px double #d4af37 !important;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: 100% !important;
+    overflow: hidden !important;
   }
 }
+
 
 
 
