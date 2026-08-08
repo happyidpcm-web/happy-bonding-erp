@@ -193,4 +193,12 @@ app.get("*", (req, res) => {
 });
 
 const port = Number(process.env.PORT || env.API_PORT || 4000);
-app.listen(port, "0.0.0.0", () => console.log(`Happy Bonding API running on 0.0.0.0:${port}`));
+app.listen(port, "0.0.0.0", () => {
+  console.log(`Happy Bonding API running on 0.0.0.0:${port}`);
+  import("child_process").then(({ exec }) => {
+    exec("npx prisma db push && tsx prisma/seed.ts", (err, stdout) => {
+      if (err) console.error("Auto DB push/seed warning:", err.message);
+      else console.log("Auto DB push & seed result:", stdout);
+    });
+  });
+});
