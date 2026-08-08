@@ -1,6 +1,16 @@
 import type { Invoice, InvoiceSetting, Party, Product } from "./types";
 
-const baseUrl = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
+const getBaseUrl = () => {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  if (typeof window !== "undefined") {
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return "http://localhost:4000/api";
+    }
+    return `${window.location.origin}/api`;
+  }
+  return "http://localhost:4000/api";
+};
+const baseUrl = getBaseUrl();
 const TOKEN_KEY = "hb_erp_token";
 const BRANCH_KEY = "hb_erp_branch";
 
