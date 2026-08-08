@@ -690,4 +690,83 @@ body{background:#fffdf7;color:#140d08}.sidebar{background:linear-gradient(180deg
   border: 1px solid #facc15;
 }
 
+/* Print-specific Styles for Clean A4 Bill Output (Matching User Image 2) */
+@media print {
+  /* Hide all app chrome, sidebars, topbars, buttons, drawers, and toasts */
+  .sidebar,
+  .topbar,
+  .full-invoice-top-bar,
+  .payment-history-drawer,
+  .modal-backdrop:not(.full-screen-modal-backdrop),
+  .scrim,
+  .toast,
+  .sales-header-metrics,
+  .page-heading,
+  header,
+  aside,
+  nav {
+    display: none !important;
+  }
+
+  /* Reset document body and app shell for printing */
+  html, body, .app-shell, main, .page {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Expand full invoice view container */
+  .full-screen-modal-backdrop {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    inset: auto !important;
+    display: block !important;
+    width: 100% !important;
+  }
+
+  .full-invoice-view-container {
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    height: auto !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    display: block !important;
+  }
+
+  .full-invoice-content-grid {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  .bill-document-preview-wrapper {
+    background: #ffffff !important;
+    padding: 0 !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  .a4-bill-document {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    box-shadow: none !important;
+    margin: 0 auto !important;
+    padding: 24px !important;
+    box-sizing: border-box !important;
+    page-break-inside: avoid !important;
+  }
+
+  .a4-bill-document.gold-frame {
+    border: 6px double #d4af37 !important;
+  }
+}
+
+
 
