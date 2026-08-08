@@ -664,6 +664,27 @@ body{background:#fffdf7;color:#140d08}.sidebar{background:linear-gradient(180deg
   color: #374151;
   font-family: 'Manrope', -apple-system, sans-serif;
   line-height: 1.4;
+  position: relative;
+}
+.gold-ornament {
+  position: absolute;
+  pointer-events: none;
+}
+.gold-ornament.top-left {
+  top: 6px;
+  left: 6px;
+}
+.gold-ornament.top-right {
+  top: 6px;
+  right: 6px;
+}
+.gold-ornament.bottom-right {
+  bottom: 6px;
+  right: 6px;
+}
+.gold-ornament.bottom-left {
+  bottom: 6px;
+  left: 6px;
 }
 .flex-header {
   display: flex;

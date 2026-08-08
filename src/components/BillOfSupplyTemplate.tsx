@@ -1,7 +1,6 @@
 import React from "react";
 import happyBondingLogo from "../assets/happy-bonding-logo-white.png";
 import type { Invoice, InvoiceSetting } from "../types";
-import { money } from "../data";
 
 const defaultSignatureUrl = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 70" width="220" height="60"><path d="M10 45 C30 10, 45 5, 55 45 C65 25, 75 15, 85 45 C95 10, 110 30, 130 40 C140 15, 155 25, 175 35 C185 10, 205 35, 240 15" stroke="%23111827" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M25 50 C80 48, 140 52, 210 48" stroke="%23111827" stroke-width="1.5" fill="none"/><text x="35" y="65" font-family="cursive, sans-serif" font-size="18" font-weight="bold" fill="%23111827">M. Saravana</text></svg>`;
 
@@ -18,7 +17,26 @@ export function numberToWords(num: number): string {
     if (n < 10000000) return inWords(Math.floor(n / 100000)) + " Lakh" + (n % 100000 !== 0 ? " " + inWords(n % 100000) : "");
     return inWords(Math.floor(n / 10000000)) + " Crore" + (n % 10000000 !== 0 ? " " + inWords(n % 10000000) : "");
   }
-  return inWords(Math.floor(num)) + " Rupees Only";
+  return inWords(Math.floor(num)) + " Rupees";
+}
+
+function CornerFiligree() {
+  const ornament = (
+    <svg width="22" height="22" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M2 2 H14 C20 2, 28 10, 28 16 V28" stroke="#d4af37" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M5 5 H12 C16 5, 23 12, 23 16 V23" stroke="#d4af37" strokeWidth="1" strokeLinecap="round"/>
+      <circle cx="8" cy="8" r="1.5" fill="#d4af37"/>
+    </svg>
+  );
+
+  return (
+    <>
+      <div className="gold-ornament top-left">{ornament}</div>
+      <div className="gold-ornament top-right">{ornament}</div>
+      <div className="gold-ornament bottom-right">{ornament}</div>
+      <div className="gold-ornament bottom-left">{ornament}</div>
+    </>
+  );
 }
 
 export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: Invoice; setting: InvoiceSetting }>(
@@ -35,7 +53,9 @@ export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: 
     const balance = Math.max(0, total - paid);
 
     return (
-      <div ref={ref} className="a4-bill-document gold-frame bill-of-supply-template">
+      <div ref={ref} className="a4-bill-document gold-frame bill-of-supply-template exact-ref-design">
+        <CornerFiligree />
+
         {/* Header Section */}
         <div className="doc-header flex-header">
           <div className="header-left">
@@ -48,7 +68,7 @@ export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: 
                 <span><strong>GSTIN</strong> 33CWZPS9715D1ZU</span>
               </p>
               <p className="phone-line">📞 7708030903</p>
-              <p className="addr-line">No. 10/901,West Bus Stand, Near Railway Gate, Pavoorchatram - 627808 , Tirunelveli, Tamil Nadu, 627808</p>
+              <p className="addr-line">📍 No. 10/901,West Bus Stand, Near Railway Gate, Pavoorchatram - 627808 , Tirunelveli, Tamil Nadu, 627808</p>
               <p className="web-line">happy bonding: <strong>www.happybonding.in</strong></p>
             </div>
           </div>
@@ -91,10 +111,10 @@ export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: 
         <table className="doc-lines-table purple-header-table">
           <thead>
             <tr>
-              <th style={{ width: 40 }}>No</th>
+              <th style={{ width: 45, textAlign: "center" }}>No</th>
               <th>Items</th>
               <th style={{ width: 80, textAlign: "center" }}>Qty.</th>
-              <th style={{ width: 90, textAlign: "right" }}>MRP</th>
+              <th style={{ width: 100, textAlign: "right" }}>MRP</th>
               <th style={{ width: 90, textAlign: "right" }}>Rate</th>
               <th style={{ width: 100, textAlign: "right" }}>Total</th>
             </tr>
@@ -123,9 +143,9 @@ export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: 
 
         {/* Subtotal Bar */}
         <div className="purple-subtotal-bar">
-          <span>SUBTOTAL</span>
-          <span>{totalQty}</span>
-          <span className="right-subtotal">₹ {subtotal}</span>
+          <span className="subtotal-label">SUBTOTAL</span>
+          <span className="subtotal-qty">{totalQty}</span>
+          <span className="subtotal-amount">₹ {subtotal}</span>
         </div>
 
         {/* Summary Footer */}
