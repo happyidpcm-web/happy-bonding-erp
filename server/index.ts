@@ -3,7 +3,7 @@ import express from "express";
 import path from "path";
 import cors from "cors";
 import helmet from "helmet";
-import { compare } from "bcryptjs";
+import { compare, hash } from "bcryptjs";
 import { Prisma, PaymentStatus } from "@prisma/client";
 import { ZodError } from "zod";
 import { db } from "./db.js";
@@ -18,9 +18,39 @@ app.use(express.json({ limit: "25mb" }));
 
 app.get("/api/health", (_req, res) => res.json({ ok: true, service: "happy-bonding-api" }));
 
+async function ensureAdminUser() {
+  try {
+    const passwordHash = await hash("HappyBonding@2026", 12);
+    const organization = await db.organization.upsert({
+      where: { id: "happy-bonding" }, update: {},
+      create: { id: "happy-bonding", name: "Happy Bonding Men's Wear", phone: "7708030903", gstin: "33CWZPS9715D1ZU", pan: "CWZPS9715D", stateCode: "33" },
+    });
+    const branch = await db.branch.upsert({
+      where: { organizationId_code: { organizationId: organization.id, code: "PAV" } }, update: {},
+      create: { organizationId: organization.id, code: "PAV", name: "Pavoorchatram", address: "No. 10/901, West Bus Stand, Near Railway Gate, Pavoorchatram - 627808" },
+    });
+    const role = await db.role.upsert({
+      where: { organizationId_name: { organizationId: organization.id, name: "Owner" } },
+      update: { permissions: ["*"] }, create: { organizationId: organization.id, name: "Owner", permissions: ["*"] },
+    });
+    const user = await db.user.upsert({
+      where: { email: "admin@happybonding.in" }, update: { passwordHash, roleId: role.id },
+      create: { organizationId: organization.id, roleId: role.id, name: "Saravana", email: "admin@happybonding.in", phone: "7708030903", passwordHash },
+    });
+    await db.userBranch.upsert({ where: { userId_branchId: { userId: user.id, branchId: branch.id } }, update: {}, create: { userId: user.id, branchId: branch.id } });
+  } catch (err) {
+    console.error("Auto admin user creation error:", err);
+  }
+}
+
 app.post("/api/auth/login", async (req, res) => {
+  await ensureAdminUser();
   const input = parseInput(loginInput, req.body);
-  const user = await db.user.findUnique({ where: { email: input.email.toLowerCase() }, include: { role: true, branches: true } });
+  let user = await db.user.findUnique({ where: { email: input.email.toLowerCase() }, include: { role: true, branches: true } });
+  if (!user) {
+    await ensureAdminUser();
+    user = await db.user.findUnique({ where: { email: input.email.toLowerCase() }, include: { role: true, branches: true } });
+  }
   if (!user || !user.active || !(await compare(input.password, user.passwordHash))) return res.status(401).json({ error: "Invalid email or password" });
   const session = { userId: user.id, organizationId: user.organizationId, branchIds: user.branches.map(x => x.branchId), permissions: user.role.permissions, tokenVersion: user.tokenVersion };
   res.json({ token: await createToken(session), user: { id: user.id, name: user.name, email: user.email }, branchIds: session.branchIds });
