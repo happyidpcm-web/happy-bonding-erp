@@ -1,0 +1,17 @@
+-- AlterTable
+ALTER TABLE "Party" ADD COLUMN     "bankAccountName" TEXT,
+ADD COLUMN     "bankAccountNumber" TEXT,
+ADD COLUMN     "bankBranch" TEXT,
+ADD COLUMN     "bankIfsc" TEXT,
+ADD COLUMN     "bankName" TEXT,
+ADD COLUMN     "category" TEXT,
+ADD COLUMN     "contactPersonDob" TIMESTAMP(3),
+ADD COLUMN     "contactPersonName" TEXT,
+ADD COLUMN     "creditLimit" DECIMAL(14,2) NOT NULL DEFAULT 0,
+ADD COLUMN     "creditPeriodDays" INTEGER NOT NULL DEFAULT 30,
+ADD COLUMN     "customBirthday" TEXT,
+ADD COLUMN     "customKovilThiruvila" TEXT,
+ADD COLUMN     "openingBalanceType" TEXT NOT NULL DEFAULT 'TO_COLLECT',
+ADD COLUMN     "pan" TEXT,
+ADD COLUMN     "sameAsBilling" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "shippingAddress" TEXT;

@@ -1,0 +1,17 @@
+{
+  "short_name": "Happy Bonding",
+  "name": "Happy Bonding Men's Wear ERP",
+  "icons": [
+    {
+      "src": "/happy-bonding-logo.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#ffffff",
+  "theme_color": "#111827",
+  "display": "standalone",
+  "orientation": "any"
+}

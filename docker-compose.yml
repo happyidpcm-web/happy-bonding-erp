@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: happybonding
+      POSTGRES_PASSWORD: change-me
+      POSTGRES_DB: happybonding_erp
+    ports:
+      - "5432:5432"
+    volumes:
+      - happybonding_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U happybonding -d happybonding_erp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  happybonding_pgdata:

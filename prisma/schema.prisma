@@ -1,0 +1,362 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PartyType {
+  CUSTOMER
+  SUPPLIER
+  BOTH
+}
+
+enum DocumentStatus {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+}
+
+enum MovementType {
+  OPENING
+  PURCHASE
+  SALE
+  SALES_RETURN
+  PURCHASE_RETURN
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  TRANSFER_IN
+  TRANSFER_OUT
+  DAMAGE
+}
+
+enum PaymentDirection {
+  IN
+  OUT
+}
+
+model Organization {
+  id          String             @id @default(cuid())
+  name        String
+  phone       String?
+  gstin       String?
+  pan         String?
+  stateCode   String             @default("33")
+  createdAt   DateTime           @default(now())
+  branches    Branch[]
+  users       User[]
+  roles       Role[]
+  parties     Party[]
+  products    Product[]
+  taxRates    TaxRate[]
+  invoices    SalesInvoice[]
+  sequences   DocumentSequence[]
+  invoiceSetting InvoiceSetting?
+  auditEvents AuditEvent[]
+}
+
+model Branch {
+  id                 String          @id @default(cuid())
+  organizationId     String
+  code               String
+  name               String
+  address            String?
+  phone              String?
+  allowNegativeStock Boolean         @default(false)
+  organization       Organization    @relation(fields: [organizationId], references: [id])
+  memberships        UserBranch[]
+  balances           StockBalance[]
+  movements          StockMovement[]
+  invoices           SalesInvoice[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+}
+
+model User {
+  id             String       @id @default(cuid())
+  organizationId String
+  roleId         String
+  name           String
+  email          String       @unique
+  phone          String?
+  passwordHash   String
+  active         Boolean      @default(true)
+  tokenVersion   Int          @default(0)
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  role           Role         @relation(fields: [roleId], references: [id])
+  branches       UserBranch[]
+  auditEvents    AuditEvent[]
+
+  @@index([organizationId])
+}
+
+model Role {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  permissions    String[]
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  users          User[]
+
+  @@unique([organizationId, name])
+}
+
+model UserBranch {
+  userId   String
+  branchId String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@id([userId, branchId])
+}
+
+model Party {
+  id             String         @id @default(cuid())
+  organizationId String
+  type           PartyType
+  name           String
+  phone          String?
+  email          String?
+  gstin          String?
+  pan            String?
+  category       String?
+  stateCode      String?
+  address        String?
+  shippingAddress String?
+  sameAsBilling  Boolean        @default(true)
+  openingBalance Decimal        @default(0) @db.Decimal(14, 2)
+  openingBalanceType String     @default("TO_COLLECT")
+  creditPeriodDays Int          @default(30)
+  creditLimit    Decimal        @default(0) @db.Decimal(14, 2)
+  contactPersonName String?
+  contactPersonDob DateTime?
+  bankName       String?
+  bankAccountName String?
+  bankAccountNumber String?
+  bankIfsc       String?
+  bankBranch     String?
+  customBirthday String?
+  customKovilThiruvila String?
+  active         Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  invoices       SalesInvoice[]
+
+  @@index([organizationId, name])
+  @@index([organizationId, phone])
+}
+
+model Product {
+  id             String           @id @default(cuid())
+  organizationId String
+  name           String
+  category       String
+  brand          String?
+  hsnCode        String
+  taxRateId      String
+  active         Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  organization   Organization     @relation(fields: [organizationId], references: [id])
+  taxRate        TaxRate          @relation(fields: [taxRateId], references: [id])
+  variants       ProductVariant[]
+
+  @@index([organizationId, name])
+}
+
+model ProductVariant {
+  id            String             @id @default(cuid())
+  productId     String
+  sku           String
+  barcode       String?
+  size          String?
+  color         String?
+  purchasePrice Decimal            @db.Decimal(14, 2)
+  sellingPrice  Decimal            @db.Decimal(14, 2)
+  mrp           Decimal            @db.Decimal(14, 2)
+  active        Boolean            @default(true)
+  product       Product            @relation(fields: [productId], references: [id])
+  balances      StockBalance[]
+  movements     StockMovement[]
+  invoiceLines  SalesInvoiceLine[]
+
+  @@unique([productId, sku])
+  @@index([barcode])
+}
+
+model TaxRate {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  rate           Decimal      @db.Decimal(5, 2)
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  products       Product[]
+
+  @@unique([organizationId, rate])
+}
+
+model StockBalance {
+  branchId  String
+  variantId String
+  quantity  Decimal        @default(0) @db.Decimal(14, 3)
+  updatedAt DateTime       @updatedAt
+  branch    Branch         @relation(fields: [branchId], references: [id])
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@id([branchId, variantId])
+}
+
+model StockMovement {
+  id            String         @id @default(cuid())
+  branchId      String
+  variantId     String
+  type          MovementType
+  quantity      Decimal        @db.Decimal(14, 3)
+  unitCost      Decimal?       @db.Decimal(14, 2)
+  referenceType String
+  referenceId   String
+  occurredAt    DateTime       @default(now())
+  branch        Branch         @relation(fields: [branchId], references: [id])
+  variant       ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@index([branchId, variantId, occurredAt])
+  @@index([referenceType, referenceId])
+}
+
+model SalesInvoice {
+  id             String              @id @default(cuid())
+  organizationId String
+  branchId       String
+  partyId        String?
+  invoiceNumber  String
+  invoiceDate    DateTime
+  status         DocumentStatus      @default(DRAFT)
+  paymentStatus  PaymentStatus       @default(UNPAID)
+  placeOfSupply  String
+  subtotal       Decimal             @db.Decimal(14, 2)
+  discountTotal  Decimal             @default(0) @db.Decimal(14, 2)
+  invoiceDiscount Decimal            @default(0) @db.Decimal(14, 2)
+  additionalCharges Decimal          @default(0) @db.Decimal(14, 2)
+  taxableTotal   Decimal             @db.Decimal(14, 2)
+  cgstTotal      Decimal             @default(0) @db.Decimal(14, 2)
+  sgstTotal      Decimal             @default(0) @db.Decimal(14, 2)
+  igstTotal      Decimal             @default(0) @db.Decimal(14, 2)
+  roundOff       Decimal             @default(0) @db.Decimal(14, 2)
+  grandTotal     Decimal             @db.Decimal(14, 2)
+  paidAmount     Decimal             @default(0) @db.Decimal(14, 2)
+  notes          String?
+  idempotencyKey String
+  createdAt      DateTime            @default(now())
+  postedAt       DateTime?
+  organization   Organization        @relation(fields: [organizationId], references: [id])
+  branch         Branch              @relation(fields: [branchId], references: [id])
+  party          Party?              @relation(fields: [partyId], references: [id])
+  lines          SalesInvoiceLine[]
+  payments       PaymentAllocation[]
+
+  @@unique([organizationId, invoiceNumber])
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, branchId, invoiceDate])
+}
+
+model SalesInvoiceLine {
+  id            String         @id @default(cuid())
+  invoiceId     String
+  variantId     String
+  itemName      String
+  sku           String
+  hsnCode       String
+  quantity      Decimal        @db.Decimal(14, 3)
+  unitPrice     Decimal        @db.Decimal(14, 2)
+  discount      Decimal        @default(0) @db.Decimal(14, 2)
+  taxableAmount Decimal        @db.Decimal(14, 2)
+  taxRate       Decimal        @db.Decimal(5, 2)
+  cgst          Decimal        @default(0) @db.Decimal(14, 2)
+  sgst          Decimal        @default(0) @db.Decimal(14, 2)
+  igst          Decimal        @default(0) @db.Decimal(14, 2)
+  total         Decimal        @db.Decimal(14, 2)
+  invoice       SalesInvoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  variant       ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@index([invoiceId])
+}
+
+model Payment {
+  id             String              @id @default(cuid())
+  organizationId String
+  branchId       String
+  direction      PaymentDirection
+  mode           String
+  amount         Decimal             @db.Decimal(14, 2)
+  reference      String?
+  paidAt         DateTime            @default(now())
+  allocations    PaymentAllocation[]
+
+  @@index([organizationId, branchId, paidAt])
+}
+
+model PaymentAllocation {
+  id             String       @id @default(cuid())
+  paymentId      String
+  salesInvoiceId String
+  amount         Decimal      @db.Decimal(14, 2)
+  payment        Payment      @relation(fields: [paymentId], references: [id])
+  salesInvoice   SalesInvoice @relation(fields: [salesInvoiceId], references: [id])
+
+  @@unique([paymentId, salesInvoiceId])
+}
+
+model DocumentSequence {
+  id             String       @id @default(cuid())
+  organizationId String
+  branchId       String
+  documentType   String
+  financialYear  String
+  prefix         String
+  nextNumber     Int          @default(1)
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, branchId, documentType, financialYear])
+}
+
+model InvoiceSetting {
+  id               String       @id @default(cuid())
+  organizationId   String       @unique
+  invoicePrefix    String       @default("HB/SL")
+  paymentTermsDays Int          @default(30)
+  terms            String       @default("NO REFUND ONCE SOLD. EXCHANGE ONLY AS PER STORE POLICY.")
+  bankName         String?
+  accountName      String?
+  accountNumber    String?
+  ifsc             String?
+  upiId            String?
+  qrText           String?
+  signatureText    String?
+  signatureUrl     String?
+  organization     Organization @relation(fields: [organizationId], references: [id])
+  updatedAt        DateTime     @updatedAt
+}
+
+model AuditEvent {
+  id             String       @id @default(cuid())
+  organizationId String
+  actorId        String?
+  action         String
+  entityType     String
+  entityId       String
+  metadata       Json?
+  occurredAt     DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  actor          User?        @relation(fields: [actorId], references: [id])
+
+  @@index([organizationId, occurredAt])
+}
