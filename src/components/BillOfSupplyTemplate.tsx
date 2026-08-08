@@ -164,12 +164,12 @@ export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: 
             <p><span>Received Amount</span><span>₹ {paid}</span></p>
             <p className="balance-row"><span>Balance</span><span>₹ {balance}</span></p>
 
-            <div className="signature-box-purple">
+            <div className="gold-signature-box">
               <div className="sig-img-wrap">
                 <img src={setting.signatureUrl || defaultSignatureUrl} alt="Signature" />
               </div>
-              <span>Signature</span>
-              <strong>Happy Bonding Men's Wear</strong>
+              <div className="sig-label">Signature</div>
+              <div className="sig-company">{setting.signatureText || "Happy Bonding Men's Wear"}</div>
             </div>
           </div>
         </div>
