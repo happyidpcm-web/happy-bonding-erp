@@ -1051,11 +1051,11 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
       {!lines.length&&<EmptyState icon={ShoppingCart} title="No items added" text="Click + Add Item to search and add products to build the invoice."/>}
       <div className="invoice-bottom polished functional">
         <div className="invoice-left-links">
-          <button className="text-button" onClick={()=>setShowNotes(!showNotes)}>+ Add Notes</button>
+          <button className="text-button link-btn" onClick={()=>setShowNotes(!showNotes)}>+ Add Notes</button>
           {showNotes&&<textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Add Notes"/>}
-          <button className="text-button" onClick={()=>setShowTerms(!showTerms)}>+ Add Terms and Conditions</button>
+          <button className="text-button link-btn" onClick={()=>setShowTerms(!showTerms)}>+ Add Terms and Conditions</button>
           {showTerms&&<textarea value={terms} onChange={e=>setTerms(e.target.value)} placeholder="Terms and Conditions"/>}
-          <button className="text-button" onClick={()=>setShowBank(!showBank)}>+ Add Bank Account</button>
+          <button className="text-button link-btn" onClick={()=>setShowBank(!showBank)}>+ Add Bank Account</button>
           {showBank&&<div className="inline-settings">
             <label>Bank Name<input value={setting.bankName||""} onChange={e=>setSetting({...setting,bankName:e.target.value})}/></label>
             <label>Account Name<input value={setting.accountName||""} onChange={e=>setSetting({...setting,accountName:e.target.value})}/></label>
@@ -1063,7 +1063,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
             <label>IFSC<input value={setting.ifsc||""} onChange={e=>setSetting({...setting,ifsc:e.target.value})}/></label>
             <button className="secondary" onClick={saveSettings}>Save Bank Details</button>
           </div>}
-          <button className="text-button" onClick={()=>setShowQr(!showQr)}>+ Add Payment QR / UPI</button>
+          <button className="text-button link-btn" onClick={()=>setShowQr(!showQr)}>+ Add Payment QR / UPI</button>
           {showQr&&<div className="inline-settings">
             <label>UPI ID<input value={setting.upiId||""} onChange={e=>setSetting({...setting,upiId:e.target.value})} placeholder="example@upi"/></label>
             <label>QR Text / UPI Link<input value={setting.qrText||""} onChange={e=>setSetting({...setting,qrText:e.target.value})} placeholder="upi://pay?..."/></label>
@@ -1071,73 +1071,91 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
           </div>}
         </div>
 
-        <div className="invoice-totals font-image1">
-          <div className="totals-line-item">
-            <button type="button" className="text-button link-btn" onClick={()=>notify("Enter additional charges")}>+ Add Additional Charges</button>
-            <input type="number" className="inline-num-input" min={0} value={additionalCharges||""} onChange={e=>setAdditionalCharges(Number(e.target.value||0))} placeholder="₹ 0"/>
+        <div className="invoice-totals-column">
+          {/* Row 1: Additional Charges */}
+          <div className="calc-row">
+            <button type="button" className="blue-link-btn" onClick={()=>notify("Enter additional charges")}>+ Add Additional Charges</button>
+            <span className="calc-val">₹ {additionalCharges}</span>
           </div>
 
-          <div className="totals-line-item">
-            <span>Taxable Amount</span>
-            <strong>{money(taxable)}</strong>
+          {/* Row 2: Taxable Amount */}
+          <div className="calc-row">
+            <span className="calc-label">Taxable Amount</span>
+            <span className="calc-val">₹ {taxable}</span>
           </div>
 
-          <div className="totals-line-item">
-            <button type="button" className="text-button link-btn" onClick={()=>notify("Enter invoice discount")}>+ Add Discount</button>
-            <span className="negative-val">- {money(invoiceDiscount)}</span>
+          {/* Row 3: Add Discount */}
+          <div className="calc-row">
+            <button type="button" className="blue-link-btn" onClick={()=>notify("Enter invoice discount")}>+ Add Discount</button>
+            <span className="calc-val">- ₹ {invoiceDiscount}</span>
           </div>
 
-          <div className="roundoff-line">
-            <label className="roundoff-check"><input type="checkbox" defaultChecked /> Auto Round Off</label>
-            <div className="add-split-field">
-              <button className="btn-add-split">+ Add ▾</button>
+          {/* Row 4: Auto Round Off */}
+          <div className="calc-row roundoff-row">
+            <label className="roundoff-lbl">
+              <input type="checkbox" defaultChecked /> Auto Round Off
+            </label>
+            <div className="split-add-box">
+              <button type="button" className="split-btn">+ Add ▾</button>
               <span className="curr-sym">₹</span>
-              <input type="number" placeholder="Enter Payment amount" readOnly />
+              <input type="number" className="split-input" value="0" readOnly />
             </div>
           </div>
 
-          <div className="total-amount-line">
-            <h3>Total Amount</h3>
-            <strong className="grand-total-val">{money(total)}</strong>
+          {/* Row 5: Total Amount */}
+          <div className="calc-row total-amount-row">
+            <strong className="total-title">Total Amount</strong>
+            <div className="total-display-rect">
+              <span>{total > 0 ? money(total) : "Enter Payment amount"}</span>
+            </div>
           </div>
 
-          <div className="fully-paid-strip">
-            <span/>
-            <label className="paid-check">Mark as fully paid <input type="checkbox" checked={markPaid} onChange={e=>{setMarkPaid(e.target.checked);if(e.target.checked)setPaid(total);}}/></label>
+          {/* Row 6: Mark as fully paid */}
+          <div className="fully-paid-right-row">
+            <label className="paid-check-lbl">
+              Mark as fully paid <input type="checkbox" checked={markPaid} onChange={e=>{setMarkPaid(e.target.checked);if(e.target.checked)setPaid(total);}} />
+            </label>
           </div>
 
-          <div className="amount-received-line">
-            <span>Amount Received</span>
-            <div className="amount-received-split-box">
-              <span className="curr-symbol">₹</span>
-              <input type="number" value={(markPaid?total:paid)||""} onChange={e=>{setPaid(Number(e.target.value));setMarkPaid(false);}}/>
-              <select value={paymentMode} onChange={e=>setPaymentMode(e.target.value as typeof paymentMode)}>
-                <option value="Cash">Cash</option>
-                <option value="UPI">UPI</option>
-                <option value="Card">Card</option>
-                <option value="Bank">Bank</option>
+          {/* Row 7: Amount Received */}
+          <div className="calc-row amount-received-row">
+            <span className="calc-label">Amount Received</span>
+            <div className="gray-input-box">
+              <span className="curr-sym">₹</span>
+              <input
+                type="number"
+                className="received-num-input"
+                value={(markPaid ? total : paid) || 0}
+                onChange={e=>{setPaid(Number(e.target.value));setMarkPaid(false);}}
+              />
+              <select className="payment-mode-select" value={paymentMode} onChange={e=>setPaymentMode(e.target.value as typeof paymentMode)}>
+                <option value="Cash">Cash ▾</option>
+                <option value="UPI">UPI ▾</option>
+                <option value="Card">Card ▾</option>
+                <option value="Bank">Bank ▾</option>
               </select>
             </div>
           </div>
-
-          <div className="balance-line">
-            <span>Balance Amount</span>
-            <strong className="green-balance">{money(Math.max(0,total-paid))}</strong>
+          {/* Row 8: Balance Amount */}
+          <div className="calc-row balance-row-green">
+            <strong className="green-label">Balance Amount</strong>
+            <strong className="green-val">{money(Math.max(0, total - paid))}</strong>
           </div>
 
-          <div className="signature-display-box">
-            <span className="signature-label">{setting.signatureText || "Authorized signatory for Happy Bonding Men's Wear"}</span>
-            <div className="signature-img-wrap">
-              <img src={setting.signatureUrl || defaultSignatureUrl} alt="Stored Digital Signature" />
+          {/* Row 9: Signature Box */}
+          <div className="ref-signature-box">
+            <span className="sig-text">{setting.signatureText || "Authorized signatory for Happy Bonding Men's Wear"}</span>
+            <div className="sig-img-container">
+              <img src={setting.signatureUrl || defaultSignatureUrl} alt="Digital Signature" />
             </div>
           </div>
 
-          <div className="invoice-save-row">
-            <button className="secondary" onClick={()=>saveInvoice(true)} disabled={saving||!lines.length}>Save & New</button>
+          <div className="invoice-save-row" style={{ marginTop: 20 }}>
+            <button className="secondary" onClick={() => saveInvoice(true)} disabled={saving || !lines.length}>Save & New</button>
             <button type="button" className="whatsapp-btn" onClick={() => shareWhatsAppInvoice({ phone: selectedParty?.phone, partyName: selectedParty?.name, number: nextNumber || "HB-INV", amount: total, paidAmount: (markPaid ? total : paid), paymentMode })} disabled={!lines.length}>
               <MessageCircle size={15} /> WhatsApp Share
             </button>
-            <button className="primary" onClick={()=>saveInvoice(false)} disabled={saving||!lines.length}>{saving?"Saving...":"Save Invoice"}</button>
+            <button className="primary" onClick={() => saveInvoice(false)} disabled={saving || !lines.length}>{saving ? "Saving..." : "Save Invoice"}</button>
           </div>
         </div>
       </div>
