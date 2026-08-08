@@ -656,6 +656,211 @@ body{background:#fffdf7;color:#140d08}.sidebar{background:linear-gradient(180deg
   border-top: 1px solid #d1d5db;
   padding-top: 4px;
 }
+
+/* Bill of Supply PDF Template Styling (Matching User PDF Screenshot) */
+.bill-of-supply-template {
+  background: #ffffff;
+  padding: 30px 36px;
+  color: #374151;
+  font-family: 'Manrope', -apple-system, sans-serif;
+  line-height: 1.4;
+}
+.flex-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+}
+.header-left {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.font-purple h1 {
+  font: 800 24px 'Outfit', sans-serif;
+  color: #1e1b4b;
+  margin: 0 0 2px;
+}
+.font-purple {
+  color: #1e1b4b;
+}
+.shop-info .subtitle {
+  font-size: 11px;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+.shop-info p {
+  font-size: 11px;
+  margin: 2px 0;
+  color: #4b5563;
+}
+.shop-info .meta-line span {
+  margin-right: 12px;
+}
+.header-right-badge .badge-box {
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 6px 14px;
+  text-align: center;
+}
+.header-right-badge h3 {
+  font: 800 13px Manrope;
+  color: #1e1b4b;
+  margin: 0;
+}
+.header-right-badge span {
+  font-size: 9px;
+  color: #9ca3af;
+  letter-spacing: 0.5px;
+}
+.grid-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #fafafa;
+  border: 1px solid #e5e7eb;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+}
+.grid-meta span {
+  font-size: 11px;
+  color: #6b7280;
+  display: block;
+}
+.grid-meta strong {
+  font-size: 13px;
+  color: #111827;
+}
+.grid-addr {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.grid-addr .addr-box {
+  border: 1px solid #e5e7eb;
+  padding: 12px 16px;
+  border-radius: 6px;
+  background: #ffffff;
+}
+.grid-addr strong {
+  font-size: 12px;
+  color: #4b5563;
+  display: block;
+  margin-bottom: 4px;
+}
+.grid-addr .party-name {
+  font: 700 15px Manrope;
+  color: #1e1b4b;
+  margin: 0 0 2px;
+}
+.grid-addr p {
+  font-size: 11px;
+  color: #6b7280;
+  margin: 2px 0;
+}
+.purple-header-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0;
+}
+.purple-header-table th {
+  background: #f3e8ff !important;
+  color: #581c87 !important;
+  font: 700 11px Manrope !important;
+  text-transform: uppercase;
+  padding: 10px 12px !important;
+  border: none !important;
+}
+.purple-header-table td {
+  padding: 12px;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 12px;
+}
+.discount-off {
+  font-size: 10px;
+  color: #9333ea;
+  display: block;
+}
+.purple-subtotal-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f3e8ff;
+  color: #581c87;
+  font: 800 12px Manrope;
+  padding: 10px 16px;
+  margin-bottom: 20px;
+  border-radius: 2px;
+}
+.purple-summary-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 30px;
+  margin-top: 16px;
+}
+.amount-words-box {
+  margin-top: 24px;
+  padding: 10px 14px;
+  background: #f9fafb;
+  border-left: 3px solid #7e22ce;
+  border-radius: 4px;
+}
+.amount-words-box span {
+  font-size: 11px;
+  color: #6b7280;
+  display: block;
+}
+.amount-words-box strong {
+  font-size: 13px;
+  color: #1e1b4b;
+}
+.summary-right {
+  width: 260px;
+  text-align: right;
+}
+.summary-right p {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #4b5563;
+  margin: 6px 0;
+}
+.grand-total-row {
+  display: flex;
+  justify-content: space-between;
+  font: 800 16px Manrope;
+  color: #111827;
+  border-top: 1px dashed #d1d5db;
+  padding-top: 8px;
+  margin: 8px 0;
+}
+.balance-row {
+  font-weight: 700;
+  color: #111827;
+}
+.signature-box-purple {
+  margin-top: 24px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px 16px;
+  text-align: center;
+  background: #ffffff;
+}
+.sig-img-wrap img {
+  height: 50px;
+}
+.signature-box-purple span {
+  display: block;
+  font-size: 10px;
+  color: #9ca3af;
+  margin-top: 4px;
+}
+.signature-box-purple strong {
+  font-size: 11px;
+  color: #374151;
+}
 .payment-history-drawer {
   background: #ffffff;
   border-left: 1px solid #e5e7eb;

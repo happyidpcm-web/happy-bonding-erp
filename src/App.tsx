@@ -10,6 +10,8 @@ import { api } from "./api";
 import type { Invoice, InvoiceSetting, Page, Party, Product } from "./types";
 import * as XLSX from "xlsx";
 import happyBondingLogo from "./assets/happy-bonding-logo-white.png";
+import { BillOfSupplyTemplate } from "./components/BillOfSupplyTemplate";
+import { downloadInvoicePdf } from "./utils/pdf";
 
 function shareWhatsAppInvoice(opts: { phone?: string; partyName?: string; number: string; amount: number; paidAmount?: number; paymentMode?: string }) {
   const name = opts.partyName || "Valued Customer";
@@ -604,7 +606,23 @@ function InvoiceDetailModal({
   setting: InvoiceSetting;
   onClose: () => void;
 }) {
+  const documentRef = useRef<HTMLDivElement>(null);
+  const [downloading, setDownloading] = useState(false);
+
   const handlePrint = () => window.print();
+
+  const handleDownloadPdf = async () => {
+    if (!documentRef.current) return;
+    try {
+      setDownloading(true);
+      await downloadInvoicePdf(documentRef.current, `Invoice_${invoice.number.replace(/[/\\?%*:|"<>]/g, "_")}`);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const handleShare = () => {
     shareWhatsAppInvoice({
       phone: invoice.partyPhone,
@@ -615,12 +633,6 @@ function InvoiceDetailModal({
     });
   };
 
-  const lines = invoice.lines && invoice.lines.length > 0 ? invoice.lines : [
-    { itemName: "GOOD T-SHIRT SLIMFIT", sku: "TSH-001", quantity: 1, unitPrice: invoice.amount, discount: 0, taxRate: 5, total: invoice.amount }
-  ];
-
-  const subtotal = lines.reduce((s, l) => s + l.unitPrice * l.quantity, 0);
-  const discount = lines.reduce((s, l) => s + l.discount, 0);
   const total = invoice.amount;
   const paid = invoice.paidAmount ?? total;
   const balance = Math.max(0, total - paid);
@@ -634,94 +646,24 @@ function InvoiceDetailModal({
             <span className={`pill ${invoice.status === "Paid" ? "success" : "danger"}`}>{invoice.status}</span>
           </div>
           <div className="actions-right">
-            <button className="secondary" onClick={handlePrint}><Download size={15} /> Download PDF</button>
-            <button className="secondary" onClick={handlePrint}><Printer size={15} /> Print PDF</button>
-            <button className="whatsapp-btn" onClick={handleShare}><MessageCircle size={15} /> Share</button>
-            <button className="icon-button" onClick={onClose}><X size={20} /></button>
+            <button className="secondary" onClick={handleDownloadPdf} disabled={downloading}>
+              <Download size={15} /> {downloading ? "Downloading..." : "Download PDF"}
+            </button>
+            <button className="secondary" onClick={handlePrint}>
+              <Printer size={15} /> Print PDF
+            </button>
+            <button className="whatsapp-btn" onClick={handleShare}>
+              <MessageCircle size={15} /> Share
+            </button>
+            <button className="icon-button" onClick={onClose}>
+              <X size={20} />
+            </button>
           </div>
         </div>
 
         <div className="full-invoice-content-grid">
           <div className="bill-document-preview-wrapper">
-            <div className="a4-bill-document gold-frame">
-              <div className="doc-header">
-                <img src={happyBondingLogo} alt="Happy Bonding" className="doc-logo" />
-                <div className="shop-title-block">
-                  <h1>Happy Bonding Men's Wear</h1>
-                  <p className="subtitle">Thanks for Choosing Happy Bonding Men's Wear</p>
-                  <p><strong>Phone:</strong> 7708030903 | <strong>GSTIN:</strong> 33CWZPS9715D1ZU</p>
-                  <p>No 10/901 West Bus Stand, Near Railway Gate, Pavoorchatram - 627808, Tenkasi</p>
-                  <p><strong>Website:</strong> www.happybonding.in</p>
-                </div>
-                <div className="bill-badge">BILL OF SUPPLY</div>
-              </div>
-
-              <div className="doc-meta-strip">
-                <div><span>Invoice No:</span> <strong>{invoice.number}</strong></div>
-                <div><span>Invoice Date:</span> <strong>{invoice.date}</strong></div>
-              </div>
-
-              <div className="doc-addresses">
-                <div className="addr-box">
-                  <strong>Bill To:</strong>
-                  <p className="party-name">{invoice.party}</p>
-                  {invoice.partyPhone && <p>Mobile: {invoice.partyPhone}</p>}
-                  {invoice.partyAddress && <p>Address: {invoice.partyAddress}</p>}
-                  <p>Place of Supply: Tamil Nadu</p>
-                </div>
-                <div className="addr-box">
-                  <strong>Ship To:</strong>
-                  <p className="party-name">{invoice.party}</p>
-                  {invoice.partyPhone && <p>Mobile: {invoice.partyPhone}</p>}
-                </div>
-              </div>
-
-              <table className="doc-lines-table">
-                <thead>
-                  <tr>
-                    <th>No</th>
-                    <th>Items</th>
-                    <th>Qty</th>
-                    <th>MRP</th>
-                    <th>Rate</th>
-                    <th className="right">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lines.map((l, idx) => (
-                    <tr key={idx}>
-                      <td>{idx + 1}</td>
-                      <td><strong>{l.itemName}</strong><small>{l.sku}</small></td>
-                      <td>{l.quantity} PCS</td>
-                      <td>{money(l.unitPrice)}</td>
-                      <td>{money(l.unitPrice)}</td>
-                      <td className="right"><strong>{money(l.total)}</strong></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <div className="doc-summary-footer">
-                <div className="summary-notes">
-                  <p><strong>Terms & Conditions</strong></p>
-                  <p>{setting.terms || "Goods once sold will not be taken back or exchanged."}</p>
-                </div>
-                <div className="summary-math">
-                  <p><span>Subtotal</span><span>{money(subtotal)}</span></p>
-                  {discount > 0 && <p><span>Discount</span><span>- {money(discount)}</span></p>}
-                  <h3><span>Total Amount</span><span>{money(total)}</span></h3>
-                  <p><span>Received Amount</span><span>{money(paid)}</span></p>
-                  <p className="balance-row"><span>Balance Amount</span><strong>{money(balance)}</strong></p>
-                </div>
-              </div>
-
-              <div className="doc-signature-footer">
-                <div className="sig-wrap">
-                  <img src={setting.signatureUrl || defaultSignatureUrl} alt="Signature" />
-                  <p>{setting.signatureText || "Authorized Signatory for Happy Bonding Men's Wear"}</p>
-                </div>
-              </div>
-            </div>
+            <BillOfSupplyTemplate ref={documentRef} invoice={invoice} setting={setting} />
           </div>
 
           <aside className="payment-history-drawer card">
