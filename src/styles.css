@@ -1119,6 +1119,245 @@ body{background:#fffdf7;color:#140d08}.sidebar{background:linear-gradient(180deg
   border: 1px solid #facc15;
 }
 
+/* Exact Pixel-Perfect myBillBook Reference CSS for Invoice Bottom Section */
+.mybillbook-ref-bottom {
+  display: grid !important;
+  grid-template-columns: 1fr 480px !important;
+  border-top: 1px solid #e5e7eb !important;
+  background: #ffffff !important;
+  margin-top: 20px !important;
+}
+
+.ref-left-section {
+  padding: 24px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+  align-items: flex-start !important;
+}
+
+.ref-link-btn {
+  background: transparent !important;
+  border: none !important;
+  color: #2563eb !important;
+  font-family: 'Manrope', sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+  box-shadow: none !important;
+}
+.ref-link-btn:hover {
+  text-decoration: underline !important;
+  background: transparent !important;
+}
+
+.ref-right-section {
+  border-left: 1px solid #e5e7eb !important;
+  padding: 20px 28px !important;
+  background: #ffffff !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.ref-calc-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  padding: 8px 0 !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  box-sizing: border-box !important;
+}
+
+.ref-lbl {
+  color: #475569 !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+.ref-val {
+  color: #0f172a !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+.ref-check-lbl {
+  font-size: 13px !important;
+  color: #334155 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  cursor: pointer !important;
+}
+
+.ref-split-box {
+  display: inline-flex !important;
+  align-items: center !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 4px !important;
+  background: #ffffff !important;
+  overflow: hidden !important;
+  height: 30px !important;
+}
+
+.ref-split-btn {
+  background: #f1f5f9 !important;
+  border: none !important;
+  border-right: 1px solid #cbd5e1 !important;
+  padding: 0 10px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: #334155 !important;
+  height: 100% !important;
+  cursor: pointer !important;
+  border-radius: 0 !important;
+}
+
+.ref-curr {
+  padding: 0 8px !important;
+  font-size: 13px !important;
+  color: #64748b !important;
+  font-weight: 600 !important;
+}
+
+.ref-split-input {
+  border: none !important;
+  width: 50px !important;
+  text-align: right !important;
+  padding: 0 8px 0 0 !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  background: transparent !important;
+  height: 100% !important;
+}
+
+.ref-total-row {
+  border-bottom: none !important;
+  padding-top: 14px !important;
+  padding-bottom: 6px !important;
+}
+
+.ref-total-lbl {
+  font-family: 'Manrope', sans-serif !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+}
+
+.ref-gray-display-rect {
+  background: #e2e8f0 !important;
+  border-radius: 6px !important;
+  padding: 8px 24px !important;
+  width: 220px !important;
+  text-align: center !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #64748b !important;
+  box-sizing: border-box !important;
+}
+
+.ref-fully-paid-row {
+  display: flex !important;
+  justify-content: flex-end !important;
+  padding: 4px 0 8px !important;
+  width: 100% !important;
+}
+
+.ref-paid-lbl {
+  font-size: 12px !important;
+  color: #475569 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  cursor: pointer !important;
+}
+
+.ref-amount-received-row {
+  border-bottom: none !important;
+  padding: 8px 0 !important;
+}
+
+.ref-gray-input-box {
+  background: #e2e8f0 !important;
+  border-radius: 6px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 0 4px !important;
+  width: 220px !important;
+  height: 38px !important;
+  box-sizing: border-box !important;
+}
+
+.ref-received-input {
+  border: none !important;
+  background: transparent !important;
+  width: 90px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  padding: 0 4px !important;
+  height: 100% !important;
+}
+
+.ref-mode-select {
+  border: none !important;
+  background: transparent !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: #334155 !important;
+  cursor: pointer !important;
+  padding: 0 4px !important;
+  height: 100% !important;
+}
+
+.ref-balance-row {
+  border-bottom: none !important;
+  padding: 12px 0 8px !important;
+}
+
+.ref-green-lbl {
+  font-family: 'Manrope', sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  color: #16a34a !important;
+}
+
+.ref-green-val {
+  font-family: 'Manrope', sans-serif !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  color: #16a34a !important;
+}
+
+.ref-signature-area {
+  margin-top: 20px !important;
+  text-align: right !important;
+  width: 100% !important;
+}
+
+.ref-sig-title {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #334155 !important;
+  display: block !important;
+  margin-bottom: 4px !important;
+}
+
+.ref-sig-img img {
+  height: 52px !important;
+  object-fit: contain !important;
+}
+
+.ref-actions-row {
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 12px !important;
+  margin-top: 24px !important;
+  width: 100% !important;
+}
+
 /* Print-specific Styles for Guaranteed Single Page A4 Output */
 @media print {
   @page {

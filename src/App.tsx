@@ -1049,86 +1049,90 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
         <span>{money(tax)}</span>
       </div>
       {!lines.length&&<EmptyState icon={ShoppingCart} title="No items added" text="Click + Add Item to search and add products to build the invoice."/>}
-      <div className="invoice-bottom polished functional">
-        <div className="invoice-left-links">
-          <button className="text-button link-btn" onClick={()=>setShowNotes(!showNotes)}>+ Add Notes</button>
-          {showNotes&&<textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Add Notes"/>}
-          <button className="text-button link-btn" onClick={()=>setShowTerms(!showTerms)}>+ Add Terms and Conditions</button>
-          {showTerms&&<textarea value={terms} onChange={e=>setTerms(e.target.value)} placeholder="Terms and Conditions"/>}
-          <button className="text-button link-btn" onClick={()=>setShowBank(!showBank)}>+ Add Bank Account</button>
-          {showBank&&<div className="inline-settings">
-            <label>Bank Name<input value={setting.bankName||""} onChange={e=>setSetting({...setting,bankName:e.target.value})}/></label>
-            <label>Account Name<input value={setting.accountName||""} onChange={e=>setSetting({...setting,accountName:e.target.value})}/></label>
-            <label>Account Number<input value={setting.accountNumber||""} onChange={e=>setSetting({...setting,accountNumber:e.target.value})}/></label>
-            <label>IFSC<input value={setting.ifsc||""} onChange={e=>setSetting({...setting,ifsc:e.target.value})}/></label>
-            <button className="secondary" onClick={saveSettings}>Save Bank Details</button>
-          </div>}
-          <button className="text-button link-btn" onClick={()=>setShowQr(!showQr)}>+ Add Payment QR / UPI</button>
-          {showQr&&<div className="inline-settings">
-            <label>UPI ID<input value={setting.upiId||""} onChange={e=>setSetting({...setting,upiId:e.target.value})} placeholder="example@upi"/></label>
-            <label>QR Text / UPI Link<input value={setting.qrText||""} onChange={e=>setSetting({...setting,qrText:e.target.value})} placeholder="upi://pay?..."/></label>
-            <button className="secondary" onClick={saveSettings}>Save UPI / QR</button>
-          </div>}
+      <div className="mybillbook-ref-bottom">
+        <div className="ref-left-section">
+          <button type="button" className="ref-link-btn" onClick={() => setShowNotes(!showNotes)}>+ Add Notes</button>
+          {showNotes && <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Add Notes" className="ref-textarea" />}
+          <button type="button" className="ref-link-btn" onClick={() => setShowTerms(!showTerms)}>+ Add Terms and Conditions</button>
+          {showTerms && <textarea value={terms} onChange={e => setTerms(e.target.value)} placeholder="Terms and Conditions" className="ref-textarea" />}
+          <button type="button" className="ref-link-btn" onClick={() => setShowBank(!showBank)}>+ Add Bank Account</button>
+          {showBank && (
+            <div className="inline-settings">
+              <label>Bank Name<input value={setting.bankName || ""} onChange={e => setSetting({ ...setting, bankName: e.target.value })} /></label>
+              <label>Account Name<input value={setting.accountName || ""} onChange={e => setSetting({ ...setting, accountName: e.target.value })} /></label>
+              <label>Account Number<input value={setting.accountNumber || ""} onChange={e => setSetting({ ...setting, accountNumber: e.target.value })} /></label>
+              <label>IFSC<input value={setting.ifsc || ""} onChange={e => setSetting({ ...setting, ifsc: e.target.value })} /></label>
+              <button className="secondary" onClick={saveSettings}>Save Bank Details</button>
+            </div>
+          )}
+          <button type="button" className="ref-link-btn" onClick={() => setShowQr(!showQr)}>+ Add Payment QR / UPI</button>
+          {showQr && (
+            <div className="inline-settings">
+              <label>UPI ID<input value={setting.upiId || ""} onChange={e => setSetting({ ...setting, upiId: e.target.value })} placeholder="example@upi" /></label>
+              <label>QR Text / UPI Link<input value={setting.qrText || ""} onChange={e => setSetting({ ...setting, qrText: e.target.value })} placeholder="upi://pay?..." /></label>
+              <button className="secondary" onClick={saveSettings}>Save UPI / QR</button>
+            </div>
+          )}
         </div>
 
-        <div className="invoice-totals-column">
+        <div className="ref-right-section">
           {/* Row 1: Additional Charges */}
-          <div className="calc-row">
-            <button type="button" className="blue-link-btn" onClick={()=>notify("Enter additional charges")}>+ Add Additional Charges</button>
-            <span className="calc-val">₹ {additionalCharges}</span>
+          <div className="ref-calc-row">
+            <button type="button" className="ref-link-btn" onClick={() => notify("Enter additional charges")}>+ Add Additional Charges</button>
+            <span className="ref-val">₹ {additionalCharges}</span>
           </div>
 
           {/* Row 2: Taxable Amount */}
-          <div className="calc-row">
-            <span className="calc-label">Taxable Amount</span>
-            <span className="calc-val">₹ {taxable}</span>
+          <div className="ref-calc-row">
+            <span className="ref-lbl">Taxable Amount</span>
+            <span className="ref-val">₹ {taxable}</span>
           </div>
 
           {/* Row 3: Add Discount */}
-          <div className="calc-row">
-            <button type="button" className="blue-link-btn" onClick={()=>notify("Enter invoice discount")}>+ Add Discount</button>
-            <span className="calc-val">- ₹ {invoiceDiscount}</span>
+          <div className="ref-calc-row">
+            <button type="button" className="ref-link-btn" onClick={() => notify("Enter invoice discount")}>+ Add Discount</button>
+            <span className="ref-val">- ₹ {invoiceDiscount}</span>
           </div>
 
           {/* Row 4: Auto Round Off */}
-          <div className="calc-row roundoff-row">
-            <label className="roundoff-lbl">
+          <div className="ref-calc-row">
+            <label className="ref-check-lbl">
               <input type="checkbox" defaultChecked /> Auto Round Off
             </label>
-            <div className="split-add-box">
-              <button type="button" className="split-btn">+ Add ▾</button>
-              <span className="curr-sym">₹</span>
-              <input type="number" className="split-input" value="0" readOnly />
+            <div className="ref-split-box">
+              <button type="button" className="ref-split-btn">+ Add ▾</button>
+              <span className="ref-curr">₹</span>
+              <input type="number" className="ref-split-input" value="0" readOnly />
             </div>
           </div>
 
           {/* Row 5: Total Amount */}
-          <div className="calc-row total-amount-row">
-            <strong className="total-title">Total Amount</strong>
-            <div className="total-display-rect">
-              <span>{total > 0 ? money(total) : "Enter Payment amount"}</span>
+          <div className="ref-calc-row ref-total-row">
+            <strong className="ref-total-lbl">Total Amount</strong>
+            <div className="ref-gray-display-rect">
+              {total > 0 ? money(total) : "Enter Payment amount"}
             </div>
           </div>
 
           {/* Row 6: Mark as fully paid */}
-          <div className="fully-paid-right-row">
-            <label className="paid-check-lbl">
-              Mark as fully paid <input type="checkbox" checked={markPaid} onChange={e=>{setMarkPaid(e.target.checked);if(e.target.checked)setPaid(total);}} />
+          <div className="ref-fully-paid-row">
+            <label className="ref-paid-lbl">
+              Mark as fully paid <input type="checkbox" checked={markPaid} onChange={e => { setMarkPaid(e.target.checked); if (e.target.checked) setPaid(total); }} />
             </label>
           </div>
 
           {/* Row 7: Amount Received */}
-          <div className="calc-row amount-received-row">
-            <span className="calc-label">Amount Received</span>
-            <div className="gray-input-box">
-              <span className="curr-sym">₹</span>
+          <div className="ref-calc-row ref-amount-received-row">
+            <span className="ref-lbl">Amount Received</span>
+            <div className="ref-gray-input-box">
+              <span className="ref-curr">₹</span>
               <input
                 type="number"
-                className="received-num-input"
+                className="ref-received-input"
                 value={(markPaid ? total : paid) || 0}
-                onChange={e=>{setPaid(Number(e.target.value));setMarkPaid(false);}}
+                onChange={e => { setPaid(Number(e.target.value)); setMarkPaid(false); }}
               />
-              <select className="payment-mode-select" value={paymentMode} onChange={e=>setPaymentMode(e.target.value as typeof paymentMode)}>
+              <select className="ref-mode-select" value={paymentMode} onChange={e => setPaymentMode(e.target.value as typeof paymentMode)}>
                 <option value="Cash">Cash ▾</option>
                 <option value="UPI">UPI ▾</option>
                 <option value="Card">Card ▾</option>
@@ -1136,26 +1140,28 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
               </select>
             </div>
           </div>
+
           {/* Row 8: Balance Amount */}
-          <div className="calc-row balance-row-green">
-            <strong className="green-label">Balance Amount</strong>
-            <strong className="green-val">{money(Math.max(0, total - paid))}</strong>
+          <div className="ref-calc-row ref-balance-row">
+            <strong className="ref-green-lbl">Balance Amount</strong>
+            <strong className="ref-green-val">{money(Math.max(0, total - paid))}</strong>
           </div>
 
-          {/* Row 9: Signature Box */}
-          <div className="ref-signature-box">
-            <span className="sig-text">{setting.signatureText || "Authorized signatory for Happy Bonding Men's Wear"}</span>
-            <div className="sig-img-container">
+          {/* Row 9: Signature */}
+          <div className="ref-signature-area">
+            <span className="ref-sig-title">{setting.signatureText || "Authorized signatory for Happy Bonding Men's Wear"}</span>
+            <div className="ref-sig-img">
               <img src={setting.signatureUrl || defaultSignatureUrl} alt="Digital Signature" />
             </div>
           </div>
 
-          <div className="invoice-save-row" style={{ marginTop: 20 }}>
-            <button className="secondary" onClick={() => saveInvoice(true)} disabled={saving || !lines.length}>Save & New</button>
+          {/* Save Action Buttons */}
+          <div className="ref-actions-row">
+            <button type="button" className="secondary" onClick={() => saveInvoice(true)} disabled={saving || !lines.length}>Save & New</button>
             <button type="button" className="whatsapp-btn" onClick={() => shareWhatsAppInvoice({ phone: selectedParty?.phone, partyName: selectedParty?.name, number: nextNumber || "HB-INV", amount: total, paidAmount: (markPaid ? total : paid), paymentMode })} disabled={!lines.length}>
               <MessageCircle size={15} /> WhatsApp Share
             </button>
-            <button className="primary" onClick={() => saveInvoice(false)} disabled={saving || !lines.length}>{saving ? "Saving..." : "Save Invoice"}</button>
+            <button type="button" className="primary" onClick={() => saveInvoice(false)} disabled={saving || !lines.length}>{saving ? "Saving..." : "Save Invoice"}</button>
           </div>
         </div>
       </div>
