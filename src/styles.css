@@ -449,6 +449,199 @@ body{background:#fffdf7;color:#140d08}.sidebar{background:linear-gradient(180deg
   cursor: pointer;
   transition: background 0.12s ease;
 }
+
+/* Image 1 Exact Reference Styling for Create Sales Invoice Builder */
+.dashed-add-party-btn {
+  width: 100%;
+  height: 80px;
+  background: #ffffff;
+  border: 1.5px dashed #3b82f6;
+  border-radius: 8px;
+  color: #2563eb;
+  font: 700 14px Manrope;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.dashed-add-party-btn:hover {
+  background: #eff6ff;
+  border-color: #1d4ed8;
+}
+
+.dashed-add-item-btn {
+  width: 100%;
+  height: 44px;
+  background: #ffffff;
+  border: 1.5px dashed #3b82f6;
+  border-radius: 6px;
+  color: #2563eb;
+  font: 700 13px Manrope;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.dashed-add-item-btn:hover {
+  background: #eff6ff;
+  border-color: #1d4ed8;
+}
+
+.font-image1 {
+  background: #ffffff;
+  padding: 16px 20px;
+  border-left: 1px solid #e5e7eb;
+}
+
+.totals-line-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: #374151;
+}
+
+.link-btn {
+  color: #2563eb !important;
+  font-weight: 700 !important;
+  padding: 0 !important;
+  font-size: 13px !important;
+}
+
+.inline-num-input {
+  width: 100px;
+  text-align: right;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.roundoff-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 12px 0;
+}
+.roundoff-check {
+  font-size: 13px;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.add-split-field {
+  display: flex;
+  align-items: center;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.btn-add-split {
+  background: #f3f4f6;
+  border: none;
+  border-right: 1px solid #d1d5db;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.curr-sym {
+  padding: 0 6px;
+  font-size: 12px;
+  color: #6b7280;
+}
+.add-split-field input {
+  border: none;
+  width: 140px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.total-amount-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 12px;
+  margin-top: 10px;
+}
+.total-amount-line h3 {
+  font: 800 16px Manrope;
+  color: #111827;
+  margin: 0;
+}
+.grand-total-val {
+  font: 800 18px Manrope;
+  color: #111827;
+}
+
+.fully-paid-strip {
+  display: flex;
+  justify-content: flex-end;
+  margin: 10px 0 6px;
+}
+.paid-check {
+  font-size: 12px;
+  color: #4b5563;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.amount-received-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #374151;
+}
+.amount-received-split-box {
+  display: flex;
+  align-items: center;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #f9fafb;
+}
+.amount-received-split-box .curr-symbol {
+  padding: 0 10px;
+  color: #6b7280;
+  font-weight: 700;
+}
+.amount-received-split-box input {
+  border: none;
+  width: 100px;
+  padding: 6px;
+  font-weight: 700;
+  font-size: 14px;
+}
+.amount-received-split-box select {
+  border: none;
+  border-left: 1px solid #e5e7eb;
+  padding: 6px 10px;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.balance-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+.green-balance {
+  font: 800 16px Manrope;
+  color: #16a34a;
+}
 .sales-invoice-list-table tr.clickable-row:hover {
   background: #f8fafc;
 }

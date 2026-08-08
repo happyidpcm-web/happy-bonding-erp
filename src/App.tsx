@@ -982,39 +982,73 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
             {selectedParty&&<button className="secondary compact" onClick={()=>{setSelectedParty(undefined);setPartySearch("");setPartyOpen(true);}}>Change Party</button>}
           </div>
           {!selectedParty&&<div className={`add-party-box ${partyOpen?"has-party":""}`} onClick={()=>setPartyOpen(true)}>
-            {!partyOpen ? <button type="button" className="dashed-add-btn"><Plus size={16}/> Add Party</button> : <>
+            {!partyOpen ? <button type="button" className="dashed-add-party-btn"><Plus size={16}/> Add Party</button> : <div className="party-search-inline">
               <Search size={16}/><input value={partySearch} autoFocus onFocus={()=>setPartyOpen(true)} onChange={e=>{setPartySearch(e.target.value);setPartyOpen(true);setSelectedParty(undefined);setNewParty({...newParty,phone:/^\d+$/.test(e.target.value.trim())?e.target.value.trim():newParty.phone,name:/^\d+$/.test(e.target.value.trim())?newParty.name:e.target.value.trim()});}} placeholder="Search party by name or number"/>
               {partyOpen&&<div className="search-results party-dropdown"><div className="dropdown-head"><span>Party Name</span><span>Balance</span></div>{partyMatches.map(p=><button key={p.id} onClick={()=>{setSelectedParty(p);setPartyOpen(false);setPartySearch(`${p.name} ${p.phone}`);}}><div><strong>{p.name}</strong><small>{p.phone||"No mobile"}</small></div><span>{money(Math.abs(p.balance||0))}</span></button>)}{!partyMatches.length&&<div className="dropdown-empty">No party found</div>}<button className="create-result" onClick={()=>setPartyModal(true)}><Plus size={15}/><div><strong>Create Party</strong><small>{partySearch||"Add new customer"}</small></div></button></div>}
-            </>}
+            </div>}
           </div>}
           {selectedParty&&<div className="party-address-card"><strong>{selectedParty.name}</strong><p><span>Phone Number:</span> {selectedParty.phone||"-"}</p>{selectedParty.gstin&&<p><span>GSTIN:</span> {selectedParty.gstin}</p>}<label>Place of Supply<select defaultValue="Tamil Nadu"><option>Tamil Nadu</option></select></label></div>}
-        </div>
-        <div className="ship-panel">
-          <div className="panel-head"><h2>Ship To</h2>{selectedParty&&<button className="secondary compact">Change Shipping Address</button>}</div>
-          {selectedParty?<div className="party-address-card"><strong>{selectedParty.name}</strong><p><span>Phone Number:</span> {selectedParty.phone||"-"}</p>{selectedParty.address&&<p><span>Address:</span> {selectedParty.address}</p>}</div>:<div className="ship-placeholder">Select a party to show shipping details</div>}
         </div>
         <div className="invoice-meta">
           <label>Invoice Prefix<input value={(nextNumber||"HB/SL/26-27/").replace(/[^/]+$/,"")} readOnly/></label><label>Invoice Number<input value={(nextNumber||"Auto").split("/").pop()} readOnly/></label><label>Sales Invoice Date<input type="date" value={invoiceDate} onChange={e=>setInvoiceDate(e.target.value)}/></label><label>Payment Terms<div className="days-input"><input type="number" value={paymentTerms} onChange={e=>setPaymentTerms(Number(e.target.value))}/><span>days</span></div></label><label>Due Date<input value={dueDate.toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})} readOnly/></label>
         </div>
       </div>
-      <div className="item-add-row polished" style={{ gridTemplateColumns: "1fr 220px 180px" }}>
-        <div className="party-picker item-search"><Search size={16}/><input value={itemSearch} onChange={e=>setItemSearch(e.target.value)} placeholder="+ Add Item by name, SKU or barcode"/>{itemMatches.length>0&&<div className="search-results">{itemMatches.map(p=><button key={p.id} onClick={()=>addLine(p)}><div><strong>{p.name}</strong><small>{p.sku} · Stock {p.stock} · GST {p.taxRate??5}%</small></div><span>{money(p.sellingPrice)}</span></button>)}</div>}</div>
-        <button type="button" className="dashed-add-btn" style={{ height: 48, margin: 0, justifyContent: "center" }} onClick={() => setShowAddItemsModal(true)}>
-          <Plus size={16} /> Add Items to Bill
-        </button>
+
+      <table className="invoice-items-table">
+        <thead>
+          <tr>
+            <th style={{ width: 36 }}>NO</th>
+            <th>ITEMS / SERVICES</th>
+            <th>HSN / SAC</th>
+            <th>MRP ⓘ</th>
+            <th>QTY</th>
+            <th>PRICE / ITEM (₹)</th>
+            <th>DISCOUNT</th>
+            <th>TAX</th>
+            <th className="right">AMOUNT (₹)</th>
+            <th style={{ width: 36, textAlign: "center" }}><Plus size={16}/></th>
+          </tr>
+        </thead>
+        <tbody>
+          {lines.map((line,index)=>{
+            const taxable=line.product.sellingPrice*line.qty-line.discount;
+            const currentTaxRate=line.taxRate??line.product.taxRate??5;
+            const lineTax=taxable*currentTaxRate/100;
+            return <tr key={line.product.id}>
+              <td>{index+1}</td>
+              <td><strong>{line.product.name}</strong><small>{line.product.sku}</small></td>
+              <td>{line.product.hsnCode||"-"}</td>
+              <td>{money(line.product.mrp)}</td>
+              <td><input className="mini-input" type="number" value={line.qty} min={1} onChange={e=>setLines(lines.map(x=>x.product.id===line.product.id?{...x,qty:Number(e.target.value)}:x))}/></td>
+              <td>{money(line.product.sellingPrice)}</td>
+              <td><input className="mini-input" type="number" value={line.discount} onChange={e=>setLines(lines.map(x=>x.product.id===line.product.id?{...x,discount:Number(e.target.value)}:x))}/></td>
+              <td><select className="mini-select" value={currentTaxRate} onChange={e=>setLines(lines.map(x=>x.product.id===line.product.id?{...x,taxRate:Number(e.target.value)}:x))}>{GST_TAX_OPTIONS.map(opt=><option key={opt.label} value={opt.value}>{opt.label}</option>)}</select><small className="tax-amount-sub">({money(lineTax)})</small></td>
+              <td className="right"><strong>{money(taxable+lineTax)}</strong></td>
+              <td style={{ textAlign: "center" }}><button type="button" className="text-button remove-btn" onClick={()=>setLines(lines.filter(x=>x.product.id!==line.product.id))}>×</button></td>
+            </tr>;
+          })}
+        </tbody>
+      </table>
+
+      <div className="item-add-row polished" style={{ gridTemplateColumns: "1fr 220px" }}>
+        <div className="add-item-dashed-container" onClick={()=>setShowAddItemsModal(true)}>
+          <button type="button" className="dashed-add-item-btn">
+            <Plus size={16}/> Add Item
+          </button>
+        </div>
         <div className="scan-barcode-card" onClick={()=>notify("Barcode scanner active. Ready for item SKU or Barcode scanning.")}>
           <BarcodeIcon />
           <span>Scan Barcode</span>
         </div>
       </div>
-      <table className="invoice-items-table"><thead><tr><th>No</th><th>Items / Services</th><th>HSN/SAC</th><th>MRP</th><th>Qty</th><th>Price/Item</th><th>Discount</th><th>Tax</th><th className="right">Amount</th></tr></thead><tbody>{lines.map((line,index)=>{const taxable=line.product.sellingPrice*line.qty-line.discount;const currentTaxRate=line.taxRate??line.product.taxRate??5;const lineTax=taxable*currentTaxRate/100;return <tr key={line.product.id}><td>{index+1}</td><td><strong>{line.product.name}</strong><small>{line.product.sku}</small></td><td>{line.product.hsnCode||"-"}</td><td>{money(line.product.mrp)}</td><td><input className="mini-input" type="number" value={line.qty} min={1} onChange={e=>setLines(lines.map(x=>x.product.id===line.product.id?{...x,qty:Number(e.target.value)}:x))}/></td><td>{money(line.product.sellingPrice)}</td><td><input className="mini-input" type="number" value={line.discount} onChange={e=>setLines(lines.map(x=>x.product.id===line.product.id?{...x,discount:Number(e.target.value)}:x))}/></td><td><select className="mini-select" value={currentTaxRate} onChange={e=>setLines(lines.map(x=>x.product.id===line.product.id?{...x,taxRate:Number(e.target.value)}:x))}>{GST_TAX_OPTIONS.map(opt=><option key={opt.label} value={opt.value}>{opt.label}</option>)}</select><small className="tax-amount-sub">({money(lineTax)})</small></td><td className="right"><strong>{money(taxable+lineTax)}</strong></td></tr>})}</tbody></table>
+
       <div className="subtotal-strip">
         <span>SUBTOTAL</span>
         <span>{money(subtotal)}</span>
         <span>{money(discount)}</span>
         <span>{money(tax)}</span>
       </div>
-      {!lines.length&&<EmptyState icon={ShoppingCart} title="No items added" text="Search and add products to build the invoice."/>}
+      {!lines.length&&<EmptyState icon={ShoppingCart} title="No items added" text="Click + Add Item to search and add products to build the invoice."/>}
       <div className="invoice-bottom polished functional">
         <div className="invoice-left-links">
           <button className="text-button" onClick={()=>setShowNotes(!showNotes)}>+ Add Notes</button>
@@ -1035,31 +1069,69 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
             <label>QR Text / UPI Link<input value={setting.qrText||""} onChange={e=>setSetting({...setting,qrText:e.target.value})} placeholder="upi://pay?..."/></label>
             <button className="secondary" onClick={saveSettings}>Save UPI / QR</button>
           </div>}
-          <div className="invoice-print-info">
-            <p><strong>Bank / UPI</strong></p>
-            <p>{setting.bankName || "Bank name not set"} {setting.accountNumber && `· ${setting.accountNumber}`}</p>
-            <p>{setting.ifsc} {setting.upiId && `· UPI: ${setting.upiId}`}</p>
-            {setting.qrText&&<div className="qr-box">{setting.qrText}</div>}
-            <p><strong>Terms & Conditions</strong></p>
-            <p>{terms}</p>
-          </div>
         </div>
-        <div className="invoice-totals">
-          <label className="total-edit-row"><span>Additional Charges</span><input type="number" min={0} value={additionalCharges||""} onChange={e=>setAdditionalCharges(Number(e.target.value||0))} placeholder="Rs 0"/></label>
-          <p><span>Taxable Amount</span><strong>{money(taxable)}</strong></p>
-          <label className="total-edit-row"><span>Invoice Discount</span><input type="number" min={0} value={invoiceDiscount||""} onChange={e=>setInvoiceDiscount(Number(e.target.value||0))} placeholder="Rs 0"/></label>
-          <p><span>Line Discount</span><strong>- {money(discount)}</strong></p>
-          <label className="roundoff"><input type="checkbox"/> Auto Round Off <span>{money(0)}</span></label>
-          <h3><span>Total Amount</span><strong>{money(total)}</strong></h3>
-          <label className="paid-check">Mark as fully paid <input type="checkbox" checked={markPaid} onChange={e=>{setMarkPaid(e.target.checked);if(e.target.checked)setPaid(total);}}/></label>
-          <label>Amount Received<div className="amount-received-split-box"><span className="curr-symbol">₹</span><input type="number" value={(markPaid?total:paid)||""} onChange={e=>{setPaid(Number(e.target.value));setMarkPaid(false);}}/><select value={paymentMode} onChange={e=>setPaymentMode(e.target.value as typeof paymentMode)}><option value="Cash">Cash</option><option value="UPI">UPI</option><option value="Card">Card</option><option value="Bank">Bank</option></select></div></label>
-          <div className="balance"><span>Balance Amount</span><strong className="positive">{money(Math.max(0,total-paid))}</strong></div>
+
+        <div className="invoice-totals font-image1">
+          <div className="totals-line-item">
+            <button type="button" className="text-button link-btn" onClick={()=>notify("Enter additional charges")}>+ Add Additional Charges</button>
+            <input type="number" className="inline-num-input" min={0} value={additionalCharges||""} onChange={e=>setAdditionalCharges(Number(e.target.value||0))} placeholder="₹ 0"/>
+          </div>
+
+          <div className="totals-line-item">
+            <span>Taxable Amount</span>
+            <strong>{money(taxable)}</strong>
+          </div>
+
+          <div className="totals-line-item">
+            <button type="button" className="text-button link-btn" onClick={()=>notify("Enter invoice discount")}>+ Add Discount</button>
+            <span className="negative-val">- {money(invoiceDiscount)}</span>
+          </div>
+
+          <div className="roundoff-line">
+            <label className="roundoff-check"><input type="checkbox" defaultChecked /> Auto Round Off</label>
+            <div className="add-split-field">
+              <button className="btn-add-split">+ Add ▾</button>
+              <span className="curr-sym">₹</span>
+              <input type="number" placeholder="Enter Payment amount" readOnly />
+            </div>
+          </div>
+
+          <div className="total-amount-line">
+            <h3>Total Amount</h3>
+            <strong className="grand-total-val">{money(total)}</strong>
+          </div>
+
+          <div className="fully-paid-strip">
+            <span/>
+            <label className="paid-check">Mark as fully paid <input type="checkbox" checked={markPaid} onChange={e=>{setMarkPaid(e.target.checked);if(e.target.checked)setPaid(total);}}/></label>
+          </div>
+
+          <div className="amount-received-line">
+            <span>Amount Received</span>
+            <div className="amount-received-split-box">
+              <span className="curr-symbol">₹</span>
+              <input type="number" value={(markPaid?total:paid)||""} onChange={e=>{setPaid(Number(e.target.value));setMarkPaid(false);}}/>
+              <select value={paymentMode} onChange={e=>setPaymentMode(e.target.value as typeof paymentMode)}>
+                <option value="Cash">Cash</option>
+                <option value="UPI">UPI</option>
+                <option value="Card">Card</option>
+                <option value="Bank">Bank</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="balance-line">
+            <span>Balance Amount</span>
+            <strong className="green-balance">{money(Math.max(0,total-paid))}</strong>
+          </div>
+
           <div className="signature-display-box">
             <span className="signature-label">{setting.signatureText || "Authorized signatory for Happy Bonding Men's Wear"}</span>
             <div className="signature-img-wrap">
               <img src={setting.signatureUrl || defaultSignatureUrl} alt="Stored Digital Signature" />
             </div>
           </div>
+
           <div className="invoice-save-row">
             <button className="secondary" onClick={()=>saveInvoice(true)} disabled={saving||!lines.length}>Save & New</button>
             <button type="button" className="whatsapp-btn" onClick={() => shareWhatsAppInvoice({ phone: selectedParty?.phone, partyName: selectedParty?.name, number: nextNumber || "HB-INV", amount: total, paidAmount: (markPaid ? total : paid), paymentMode })} disabled={!lines.length}>
