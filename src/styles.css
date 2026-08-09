@@ -2976,6 +2976,51 @@ input:checked + .slider:before {
   margin-top: 4px !important;
 }
 
+/* Sidebar Smooth Vertical Scrollbar Fix */
+.sidebar {
+  position: fixed !important;
+  z-index: 20 !important;
+  inset: 0 auto 0 0 !important;
+  width: 252px !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-sizing: border-box !important;
+  padding: 16px 14px !important;
+}
+
+.sidebar nav {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  min-height: 0 !important;
+  padding-right: 3px !important;
+  margin-bottom: 8px !important;
+}
+
+.sidebar nav::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sidebar nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar nav::-webkit-scrollbar-thumb {
+  background: rgba(216, 31, 53, 0.25);
+  border-radius: 4px;
+}
+
+.sidebar nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(216, 31, 53, 0.5);
+}
+
+.branch-card {
+  margin-top: auto !important;
+  flex-shrink: 0 !important;
+}
+
 
 
 
