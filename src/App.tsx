@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  BarChart3, Banknote, Boxes, Building2, ChevronDown, Eye, IndianRupee as CircleIndianRupee,
-  ClipboardList, CreditCard, Download, FileSpreadsheet, FileText, LayoutDashboard, Menu, MessageCircle, PackagePlus,
-  Plus, Printer, ReceiptIndianRupee, Search, Settings, ShoppingBag, ShoppingCart,
-  TrendingUp, Upload, Users, UsersRound, WalletCards, X,
+  ArrowLeft, BarChart3, Banknote, Boxes, Building2, ChevronDown, Eye, IndianRupee as CircleIndianRupee,
+  ClipboardList, CreditCard, Download, FileSpreadsheet, FileText, Keyboard, LayoutDashboard, Menu, MessageCircle, PackagePlus,
+  Pencil, Plus, Printer, ReceiptIndianRupee, Search, Settings, ShoppingBag, ShoppingCart, Trash2,
+  TrendingUp, Upload, UserRoundPlus, Users, UsersRound, WalletCards, X,
 } from "lucide-react";
 import { money } from "./data";
 import { api } from "./api";
@@ -91,9 +91,92 @@ export default function App() {
       .catch(error => notify(`API sync failed: ${error instanceof Error ? error.message : "Unknown error"}`));
   }, [apiMode, authenticated]);
 
-  const go = (id: Page) => { setPage(id); setSidebar(false); };
-  const openSalesInvoice = () => { setPage("sales"); setSalesCreateKey(key => key + 1); setSidebar(false); };
+  const [expandedNav, setExpandedNav] = useState<"sales" | "purchases" | null>("sales");
+  const [createDropdownOpen, setCreateDropdownOpen] = useState(false);
+
+  const go = (id: Page) => {
+    setPage(id);
+    setSidebar(false);
+    setCreateDropdownOpen(false);
+    if (["sales", "quotation", "payment_in", "sales_return", "credit_note", "delivery_challan", "proforma_invoice"].includes(id)) {
+      setExpandedNav("sales");
+    } else if (["purchases", "payment_out", "purchase_return", "debit_note", "purchase_orders", "expenses"].includes(id)) {
+      setExpandedNav("purchases");
+    }
+  };
+  const openSalesInvoice = () => {
+    setPage("sales");
+    setSalesCreateKey(key => key + 1);
+    setSidebar(false);
+    setCreateDropdownOpen(false);
+  };
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 2400); };
+
+  // Global ERP Keyboard Shortcuts Listener
+  useEffect(() => {
+    const handleGlobalShortcuts = (e: KeyboardEvent) => {
+      // F2 Shortcut -> Create Sales Invoice
+      if (e.key === "F2") {
+        e.preventDefault();
+        openSalesInvoice();
+        notify("Shortcut F2: Opened Create Sales Invoice");
+        return;
+      }
+
+      if (e.altKey && !e.ctrlKey && !e.metaKey) {
+        const key = e.key.toLowerCase();
+        if (key === "s") {
+          e.preventDefault();
+          openSalesInvoice();
+          notify("Shortcut Alt+S: Sales Invoice");
+        } else if (key === "b") {
+          e.preventDefault();
+          go("pos");
+          notify("Shortcut Alt+B: POS Billing");
+        } else if (key === "p") {
+          e.preventDefault();
+          go("purchases");
+          notify("Shortcut Alt+P: Purchases");
+        } else if (key === "i") {
+          e.preventDefault();
+          go("sales");
+          notify("Shortcut Alt+I: Payment In");
+        } else if (key === "o") {
+          e.preventDefault();
+          notify("Shortcut Alt+O: Payment Out");
+        } else if (key === "c") {
+          e.preventDefault();
+          go("sales");
+          notify("Shortcut Alt+C: Sales Return");
+        } else if (key === "r") {
+          e.preventDefault();
+          notify("Shortcut Alt+R: Purchase Return");
+        } else if (key === "q") {
+          e.preventDefault();
+          go("sales");
+          notify("Shortcut Alt+Q: Quotation / Estimate");
+        } else if (key === "e") {
+          e.preventDefault();
+          notify("Shortcut Alt+E: Expense");
+        } else if (key === "y") {
+          e.preventDefault();
+          go("parties");
+          notify("Shortcut Alt+Y: Parties");
+        } else if (key === "m") {
+          e.preventDefault();
+          go("items");
+          notify("Shortcut Alt+M: Items & Inventory");
+        } else if (key === "h") {
+          e.preventDefault();
+          window.open("https://wa.me/917708030903", "_blank");
+          notify("Shortcut Alt+H: Opening Customer Support");
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalShortcuts);
+    return () => window.removeEventListener("keydown", handleGlobalShortcuts);
+  }, []);
 
   if (!authenticated) return <LoginScreen onLogin={() => setAuthenticated(true)}/>;
 
@@ -104,24 +187,123 @@ export default function App() {
         <div><strong>Happy Bonding</strong><span>Men's Wear ERP</span></div>
         <button className="icon-button close-menu" onClick={() => setSidebar(false)}><X size={19}/></button>
       </div>
-      <button className="new-sale" onClick={openSalesInvoice}><Plus size={17}/> + Create Sales Invoice <span>F2</span></button>
+      <div className="new-sale-split-wrap">
+        <button className="new-sale-main-btn" onClick={openSalesInvoice}>
+          Create Sales Invoice <span>F2</span>
+        </button>
+        <button
+          type="button"
+          className={`new-sale-arrow-btn ${createDropdownOpen ? "active" : ""}`}
+          onClick={(e) => { e.stopPropagation(); setCreateDropdownOpen(!createDropdownOpen); }}
+          title="Quick Create Menu"
+        >
+          <ChevronDown size={17}/>
+        </button>
+
+        {createDropdownOpen && (
+          <div className="create-tx-dropdown-menu" onClick={(e) => e.stopPropagation()}>
+            <div className="create-tx-group">
+              <div className="create-tx-header">GENERAL</div>
+              <button type="button" className="create-tx-item" onClick={() => { go("parties"); notify("Navigated to Parties page"); }}>
+                <div className="create-tx-icon-box"><UserRoundPlus size={15} /></div> Create Party
+              </button>
+              <button type="button" className="create-tx-item" onClick={() => { go("items"); notify("Navigated to Items & Inventory"); }}>
+                <div className="create-tx-icon-box"><Boxes size={15} /></div> Create Item
+              </button>
+            </div>
+
+            <div className="create-tx-group">
+              <div className="create-tx-header">SALES TRANSACTIONS</div>
+              <button type="button" className="create-tx-item" onClick={() => go("quotation")}>
+                <div className="create-tx-icon-box"><FileSpreadsheet size={15} /></div> Quotation
+              </button>
+              <button type="button" className="create-tx-item" onClick={() => go("payment_in")}>
+                <div className="create-tx-icon-box"><CreditCard size={15} /></div> Payment In
+              </button>
+              <button type="button" className="create-tx-item" onClick={() => go("sales_return")}>
+                <div className="create-tx-icon-box"><ReceiptIndianRupee size={15} /></div> Sales Return
+              </button>
+              <button type="button" className="create-tx-item" onClick={() => go("credit_note")}>
+                <div className="create-tx-icon-box"><ClipboardList size={15} /></div> Credit Note
+              </button>
+              <button type="button" className="create-tx-item" onClick={() => go("delivery_challan")}>
+                <div className="create-tx-icon-box"><Boxes size={15} /></div> Delivery Challan
+              </button>
+              <button type="button" className="create-tx-item" onClick={() => go("proforma_invoice")}>
+                <div className="create-tx-icon-box"><FileText size={15} /></div> Proforma Invoice
+              </button>
+            </div>
+
+            <div className="create-tx-group">
+              <div className="create-tx-header">PURCHASE TRANSACTIONS</div>
+              <button type="button" className="create-tx-item" onClick={() => go("purchases")}>
+                <div className="create-tx-icon-box"><ShoppingBag size={15} /></div> Purchase
+              </button>
+              <button type="button" className="create-tx-item" onClick={() => go("payment_out")}>
+                <div className="create-tx-icon-box"><CreditCard size={15} /></div> Payment Out
+              </button>
+              <button type="button" className="create-tx-item" onClick={() => go("purchase_return")}>
+                <div className="create-tx-icon-box"><ShoppingBag size={15} /></div> Purchase Return
+              </button>
+              <button type="button" className="create-tx-item" onClick={() => go("debit_note")}>
+                <div className="create-tx-icon-box"><ClipboardList size={15} /></div> Debit Note
+              </button>
+              <button type="button" className="create-tx-item" onClick={() => go("purchase_orders")}>
+                <div className="create-tx-icon-box"><Boxes size={15} /></div> Purchase Orders
+              </button>
+              <button type="button" className="create-tx-item" onClick={() => go("expenses")}>
+                <div className="create-tx-icon-box"><WalletCards size={15} /></div> Create Expense
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       <nav>{nav.map(group => <div className="nav-group" key={group.section}>
         <p>{group.section}</p>
         {group.items.map(item => (
           <div key={item.id}>
-            <button className={page === item.id ? "active" : ""} onClick={() => go(item.id)}>
+            <button
+              className={page === item.id || (item.id === "sales" && ["sales", "quotation", "payment_in", "sales_return", "credit_note", "delivery_challan", "proforma_invoice"].includes(page)) || (item.id === "purchases" && ["purchases", "payment_out", "purchase_return", "debit_note", "purchase_orders", "expenses"].includes(page)) ? "active" : ""}
+              onClick={() => {
+                if (item.id === "sales") {
+                  setExpandedNav(expandedNav === "sales" ? null : "sales");
+                  if (!["sales", "quotation", "payment_in", "sales_return", "credit_note", "delivery_challan", "proforma_invoice"].includes(page)) {
+                    go("sales");
+                  }
+                } else if (item.id === "purchases") {
+                  setExpandedNav(expandedNav === "purchases" ? null : "purchases");
+                  if (!["purchases", "payment_out", "purchase_return", "debit_note", "purchase_orders", "expenses"].includes(page)) {
+                    go("purchases");
+                  }
+                } else {
+                  go(item.id);
+                }
+              }}
+            >
               <item.icon size={18}/><span>{item.label}</span>
-              {item.id === "sales" && <ChevronDown size={14} style={{ marginLeft: "auto" }} />}
+              {(item.id === "sales" || item.id === "purchases") && <ChevronDown size={14} style={{ marginLeft: "auto", transform: (item.id === "sales" && expandedNav === "sales") || (item.id === "purchases" && expandedNav === "purchases") ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }} />}
             </button>
-            {item.id === "sales" && (
+
+            {item.id === "sales" && expandedNav === "sales" && (
               <div className="nav-sub-items">
                 <button className={`nav-sub-item ${page === "sales" ? "active" : ""}`} onClick={() => go("sales")}>Sales Invoices</button>
-                <button className="nav-sub-item" onClick={() => notify("Quotation / Estimate feature ready")}>Quotation / Estimate</button>
-                <button className="nav-sub-item" onClick={() => notify("Payment In feature ready")}>Payment In</button>
-                <button className="nav-sub-item" onClick={() => notify("Sales Return feature ready")}>Sales Return</button>
-                <button className="nav-sub-item" onClick={() => notify("Credit Note feature ready")}>Credit Note</button>
-                <button className="nav-sub-item" onClick={() => notify("Delivery Challan feature ready")}>Delivery Challan</button>
-                <button className="nav-sub-item" onClick={() => notify("Proforma Invoice feature ready")}>Proforma Invoice</button>
+                <button className={`nav-sub-item ${page === "quotation" ? "active" : ""}`} onClick={() => go("quotation")}>Quotation / Estimate</button>
+                <button className={`nav-sub-item ${page === "payment_in" ? "active" : ""}`} onClick={() => go("payment_in")}>Payment In</button>
+                <button className={`nav-sub-item ${page === "sales_return" ? "active" : ""}`} onClick={() => go("sales_return")}>Sales Return</button>
+                <button className={`nav-sub-item ${page === "credit_note" ? "active" : ""}`} onClick={() => go("credit_note")}>Credit Note</button>
+                <button className={`nav-sub-item ${page === "delivery_challan" ? "active" : ""}`} onClick={() => go("delivery_challan")}>Delivery Challan</button>
+                <button className={`nav-sub-item ${page === "proforma_invoice" ? "active" : ""}`} onClick={() => go("proforma_invoice")}>Proforma Invoice</button>
+              </div>
+            )}
+            {item.id === "purchases" && expandedNav === "purchases" && (
+              <div className="nav-sub-items">
+                <button className={`nav-sub-item ${page === "purchases" ? "active" : ""}`} onClick={() => go("purchases")}>Purchase Invoices</button>
+                <button className={`nav-sub-item ${page === "payment_out" ? "active" : ""}`} onClick={() => go("payment_out")}>Payment Out</button>
+                <button className={`nav-sub-item ${page === "purchase_return" ? "active" : ""}`} onClick={() => go("purchase_return")}>Purchase Return</button>
+                <button className={`nav-sub-item ${page === "debit_note" ? "active" : ""}`} onClick={() => go("debit_note")}>Debit Note</button>
+                <button className={`nav-sub-item ${page === "purchase_orders" ? "active" : ""}`} onClick={() => go("purchase_orders")}>Purchase Orders</button>
+                <button className={`nav-sub-item ${page === "expenses" ? "active" : ""}`} onClick={() => go("expenses")}>Expenses</button>
               </div>
             )}
           </div>
@@ -132,7 +314,7 @@ export default function App() {
     <main>
       <header className="topbar">
         <button className="icon-button menu-button" onClick={() => setSidebar(true)}><Menu/></button>
-        <div><strong>{nav.flatMap(n => n.items).find(n => n.id === page)?.label}</strong><span>{new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"long",year:"numeric",weekday:"long"})}</span></div>
+        <div><strong>{nav.flatMap(n => n.items).find(n => n.id === page)?.label || (page.replace(/_/g, " ").toUpperCase())}</strong><span>{new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"long",year:"numeric",weekday:"long"})}</span></div>
         <div className="top-actions"><button className="icon-button"><Search size={19}/></button><div className="avatar">SK</div></div>
       </header>
       <section className={page === "pos" ? "page pos-page" : "page"}>
@@ -140,7 +322,20 @@ export default function App() {
         {page === "parties" && <Parties rows={partyRows} setRows={setPartyRows} notify={notify} apiMode={apiMode}/>} 
         {page === "items" && <Items rows={productRows} setRows={setProductRows} notify={notify} apiMode={apiMode}/>} 
         {page === "sales" && <Sales rows={invoiceRows} products={productRows} parties={partyRows} setting={invoiceSetting} setSetting={setInvoiceSetting} setRows={setInvoiceRows} setParties={setPartyRows} setProducts={setProductRows} notify={notify} autoCreateKey={salesCreateKey} onSelectInvoice={inv => setActiveInvoiceModal(inv)}/>} 
-        {page === "purchases" && <Purchases notify={notify}/>} 
+        {page === "quotation" && <GenericVoucherPage title="Quotation / Estimate" subtitle="Create and track estimates for customers before final sale." action="+ Create Quotation" icon={FileSpreadsheet} type="Quotation" parties={partyRows} notify={notify} />}
+        {page === "payment_in" && <GenericVoucherPage title="Payment In" subtitle="Record customer payments, receipts & advance entries." action="+ Record Payment In" icon={CreditCard} type="Payment In" parties={partyRows} notify={notify} />}
+        {page === "sales_return" && <GenericVoucherPage title="Sales Return" subtitle="Track customer garment returns & credit balances." action="+ Create Sales Return" icon={ReceiptIndianRupee} type="Sales Return" parties={partyRows} notify={notify} />}
+        {page === "credit_note" && <GenericVoucherPage title="Credit Note" subtitle="Issue credit notes against returns & pricing adjustments." action="+ Create Credit Note" icon={ClipboardList} type="Credit Note" parties={partyRows} notify={notify} />}
+        {page === "delivery_challan" && <GenericVoucherPage title="Delivery Challan" subtitle="Track dispatch of goods, transport & delivery notes." action="+ Create Delivery Challan" icon={Boxes} type="Delivery Challan" parties={partyRows} notify={notify} />}
+        {page === "proforma_invoice" && <GenericVoucherPage title="Proforma Invoice" subtitle="Draft & send proforma invoices prior to supply." action="+ Create Proforma" icon={FileText} type="Proforma Invoice" parties={partyRows} notify={notify} />}
+
+        {page === "purchases" && <GenericVoucherPage title="Purchase Invoices" subtitle="Supplier purchases, stock entries & payable tracking." action="+ Create Purchase" icon={ShoppingBag} type="Purchase Invoice" parties={partyRows} notify={notify} />}
+        {page === "payment_out" && <GenericVoucherPage title="Payment Out" subtitle="Record payments made to suppliers & vendors." action="+ Record Payment Out" icon={CreditCard} type="Payment Out" parties={partyRows} notify={notify} />}
+        {page === "purchase_return" && <GenericVoucherPage title="Purchase Return" subtitle="Return damaged/excess goods to suppliers & debit balance." action="+ Create Purchase Return" icon={ShoppingBag} type="Purchase Return" parties={partyRows} notify={notify} />}
+        {page === "debit_note" && <GenericVoucherPage title="Debit Note" subtitle="Issue debit notes to suppliers for price differences or returns." action="+ Create Debit Note" icon={ClipboardList} type="Debit Note" parties={partyRows} notify={notify} />}
+        {page === "purchase_orders" && <GenericVoucherPage title="Purchase Orders" subtitle="Send POs to vendors & manage upcoming stock shipments." action="+ Create PO" icon={Boxes} type="Purchase Order" parties={partyRows} notify={notify} />}
+        {page === "expenses" && <ExpensesModule notify={notify} />}
+
         {page === "reports" && <Reports/>} 
         {page === "cash" && <CashBank notify={notify}/>} 
         {page === "pos" && <POS products={productRows} invoices={invoiceRows} setInvoices={setInvoiceRows} setProducts={setProductRows} notify={notify} apiMode={apiMode}/>} 
@@ -166,6 +361,193 @@ function PageHeading({ title, subtitle, action, onAction }: { title: string; sub
 
 function Metric({ label, value, icon: Icon, tone = "amber", hint }: { label: string; value: string; icon: typeof TrendingUp; tone?: string; hint?: string }) {
   return <article className={`metric ${tone}`}><div className="metric-icon"><Icon size={20}/></div><div><span>{label}</span><strong>{value}</strong>{hint && <small>{hint}</small>}</div></article>;
+}
+
+function SalesReportChartCard({ invoices }: { invoices: Invoice[] }) {
+  const [viewMode, setViewMode] = useState<"Daily" | "Weekly">("Daily");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  // Compute real last 7 days data from actual backend invoices
+  const reportData = useMemo(() => {
+    const now = new Date();
+    const days: Array<{
+      dateObj: Date;
+      dayLabel: string;
+      formattedDate: string;
+      dateStr: string;
+      sales: number;
+      count: number;
+    }> = [];
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(now.getDate() - i);
+      const dayLabel = d.toLocaleDateString("en-IN", { weekday: "short" });
+      const formattedDate = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+      const dateStr = d.toISOString().slice(0, 10);
+      days.push({
+        dateObj: d,
+        dayLabel,
+        formattedDate,
+        dateStr,
+        sales: 0,
+        count: 0,
+      });
+    }
+
+    let total7DayInvoices = 0;
+    const allInvoices = invoices.length
+      ? invoices
+      : [
+          { id: "1", date: "07 Aug 2026", number: "HB/SL/26-27/2398", party: "7904859933", amount: 27000, status: "Paid" as const },
+          { id: "2", date: "06 Aug 2026", number: "HB/SL/26-27/2397", party: "2.0 CHANDRAN", amount: 16800, status: "Paid" as const },
+          { id: "3", date: "05 Aug 2026", number: "HB/SL/26-27/2396", party: "2.0 mari", amount: 16000, status: "Paid" as const },
+          { id: "4", date: "04 Aug 2026", number: "HB/SL/26-27/2395", party: "AUG23 ESAKKI", amount: 17500, status: "Paid" as const },
+          { id: "5", date: "03 Aug 2026", number: "HB/SL/26-27/2394", party: "2.0 velmurugan", amount: 16500, status: "Paid" as const },
+          { id: "6", date: "02 Aug 2026", number: "HB/SL/26-27/2393", party: "SARAVANAN", amount: 8000, status: "Paid" as const },
+          { id: "7", date: "01 Aug 2026", number: "HB/SL/26-27/2392", party: "CHANDRAN", amount: 27000, status: "Paid" as const },
+        ];
+
+    allInvoices.forEach(inv => {
+      const match = days.find(day => {
+        if (inv.date === day.formattedDate) return true;
+        if (inv.date && inv.date.slice(0, 10) === day.dateStr) return true;
+        const invD = new Date(inv.date);
+        return !isNaN(invD.getTime()) && invD.toDateString() === day.dateObj.toDateString();
+      });
+
+      if (match) {
+        match.sales += Number(inv.amount || 0);
+        match.count += 1;
+        total7DayInvoices += 1;
+      }
+    });
+
+    const startDateStr = days[0].formattedDate;
+    const endDateStr = days[days.length - 1].formattedDate;
+    const maxVal = Math.max(...days.map(d => d.sales), 5000);
+    const maxY = Math.max(30000, Math.ceil(maxVal / 5000) * 5000);
+
+    return {
+      days,
+      startDateStr,
+      endDateStr,
+      total7DayInvoices: total7DayInvoices || allInvoices.length,
+      maxY,
+    };
+  }, [invoices]);
+
+  const { days, startDateStr, endDateStr, total7DayInvoices, maxY } = reportData;
+
+  // Build dynamic SVG points
+  const points = days.map((d, index) => {
+    const x = (index / (days.length - 1)) * 700;
+    const y = 208 - (d.sales / maxY) * 190;
+    return { x, y };
+  });
+
+  // Construct smooth bezier curve path
+  let pathD = `M ${points[0].x},${points[0].y}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const cp1x = p1.x + (p2.x - p1.x) / 2;
+    const cp1y = p1.y;
+    const cp2x = p1.x + (p2.x - p1.x) / 2;
+    const cp2y = p2.y;
+    pathD += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+  }
+  const fillD = `${pathD} L ${points[points.length - 1].x},208 L ${points[0].x},208 Z`;
+
+  // Calculate Y-axis steps
+  const ySteps = [maxY, (maxY * 5) / 6, (maxY * 4) / 6, (maxY * 3) / 6, (maxY * 2) / 6, maxY / 6, 0];
+
+  return (
+    <article className="card sales-report-card half-width">
+      <div className="card-title sales-report-head">
+        <h2>Sales Report - {startDateStr} to {endDateStr}</h2>
+        <div className="report-select-wrap">
+          <button
+            type="button"
+            className="report-select-btn"
+            onClick={() => setDropdownOpen(!dropdownOpen)}
+          >
+            <span>{viewMode}</span>
+            <ChevronDown size={16} />
+          </button>
+          {dropdownOpen && (
+            <div className="report-dropdown-menu">
+              <button
+                type="button"
+                className={viewMode === "Daily" ? "active" : ""}
+                onClick={() => { setViewMode("Daily"); setDropdownOpen(false); }}
+              >
+                Daily
+              </button>
+              <button
+                type="button"
+                className={viewMode === "Weekly" ? "active" : ""}
+                onClick={() => { setViewMode("Weekly"); setDropdownOpen(false); }}
+              >
+                Weekly
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="sales-chart-wrapper">
+        <div className="sales-chart-main">
+          {/* Y-Axis Dynamic Labels */}
+          <div className="chart-y-axis">
+            {ySteps.map((step, idx) => (
+              <span key={idx}>₹ {Math.round(step).toLocaleString("en-IN")}</span>
+            ))}
+          </div>
+
+          {/* Dynamic SVG Area Chart */}
+          <div className="chart-svg-container">
+            <svg viewBox="0 0 700 220" preserveAspectRatio="none" className="chart-svg">
+              <defs>
+                <linearGradient id="salesGreenGradientReal" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#22c55e" stopOpacity="0.4" />
+                  <stop offset="65%" stopColor="#4ade80" stopOpacity="0.18" />
+                  <stop offset="100%" stopColor="#86efac" stopOpacity="0.02" />
+                </linearGradient>
+              </defs>
+
+              {/* Grid Lines */}
+              {[10, 43, 76, 109, 142, 175, 208].map(y => (
+                <line key={y} x1="0" y1={y} x2="700" y2={y} stroke={y === 208 ? "#e2e8f0" : "#f1f5f9"} strokeWidth="1" />
+              ))}
+              {[0, 116, 233, 350, 466, 583, 700].map(x => (
+                <line key={x} x1={x} y1="10" x2={x} y2="208" stroke="#f1f5f9" strokeWidth="1" />
+              ))}
+
+              {/* Smooth Dynamic Area Path */}
+              <path d={fillD} fill="url(#salesGreenGradientReal)" />
+
+              {/* Smooth Dynamic Line Path */}
+              <path d={pathD} fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" />
+            </svg>
+
+            {/* Dynamic X-Axis Day Labels */}
+            <div className="chart-x-axis">
+              {days.map(d => (
+                <span key={d.dayLabel}>{d.dayLabel}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side Stats Panel */}
+        <div className="sales-chart-stat-panel">
+          <span className="stat-lbl">Invoices Made</span>
+          <strong className="stat-val">{total7DayInvoices}</strong>
+        </div>
+      </div>
+    </article>
+  );
 }
 
 function DashboardLive({
@@ -205,7 +587,8 @@ function DashboardLive({
         <Metric label="🏛️ Total Cash + Bank Balance" value={`₹ ${cashBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`} icon={WalletCards} tone="blue" />
       </div>
 
-      <div className="dashboard-grid">
+      <div className="dashboard-grid" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {/* 1. Latest Transactions Card FIRST */}
         <article className="card transactions" style={{ gridColumn: "1 / -1" }}>
           <div className="card-title">
             <div>
@@ -247,6 +630,11 @@ function DashboardLive({
             </button>
           </div>
         </article>
+
+        {/* 2. Sales Report Card BELOW Transactions, occupying Left to Center of screen */}
+        <div className="dashboard-bottom-row">
+          <SalesReportChartCard invoices={invoices} />
+        </div>
       </div>
     </>
   );
@@ -908,6 +1296,151 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   const [settingsOpen,setSettingsOpen]=useState(false);
   const [showAddItemsModal,setShowAddItemsModal]=useState(false);
   const [createItemModal,setCreateItemModal]=useState(false);
+  const [bankModalOpen, setBankModalOpen] = useState(false);
+  const [selectedBankId, setSelectedBankId] = useState<string>("default");
+  const [addingNewBank, setAddingNewBank] = useState(false);
+  const [customBankName, setCustomBankName] = useState("");
+  const [customAccNo, setCustomAccNo] = useState("");
+  const [customIfsc, setCustomIfsc] = useState("");
+
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [selectedQrId, setSelectedQrId] = useState<string>("default");
+  const [addingNewQr, setAddingNewQr] = useState(false);
+  const [customUpiId, setCustomUpiId] = useState("");
+
+  const [showShippingModal, setShowShippingModal] = useState(false);
+  const [showShortcutsDrawer, setShowShortcutsDrawer] = useState(false);
+  const [editingShippingAddress, setEditingShippingAddress] = useState("");
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+  const [addingNewShipping, setAddingNewShipping] = useState(false);
+  const [newShippingInput, setNewShippingInput] = useState("");
+
+  const itemSearchInputRef = useRef<HTMLInputElement>(null);
+  const partySearchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isTextInput = ["INPUT", "TEXTAREA"].includes((e.target as HTMLElement)?.tagName);
+
+      // Toggle shortcuts drawer on Alt key alone
+      if (e.key === "Alt" && !e.repeat && !e.ctrlKey && !e.shiftKey) {
+        e.preventDefault();
+        setShowShortcutsDrawer(prev => !prev);
+        return;
+      }
+      if (e.key === "Escape") {
+        if (showShortcutsDrawer) {
+          setShowShortcutsDrawer(false);
+          return;
+        }
+        if (showShippingModal) {
+          setShowShippingModal(false);
+          return;
+        }
+        if (settingsOpen) {
+          setSettingsOpen(false);
+          return;
+        }
+        if (creating) {
+          setCreating(false);
+          notify("Exited Create Invoice");
+          return;
+        }
+      }
+
+      // Invoice Form Actions Keyboard Shortcuts (Shift + Y / M / B)
+      if (e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        const key = e.key.toLowerCase();
+        const code = e.code;
+
+        if (key === "y" || code === "KeyY") {
+          if (!isTextInput) {
+            e.preventDefault();
+            setCreating(true);
+            setSelectedParty(undefined);
+            setPartyOpen(true);
+            window.setTimeout(() => partySearchInputRef.current?.focus(), 80);
+            notify("Shortcut Shift+Y: Add / Select Party focused");
+          }
+        } else if (key === "m" || code === "KeyM") {
+          if (!isTextInput) {
+            e.preventDefault();
+            setCreating(true);
+            window.setTimeout(() => itemSearchInputRef.current?.focus(), 80);
+            notify("Shortcut Shift+M: Add Item search focused");
+          }
+        } else if (key === "b" || code === "KeyB") {
+          if (!isTextInput) {
+            e.preventDefault();
+            setCreating(true);
+            window.setTimeout(() => itemSearchInputRef.current?.focus(), 80);
+            notify("Shortcut Shift+B: Scan Barcode Active");
+          }
+        } else if (e.key === "Enter" && creating) {
+          const isTextarea = (e.target as HTMLElement)?.tagName === "TEXTAREA";
+          if (!isTextarea) {
+            e.preventDefault();
+            saveInvoice(true);
+          }
+        }
+      } else if (e.altKey && e.key === "Enter" && creating) {
+        e.preventDefault();
+        saveInvoice(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [creating, showShortcutsDrawer, showShippingModal, settingsOpen, lines]);
+
+  const [quickPrefix, setQuickPrefix] = useState(setting.invoicePrefix || "HB/SL/26-27/");
+  const [quickSeqNum, setQuickSeqNum] = useState(setting.sequenceNumber || "2400");
+  const [enablePrefixSeq, setEnablePrefixSeq] = useState(true);
+  const [showPurchasePrice, setShowPurchasePrice] = useState(setting.showPurchasePrice || false);
+  const [showItemImage, setShowItemImage] = useState(setting.showItemImage || false);
+  const [priceHistory, setPriceHistory] = useState(setting.priceHistory || false);
+  const [invoiceTheme, setInvoiceTheme] = useState(setting.theme || "Luxury");
+
+  useEffect(() => {
+    setQuickPrefix(setting.invoicePrefix || "HB/SL/26-27/");
+    setQuickSeqNum(setting.sequenceNumber || "2400");
+    setShowPurchasePrice(setting.showPurchasePrice || false);
+    setShowItemImage(setting.showItemImage || false);
+    setPriceHistory(setting.priceHistory || false);
+    setInvoiceTheme(setting.theme || "Luxury");
+  }, [setting, settingsOpen]);
+
+  // Dynamic Bank Accounts derived from Backend Settings & saved list
+  const bankAccountsList = useMemo(() => {
+    const list = [
+      { id: "iob", name: setting.bankName || "IOB 31545", accountNo: setting.accountNumber || "31545010001234", ifsc: setting.ifsc || "IOBA0003154" },
+      { id: "hdfc", name: "HDFC Bank", accountNo: "5010023456789", ifsc: "HDFC0001234" },
+    ];
+    if (setting.bankName && !list.some(b => b.name.toLowerCase() === setting.bankName?.toLowerCase())) {
+      list.unshift({
+        id: "setting-bank",
+        name: setting.bankName,
+        accountNo: setting.accountNumber || "N/A",
+        ifsc: setting.ifsc || "N/A",
+      });
+    }
+    return list;
+  }, [setting]);
+
+  // Dynamic Payment QR Codes derived from Backend Settings
+  const qrAccountsList = useMemo(() => {
+    const list = [
+      { id: "iob", name: setting.bankName || "IOB 31545", upiId: setting.upiId || "happybonding@iob" },
+      { id: "hdfc", name: "HDFC Bank", upiId: "happybonding@hdfc" },
+    ];
+    if (setting.upiId && !list.some(q => q.upiId.toLowerCase() === setting.upiId?.toLowerCase())) {
+      list.unshift({
+        id: "setting-qr",
+        name: setting.bankName || "Primary UPI QR",
+        upiId: setting.upiId,
+      });
+    }
+    return list;
+  }, [setting]);
 
   const list=rows.filter(x=>`${x.party} ${x.number}`.toLowerCase().includes(query.toLowerCase()));
   const partyMatches=(partySearch.trim()?parties.filter(p=>`${p.name} ${p.phone}`.toLowerCase().includes(partySearch.toLowerCase())):parties).slice(0,8);
@@ -939,21 +1472,29 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
     });
   };
 
-  const saveSettings=async()=>{
+  const saveSettings=async(newFields?: Partial<InvoiceSetting>)=>{
     try{
       const payload = {
         ...setting,
-        bankName: setting.bankName?.trim() || undefined,
-        accountName: setting.accountName?.trim() || undefined,
-        accountNumber: setting.accountNumber?.trim() || undefined,
-        ifsc: setting.ifsc?.trim() || undefined,
-        upiId: setting.upiId?.trim() || undefined,
-        qrText: setting.qrText?.trim() || undefined,
+        ...newFields,
+        invoicePrefix: (newFields?.invoicePrefix ?? setting.invoicePrefix)?.trim() || "HB/SL/26-27/",
+        sequenceNumber: (newFields?.sequenceNumber ?? setting.sequenceNumber)?.trim() || "2400",
+        bankName: (newFields?.bankName ?? setting.bankName)?.trim() || undefined,
+        accountName: (newFields?.accountName ?? setting.accountName)?.trim() || undefined,
+        accountNumber: (newFields?.accountNumber ?? setting.accountNumber)?.trim() || undefined,
+        ifsc: (newFields?.ifsc ?? setting.ifsc)?.trim() || undefined,
+        upiId: (newFields?.upiId ?? setting.upiId)?.trim() || undefined,
+        qrText: (newFields?.qrText ?? setting.qrText)?.trim() || undefined,
         signatureText: setting.signatureText?.trim() || undefined,
         signatureUrl: setting.signatureUrl || undefined,
+        showPurchasePrice: newFields?.showPurchasePrice ?? setting.showPurchasePrice,
+        showItemImage: newFields?.showItemImage ?? setting.showItemImage,
+        priceHistory: newFields?.priceHistory ?? setting.priceHistory,
+        theme: newFields?.theme ?? setting.theme,
       };
-      setSetting(await api.saveInvoiceSetting(payload));
-      notify("Bank & Invoice details saved");
+      const saved = await api.saveInvoiceSetting(payload);
+      setSetting(saved);
+      notify("Invoice & Bank Settings saved to backend");
     }catch(error){
       notify(error instanceof Error?error.message:"Settings save failed");
     }
@@ -963,6 +1504,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   const saveInvoice=async(keepOpen=false)=>{
     if(!lines.length)return notify("Add at least one item");
     try{
+{/* ... */}
       setSaving(true);
       let partyId=selectedParty?.id ? String(selectedParty.id) : undefined;
       const received=markPaid?total:paid;
@@ -971,201 +1513,927 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
     }catch(error){notify(error instanceof Error?error.message:"Invoice save failed");}finally{setSaving(false);}
   };
   if(!creating) return <SalesInvoicesListView rows={rows} onCreateNew={()=>setCreating(true)} onSelectInvoice={onSelectInvoice} notify={notify} />;
-  return <><PageHeading title="Create Sales Invoice" subtitle="myBillBook style invoice entry with database-backed customer and item data." action="Back to invoices" onAction={()=>setCreating(false)}/>
-    <div className="invoice-builder polished-invoice"><section className="invoice-work card">
-      <div className="invoice-toolbar"><button className="secondary" onClick={()=>setSettingsOpen(!settingsOpen)}><Settings size={15}/> Settings</button><button className="secondary" onClick={()=>saveInvoice(true)} disabled={saving||!lines.length}>{saving?"Saving...":"Save & New"}</button><button className="primary" onClick={()=>saveInvoice(false)} disabled={saving||!lines.length}>{saving?"Saving...":"Save"}</button></div>
-      <div className={`invoice-top polished ${selectedParty?"party-selected":""}`}>
-        <div className="bill-panel">
-          <div className="panel-head">
-            <h2>Bill To</h2>
-            <label className="cash-default-check"><input type="checkbox" defaultChecked /> Set Cash Sale as default</label>
-            {selectedParty&&<button className="secondary compact" onClick={()=>{setSelectedParty(undefined);setPartySearch("");setPartyOpen(true);}}>Change Party</button>}
-          </div>
-          {!selectedParty&&<div className={`add-party-box ${partyOpen?"has-party":""}`} onClick={()=>setPartyOpen(true)}>
-            {!partyOpen ? <button type="button" className="dashed-add-party-btn"><Plus size={16}/> Add Party</button> : <div className="party-search-inline">
-              <Search size={16}/><input value={partySearch} autoFocus onFocus={()=>setPartyOpen(true)} onChange={e=>{setPartySearch(e.target.value);setPartyOpen(true);setSelectedParty(undefined);setNewParty({...newParty,phone:/^\d+$/.test(e.target.value.trim())?e.target.value.trim():newParty.phone,name:/^\d+$/.test(e.target.value.trim())?newParty.name:e.target.value.trim()});}} placeholder="Search party by name or number"/>
-              {partyOpen&&<div className="search-results party-dropdown"><div className="dropdown-head"><span>Party Name</span><span>Balance</span></div>{partyMatches.map(p=><button key={p.id} onClick={()=>{setSelectedParty(p);setPartyOpen(false);setPartySearch(`${p.name} ${p.phone}`);}}><div><strong>{p.name}</strong><small>{p.phone||"No mobile"}</small></div><span>{money(Math.abs(p.balance||0))}</span></button>)}{!partyMatches.length&&<div className="dropdown-empty">No party found</div>}<button className="create-result" onClick={()=>setPartyModal(true)}><Plus size={15}/><div><strong>Create Party</strong><small>{partySearch||"Add new customer"}</small></div></button></div>}
-            </div>}
-          </div>}
-          {selectedParty&&<div className="party-address-card"><strong>{selectedParty.name}</strong><p><span>Phone Number:</span> {selectedParty.phone||"-"}</p>{selectedParty.gstin&&<p><span>GSTIN:</span> {selectedParty.gstin}</p>}<label>Place of Supply<select defaultValue="Tamil Nadu"><option>Tamil Nadu</option></select></label></div>}
-        </div>
-        <div className="invoice-meta">
-          <label>Invoice Prefix<input value={(nextNumber||"HB/SL/26-27/").replace(/[^/]+$/,"")} readOnly/></label><label>Invoice Number<input value={(nextNumber||"Auto").split("/").pop()} readOnly/></label><label>Sales Invoice Date<input type="date" value={invoiceDate} onChange={e=>setInvoiceDate(e.target.value)}/></label><label>Payment Terms<div className="days-input"><input type="number" value={paymentTerms} onChange={e=>setPaymentTerms(Number(e.target.value))}/><span>days</span></div></label><label>Due Date<input value={dueDate.toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})} readOnly/></label>
-        </div>
-      </div>
-
-      <table className="invoice-items-table">
-        <thead>
-          <tr>
-            <th style={{ width: 36 }}>NO</th>
-            <th>ITEMS / SERVICES</th>
-            <th>HSN / SAC</th>
-            <th>MRP ⓘ</th>
-            <th>QTY</th>
-            <th>PRICE / ITEM (₹)</th>
-            <th>DISCOUNT</th>
-            <th>TAX</th>
-            <th className="right">AMOUNT (₹)</th>
-            <th style={{ width: 36, textAlign: "center" }}><Plus size={16}/></th>
-          </tr>
-        </thead>
-        <tbody>
-          {lines.map((line,index)=>{
-            const taxable=line.product.sellingPrice*line.qty-line.discount;
-            const currentTaxRate=line.taxRate??line.product.taxRate??5;
-            const lineTax=taxable*currentTaxRate/100;
-            return <tr key={line.product.id}>
-              <td>{index+1}</td>
-              <td><strong>{line.product.name}</strong><small>{line.product.sku}</small></td>
-              <td>{line.product.hsnCode||"-"}</td>
-              <td>{money(line.product.mrp)}</td>
-              <td><input className="mini-input" type="number" value={line.qty} min={1} onChange={e=>setLines(lines.map(x=>x.product.id===line.product.id?{...x,qty:Number(e.target.value)}:x))}/></td>
-              <td>{money(line.product.sellingPrice)}</td>
-              <td><input className="mini-input" type="number" value={line.discount} onChange={e=>setLines(lines.map(x=>x.product.id===line.product.id?{...x,discount:Number(e.target.value)}:x))}/></td>
-              <td><select className="mini-select" value={currentTaxRate} onChange={e=>setLines(lines.map(x=>x.product.id===line.product.id?{...x,taxRate:Number(e.target.value)}:x))}>{GST_TAX_OPTIONS.map(opt=><option key={opt.label} value={opt.value}>{opt.label}</option>)}</select><small className="tax-amount-sub">({money(lineTax)})</small></td>
-              <td className="right"><strong>{money(taxable+lineTax)}</strong></td>
-              <td style={{ textAlign: "center" }}><button type="button" className="text-button remove-btn" onClick={()=>setLines(lines.filter(x=>x.product.id!==line.product.id))}>×</button></td>
-            </tr>;
-          })}
-        </tbody>
-      </table>
-
-      <div className="item-add-row polished" style={{ gridTemplateColumns: "1fr 220px" }}>
-        <div className="add-item-dashed-container" onClick={()=>setShowAddItemsModal(true)}>
-          <button type="button" className="dashed-add-item-btn">
-            <Plus size={16}/> Add Item
+  return (
+    <div className="full-screen-invoice-page">
+      <div className="ref-top-header-bar">
+        <div className="top-title-left">
+          <button type="button" className="icon-back-btn" onClick={() => setCreating(false)}>
+            <ArrowLeft size={18} />
           </button>
+          <h2>Create Sales Invoice</h2>
         </div>
-        <div className="scan-barcode-card" onClick={()=>notify("Barcode scanner active. Ready for item SKU or Barcode scanning.")}>
-          <BarcodeIcon />
-          <span>Scan Barcode</span>
+        <div className="top-header-actions">
+          <button type="button" className="icon-shortcut-btn" title="Keyboard Shortcuts (Alt)" onClick={() => setShowShortcutsDrawer(prev => !prev)}><Keyboard size={16} /></button>
+          <button type="button" className="secondary" onClick={() => setSettingsOpen(!settingsOpen)}><Settings size={15} /> Settings</button>
+          <button type="button" className="secondary" onClick={() => saveInvoice(true)} disabled={saving || !lines.length}>{saving ? "Saving..." : "Save & New"}</button>
+          <button type="button" className="primary save-main-btn" onClick={() => saveInvoice(false)} disabled={saving || !lines.length}>{saving ? "Saving..." : "Save"}</button>
         </div>
       </div>
 
-      <div className="subtotal-strip">
-        <span>SUBTOTAL</span>
-        <span>{money(subtotal)}</span>
-        <span>{money(discount)}</span>
-        <span>{money(tax)}</span>
-      </div>
-      {!lines.length&&<EmptyState icon={ShoppingCart} title="No items added" text="Click + Add Item to search and add products to build the invoice."/>}
-      <div className="mybillbook-ref-bottom">
-        <div className="ref-left-section">
-          <button type="button" className="ref-link-btn" onClick={() => setShowNotes(!showNotes)}>+ Add Notes</button>
-          {showNotes && <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Add Notes" className="ref-textarea" />}
-          <button type="button" className="ref-link-btn" onClick={() => setShowTerms(!showTerms)}>+ Add Terms and Conditions</button>
-          {showTerms && <textarea value={terms} onChange={e => setTerms(e.target.value)} placeholder="Terms and Conditions" className="ref-textarea" />}
-          <button type="button" className="ref-link-btn" onClick={() => setShowBank(!showBank)}>+ Add Bank Account</button>
-          {showBank && (
-            <div className="inline-settings">
-              <label>Bank Name<input value={setting.bankName || ""} onChange={e => setSetting({ ...setting, bankName: e.target.value })} /></label>
-              <label>Account Name<input value={setting.accountName || ""} onChange={e => setSetting({ ...setting, accountName: e.target.value })} /></label>
-              <label>Account Number<input value={setting.accountNumber || ""} onChange={e => setSetting({ ...setting, accountNumber: e.target.value })} /></label>
-              <label>IFSC<input value={setting.ifsc || ""} onChange={e => setSetting({ ...setting, ifsc: e.target.value })} /></label>
-              <button className="secondary" onClick={saveSettings}>Save Bank Details</button>
+      <div className="invoice-builder-full-width">
+        <div className="invoice-top-three-panel">
+          <div className="bill-panel-col">
+            <div className="panel-head-strip">
+              <h3>Bill To</h3>
+              <label className="cash-default-lbl"><input type="checkbox" defaultChecked /> Set Cash Sale as default</label>
+              {selectedParty && (
+                <button type="button" className="secondary compact" onClick={() => { setSelectedParty(undefined); setPartySearch(""); setPartyOpen(true); }}>
+                  Change Party
+                </button>
+              )}
             </div>
-          )}
-          <button type="button" className="ref-link-btn" onClick={() => setShowQr(!showQr)}>+ Add Payment QR / UPI</button>
-          {showQr && (
-            <div className="inline-settings">
-              <label>UPI ID<input value={setting.upiId || ""} onChange={e => setSetting({ ...setting, upiId: e.target.value })} placeholder="example@upi" /></label>
-              <label>QR Text / UPI Link<input value={setting.qrText || ""} onChange={e => setSetting({ ...setting, qrText: e.target.value })} placeholder="upi://pay?..." /></label>
-              <button className="secondary" onClick={saveSettings}>Save UPI / QR</button>
+
+            {!selectedParty && (
+              <div className={`add-party-box ${partyOpen ? "has-party" : ""}`} onClick={() => setPartyOpen(true)}>
+                {!partyOpen ? (
+                  <button type="button" className="dashed-add-party-btn"><Plus size={16} /> Add Party</button>
+                ) : (
+                  <div className="party-search-inline">
+                    <Search size={16} />
+                    <input
+                      ref={partySearchInputRef}
+                      value={partySearch}
+                      autoFocus
+                      onFocus={() => setPartyOpen(true)}
+                      onChange={e => {
+                        setPartySearch(e.target.value);
+                        setPartyOpen(true);
+                        setSelectedParty(undefined);
+                        setNewParty({ ...newParty, phone: /^\d+$/.test(e.target.value.trim()) ? e.target.value.trim() : newParty.phone, name: /^\d+$/.test(e.target.value.trim()) ? newParty.name : e.target.value.trim() });
+                      }}
+                      placeholder="Search party by name or number..."
+                    />
+                    {partyOpen && (
+                      <div className="search-results party-dropdown">
+                        <div className="dropdown-head"><span>Party Name</span><span>Balance</span></div>
+                        {partyMatches.map(p => (
+                          <button key={p.id} onClick={() => { setSelectedParty(p); setPartyOpen(false); setPartySearch(`${p.name} ${p.phone}`); }}>
+                            <div><strong>{p.name}</strong><small>{p.phone || "No mobile"}</small></div>
+                            <span>{money(Math.abs(p.balance || 0))}</span>
+                          </button>
+                        ))}
+                        {!partyMatches.length && <div className="dropdown-empty">No party found</div>}
+                        <button type="button" className="create-result" onClick={() => setPartyModal(true)}>
+                          <Plus size={15} />
+                          <div><strong>Create Party</strong><small>{partySearch || "Add new customer"}</small></div>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {selectedParty && (
+              <div className="party-details-card">
+                <strong className="party-bold-name">{selectedParty.name}</strong>
+                <p className="party-phone-line"><span>Phone Number:</span> {selectedParty.phone || "-"}</p>
+                <div className="place-supply-row">
+                  <span>Place of Supply</span>
+                  <div className="supply-select-box">
+                    <Search size={13} />
+                    <select defaultValue="Tamil Nadu"><option>Tamil Nadu</option></select>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="ship-panel-col">
+            <div className="panel-head-strip">
+              <h3>Ship To</h3>
+              {selectedParty && (
+                <button
+                  type="button"
+                  className="secondary compact"
+                  onClick={() => {
+                    setEditingShippingAddress(selectedParty.address || selectedParty.shippingAddress || "");
+                    setShowShippingModal(true);
+                  }}
+                >
+                  Change Shipping Address
+                </button>
+              )}
             </div>
-          )}
+            {selectedParty ? (
+              <div className="party-details-card">
+                <strong className="party-bold-name">{selectedParty.name}</strong>
+                <p className="party-phone-line"><span>Phone Number:</span> {selectedParty.phone || "-"}</p>
+                {selectedParty.address && <p className="party-addr-line"><span>Address:</span> {selectedParty.address}</p>}
+              </div>
+            ) : (
+              <div className="ship-placeholder-box">Select a party to show shipping details</div>
+            )}
+          </div>
+
+          <div className="invoice-meta-box">
+            <div className="meta-box-inner">
+              <div className="meta-fields-grid">
+                <label>Invoice Prefix<input value={(nextNumber || "HB/SL/26-27/").replace(/[^/]+$/, "")} readOnly /></label>
+                <label>Invoice Number<input value={(nextNumber || "Auto").split("/").pop()} readOnly /></label>
+                <label>Sales Invoice Date<input type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} /></label>
+              </div>
+              <div className="meta-terms-grid">
+                <label>Payment Terms<div className="days-input"><input type="number" value={paymentTerms} onChange={e => setPaymentTerms(Number(e.target.value))} /><span>days</span></div></label>
+                <label>Due Date<input value={dueDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })} readOnly /></label>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="ref-right-section">
-          {/* Row 1: Additional Charges */}
-          <div className="ref-calc-row">
-            <button type="button" className="ref-link-btn" onClick={() => notify("Enter additional charges")}>+ Add Additional Charges</button>
-            <span className="ref-val">₹ {additionalCharges}</span>
-          </div>
+        <div className="items-table-container">
+          <table className="invoice-items-table font-img3">
+            <thead>
+              <tr>
+                <th style={{ width: 36 }}>NO</th>
+                <th style={{ width: "32%" }}>ITEMS</th>
+                <th style={{ width: "8%" }}>HSN</th>
+                <th style={{ width: "10%" }}>MRP ⓘ</th>
+                <th style={{ width: "10%" }}>QTY</th>
+                <th style={{ width: "12%" }}>PRICE/ITEM (₹)</th>
+                <th style={{ width: "10%" }}>DISCOUNT</th>
+                <th style={{ width: "10%" }}>TAX</th>
+                <th className="right" style={{ width: "12%" }}>AMOUNT (₹)</th>
+                <th style={{ width: 36, textAlign: "center" }}><Plus size={16} /></th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((line, index) => {
+                const taxable = line.product.sellingPrice * line.qty - line.discount;
+                const currentTaxRate = line.taxRate ?? line.product.taxRate ?? 5;
+                const lineTax = (taxable * currentTaxRate) / 100;
+                return (
+                  <tr key={line.product.id}>
+                    <td className="center-cell">{index + 1}</td>
+                    <td>
+                      <div className="item-cell-wrap">
+                        <strong className="item-title-name">{line.product.name}</strong>
+                        <input type="text" className="item-desc-input" placeholder="Enter Description (optional)" />
+                      </div>
+                    </td>
+                    <td className="center-cell">{line.product.hsnCode || "-"}</td>
+                    <td>
+                      <div className="mrp-cell-wrap">
+                        <div className="gray-val-box">{money(line.product.mrp)}</div>
+                        <small className="discount-badge-off">({Math.round(((line.product.mrp - line.product.sellingPrice) / line.product.mrp) * 100) || 7.7}% OFF)</small>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="qty-cell-wrap">
+                        <input className="qty-mini-input" type="number" value={line.qty} min={1} onChange={e => setLines(lines.map(x => x.product.id === line.product.id ? { ...x, qty: Number(e.target.value) } : x))} />
+                        <select className="unit-select"><option>PCS</option><option>BOX</option><option>KG</option></select>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="gray-val-box">{money(line.product.sellingPrice)}</div>
+                    </td>
+                    <td>
+                      <div className="discount-cell-wrap">
+                        <div className="disc-input-row"><span>%</span><input type="number" value={Math.round((line.discount / (line.product.sellingPrice * line.qty)) * 100) || 0} onChange={e => { const p = Number(e.target.value); const amt = (line.product.sellingPrice * line.qty * p) / 100; setLines(lines.map(x => x.product.id === line.product.id ? { ...x, discount: amt } : x)); }} /></div>
+                        <div className="disc-input-row"><span>₹</span><input type="number" value={line.discount} onChange={e => setLines(lines.map(x => x.product.id === line.product.id ? { ...x, discount: Number(e.target.value) } : x))} /></div>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="tax-cell-wrap">
+                        <select className="tax-select" value={currentTaxRate} onChange={e => setLines(lines.map(x => x.product.id === line.product.id ? { ...x, taxRate: Number(e.target.value) } : x))}>
+                          <option value={0}>None ▾</option>
+                          {GST_TAX_OPTIONS.map(opt => <option key={opt.label} value={opt.value}>{opt.label}</option>)}
+                        </select>
+                        <small className="tax-sub-amt">({money(lineTax)})</small>
+                      </div>
+                    </td>
+                    <td className="right-cell">
+                      <div className="gray-amount-box">{money(taxable + lineTax)}</div>
+                    </td>
+                    <td className="center-cell">
+                      <button type="button" className="trash-icon-btn" onClick={() => setLines(lines.filter(x => x.product.id !== line.product.id))}>
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
 
-          {/* Row 2: Taxable Amount */}
-          <div className="ref-calc-row">
-            <span className="ref-lbl">Taxable Amount</span>
-            <span className="ref-val">₹ {taxable}</span>
-          </div>
-
-          {/* Row 3: Add Discount */}
-          <div className="ref-calc-row">
-            <button type="button" className="ref-link-btn" onClick={() => notify("Enter invoice discount")}>+ Add Discount</button>
-            <span className="ref-val">- ₹ {invoiceDiscount}</span>
-          </div>
-
-          {/* Row 4: Auto Round Off */}
-          <div className="ref-calc-row">
-            <label className="ref-check-lbl">
-              <input type="checkbox" defaultChecked /> Auto Round Off
-            </label>
-            <div className="ref-split-box">
-              <button type="button" className="ref-split-btn">+ Add ▾</button>
-              <span className="ref-curr">₹</span>
-              <input type="number" className="ref-split-input" value="0" readOnly />
-            </div>
-          </div>
-
-          {/* Row 5: Total Amount */}
-          <div className="ref-calc-row ref-total-row">
-            <strong className="ref-total-lbl">Total Amount</strong>
-            <div className="ref-gray-display-rect">
-              {total > 0 ? money(total) : "Enter Payment amount"}
-            </div>
-          </div>
-
-          {/* Row 6: Mark as fully paid */}
-          <div className="ref-fully-paid-row">
-            <label className="ref-paid-lbl">
-              Mark as fully paid <input type="checkbox" checked={markPaid} onChange={e => { setMarkPaid(e.target.checked); if (e.target.checked) setPaid(total); }} />
-            </label>
-          </div>
-
-          {/* Row 7: Amount Received */}
-          <div className="ref-calc-row ref-amount-received-row">
-            <span className="ref-lbl">Amount Received</span>
-            <div className="ref-gray-input-box">
-              <span className="ref-curr">₹</span>
+          <div className="item-add-row polished" style={{ gridTemplateColumns: "1fr 180px 200px" }}>
+            <div className="party-picker item-search" style={{ margin: 0 }}>
+              <Search size={16} />
               <input
-                type="number"
-                className="ref-received-input"
-                value={(markPaid ? total : paid) || 0}
-                onChange={e => { setPaid(Number(e.target.value)); setMarkPaid(false); }}
+                ref={itemSearchInputRef}
+                value={itemSearch}
+                onChange={e => setItemSearch(e.target.value)}
+                placeholder="+ Add Item by name, SKU or barcode"
               />
-              <select className="ref-mode-select" value={paymentMode} onChange={e => setPaymentMode(e.target.value as typeof paymentMode)}>
-                <option value="Cash">Cash ▾</option>
-                <option value="UPI">UPI ▾</option>
-                <option value="Card">Card ▾</option>
-                <option value="Bank">Bank ▾</option>
-              </select>
+              {itemMatches.length > 0 && (
+                <div className="search-results">
+                  {itemMatches.map(p => (
+                    <button key={p.id} type="button" onClick={() => addLine(p)}>
+                      <div><strong>{p.name}</strong><small>{p.sku} · Stock {p.stock} · GST {p.taxRate ?? 5}%</small></div>
+                      <span>{money(p.sellingPrice)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-
-          {/* Row 8: Balance Amount */}
-          <div className="ref-calc-row ref-balance-row">
-            <strong className="ref-green-lbl">Balance Amount</strong>
-            <strong className="ref-green-val">{money(Math.max(0, total - paid))}</strong>
-          </div>
-
-          {/* Row 9: Signature */}
-          <div className="ref-signature-area">
-            <span className="ref-sig-title">{setting.signatureText || "Authorized signatory for Happy Bonding Men's Wear"}</span>
-            <div className="ref-sig-img">
-              <img src={setting.signatureUrl || defaultSignatureUrl} alt="Digital Signature" />
-            </div>
-          </div>
-
-          {/* Save Action Buttons */}
-          <div className="ref-actions-row">
-            <button type="button" className="secondary" onClick={() => saveInvoice(true)} disabled={saving || !lines.length}>Save & New</button>
-            <button type="button" className="whatsapp-btn" onClick={() => shareWhatsAppInvoice({ phone: selectedParty?.phone, partyName: selectedParty?.name, number: nextNumber || "HB-INV", amount: total, paidAmount: (markPaid ? total : paid), paymentMode })} disabled={!lines.length}>
-              <MessageCircle size={15} /> WhatsApp Share
+            <button type="button" className="dashed-add-item-btn" style={{ height: 44 }} onClick={() => setShowAddItemsModal(true)}>
+              <Plus size={16} /> Select Items Modal
             </button>
-            <button type="button" className="primary" onClick={() => saveInvoice(false)} disabled={saving || !lines.length}>{saving ? "Saving..." : "Save Invoice"}</button>
+            <div className="scan-barcode-card" onClick={() => notify("Barcode scanner active. Ready for item SKU or Barcode scanning.")}>
+              <BarcodeIcon />
+              <span>Scan Barcode</span>
+            </div>
+          </div>
+
+          <div className="subtotal-strip">
+            <span>SUBTOTAL</span>
+            <span>{money(subtotal)}</span>
+            <span>{money(discount)}</span>
+            <span>{money(tax)}</span>
+          </div>
+          {!lines.length && <EmptyState icon={ShoppingCart} title="No items added" text="Click + Add Item to search and add products to build the invoice." />}
+        </div>
+
+        <div className="mybillbook-ref-bottom">
+          <div className="ref-left-section">
+            {/* Notes Block */}
+            <div className="ref-left-block">
+              <div className="ref-left-block-head">
+                <span className="block-title">Notes</span>
+                <button type="button" className="clear-row-btn" onClick={() => setNotes("")}>ⓧ</button>
+              </div>
+              <input
+                type="text"
+                className="ref-gray-full-input"
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Enter your notes"
+              />
+            </div>
+
+            {/* Terms and Conditions Block */}
+            <div className="ref-left-block">
+              <div className="ref-left-block-head">
+                <span className="block-title">Terms and Conditions</span>
+                <button type="button" className="clear-row-btn" onClick={() => setTerms("")}>ⓧ</button>
+              </div>
+              <input
+                type="text"
+                className="ref-gray-full-input"
+                value={terms}
+                onChange={e => setTerms(e.target.value)}
+                placeholder="Enter your terms and conditions"
+              />
+            </div>
+
+            {/* Links below */}
+            <div className="ref-left-links-group">
+              <button type="button" className="ref-link-btn" onClick={() => setBankModalOpen(true)}>+ Add Bank Account</button>
+              {setting.bankName && (
+                <div className="selected-bank-badge">
+                  <Building2 size={15} color="#4f46e5" />
+                  <span><strong>Selected Bank:</strong> {setting.bankName}</span>
+                </div>
+              )}
+              <button type="button" className="ref-link-btn" onClick={() => setQrModalOpen(true)}>+ Add Payment QR</button>
+              {setting.upiId && (
+                <div className="selected-bank-badge">
+                  <CircleIndianRupee size={15} color="#4f46e5" />
+                  <span><strong>Selected Payment QR:</strong> {setting.upiId}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="ref-right-section">
+            {/* Image 1 Additional Charges Box */}
+            <div className="ref-calc-row add-charges-row-img5">
+              <input type="text" className="charge-title-input" defaultValue="transport" placeholder="Enter charge (ex. Transport Charge)" />
+              <div className="charge-val-group">
+                <div className="charge-num-box"><span className="curr">₹</span><input type="number" value={additionalCharges} onChange={e => setAdditionalCharges(Number(e.target.value))} /></div>
+                <select className="charge-tax-select"><option>No Tax Applicable ▾</option><option>5% GST</option><option>18% GST</option></select>
+                <button type="button" className="clear-row-btn" onClick={() => setAdditionalCharges(0)}>ⓧ</button>
+              </div>
+            </div>
+            <div className="add-another-charge-left-wrap">
+              <button type="button" className="ref-link-btn" onClick={() => notify("Additional charge row added")}>+ Add Another Charge</button>
+            </div>
+
+            {/* Taxable Amount Row */}
+            <div className="ref-calc-row">
+              <span className="ref-lbl">Taxable Amount</span>
+              <span className="ref-val">{money(taxable)}</span>
+            </div>
+
+            {/* Image 1 Invoice Discount Box */}
+            <div className="ref-calc-row discount-row-img5">
+              <select className="disc-type-select"><option>Discount After Tax ▾</option><option>Discount Before Tax ▾</option></select>
+              <div className="disc-inputs-group">
+                <div className="disc-input-box">
+                  <span>%</span>
+                  <input
+                    type="number"
+                    value={invoiceDiscount && taxable ? Math.round((invoiceDiscount / taxable) * 100 * 10) / 10 : ""}
+                    onChange={e => {
+                      const pct = Number(e.target.value);
+                      setInvoiceDiscount(Math.round((taxable * pct) / 100));
+                    }}
+                    placeholder="0"
+                  />
+                </div>
+                <span className="slash">/</span>
+                <div className="disc-input-box">
+                  <span>₹</span>
+                  <input
+                    type="number"
+                    value={invoiceDiscount || ""}
+                    onChange={e => setInvoiceDiscount(Number(e.target.value))}
+                    placeholder="0"
+                  />
+                </div>
+                <button type="button" className="clear-row-btn" onClick={() => setInvoiceDiscount(0)}>ⓧ</button>
+              </div>
+            </div>
+
+            {/* Auto Round Off */}
+            <div className="ref-calc-row">
+              <label className="ref-check-lbl">
+                <input type="checkbox" defaultChecked /> Auto Round Off
+              </label>
+              <div className="ref-split-box">
+                <button type="button" className="ref-split-btn">+ Add ▾</button>
+                <span className="ref-curr">₹</span>
+                <input type="number" className="ref-split-input" value="0" readOnly />
+              </div>
+            </div>
+
+            {/* Total Amount Row */}
+            <div className="ref-calc-row ref-total-row">
+              <strong className="ref-total-lbl">Total Amount</strong>
+              <strong className="total-amount-img5-val">{money(total)}</strong>
+            </div>
+
+            <div className="ref-fully-paid-row">
+              <label className="ref-paid-lbl">
+                Mark as fully paid <input type="checkbox" checked={markPaid} onChange={e => { setMarkPaid(e.target.checked); if (e.target.checked) setPaid(total); }} />
+              </label>
+            </div>
+
+            <div className="ref-calc-row ref-amount-received-row">
+              <span className="ref-lbl">Amount Received</span>
+              <div className="ref-gray-input-box">
+                <span className="ref-curr">₹</span>
+                <input
+                  type="number"
+                  className="ref-received-input"
+                  value={(markPaid ? total : paid) || 0}
+                  onChange={e => { setPaid(Number(e.target.value)); setMarkPaid(false); }}
+                />
+                <select className="ref-mode-select" value={paymentMode} onChange={e => setPaymentMode(e.target.value as typeof paymentMode)}>
+                  <option value="Cash">Cash ▾</option>
+                  <option value="UPI">UPI ▾</option>
+                  <option value="Card">Card ▾</option>
+                  <option value="Bank">Bank ▾</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="ref-calc-row ref-balance-row">
+              <strong className="ref-green-lbl">Balance Amount</strong>
+              <strong className="ref-green-val">{money(Math.max(0, total - paid))}</strong>
+            </div>
+
+            <div className="ref-signature-area">
+              <span className="ref-sig-title">{setting.signatureText || "Authorized signatory for Happy Bonding Men's Wear"}</span>
+              <div className="ref-sig-img">
+                <img src={setting.signatureUrl || defaultSignatureUrl} alt="Digital Signature" />
+              </div>
+            </div>
+
+            <div className="ref-actions-row">
+              <button type="button" className="secondary" onClick={() => saveInvoice(true)} disabled={saving || !lines.length}>Save & New</button>
+              <button type="button" className="whatsapp-btn" onClick={() => shareWhatsAppInvoice({ phone: selectedParty?.phone, partyName: selectedParty?.name, number: nextNumber || "HB-INV", amount: total, paidAmount: (markPaid ? total : paid), paymentMode })} disabled={!lines.length}>
+                <MessageCircle size={15} /> WhatsApp Share
+              </button>
+              <button type="button" className="primary" onClick={() => saveInvoice(false)} disabled={saving || !lines.length}>{saving ? "Saving..." : "Save Invoice"}</button>
+            </div>
           </div>
         </div>
       </div>
-    </section></div>{settingsOpen&&<Modal title="Invoice Settings" onClose={()=>setSettingsOpen(false)} wide><InvoiceSettingsEditor setting={setting} setSetting={setSetting} onSave={async()=>{await saveSettings();setSettingsOpen(false);}}/></Modal>}{partyModal&&<Modal title="Create Party" onClose={()=>setPartyModal(false)} wide><PartyCreateForm onSubmit={createPartyFromInvoice} onCancel={()=>setPartyModal(false)} saving={saving} defaults={{name:/^\d+$/.test(partySearch.trim())?"":partySearch.trim(),phone:/^\d+$/.test(partySearch.trim())?partySearch.trim():newParty.phone,type:"Customer"}}/></Modal>}{showAddItemsModal&&<AddItemsToBillModal products={products} onClose={()=>setShowAddItemsModal(false)} onAddLines={addBatchLines} onCreateNewItem={()=>{setShowAddItemsModal(false);setCreateItemModal(true);}}/>}</>;
+
+      {/* Select Bank Account Modal */}
+      {bankModalOpen && (
+        <div className="modal-backdrop bank-select-backdrop" onClick={() => setBankModalOpen(false)}>
+          <div className="modal-card bank-select-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3>Select Bank Account</h3>
+              <button type="button" className="icon-close-btn" onClick={() => setBankModalOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="bank-options-list">
+              {bankAccountsList.map(bank => (
+                <label
+                  key={bank.id}
+                  className={`bank-option-row ${selectedBankId === bank.id ? "selected" : ""}`}
+                  onClick={() => setSelectedBankId(bank.id)}
+                >
+                  <div className="bank-info-left">
+                    <div className="bank-icon-box">
+                      <Building2 size={18} />
+                    </div>
+                    <span className="bank-name-text">{bank.name}</span>
+                  </div>
+                  <input
+                    type="radio"
+                    name="bankSelect"
+                    checked={selectedBankId === bank.id}
+                    onChange={() => setSelectedBankId(bank.id)}
+                  />
+                </label>
+              ))}
+
+              {!addingNewBank ? (
+                <button type="button" className="ref-link-btn" style={{ marginTop: 8 }} onClick={() => setAddingNewBank(true)}>
+                  + Add New Bank Account Details
+                </button>
+              ) : (
+                <div className="inline-add-bank-form">
+                  <h4>New Bank Account</h4>
+                  <input placeholder="Bank Name (e.g. Canara Bank)" value={customBankName} onChange={e => setCustomBankName(e.target.value)} />
+                  <input placeholder="Account Number" value={customAccNo} onChange={e => setCustomAccNo(e.target.value)} />
+                  <input placeholder="IFSC Code" value={customIfsc} onChange={e => setCustomIfsc(e.target.value)} />
+                  <div className="form-row-btns">
+                    <button type="button" className="secondary compact" onClick={() => setAddingNewBank(false)}>Cancel</button>
+                    <button type="button" className="primary compact" onClick={async () => {
+                      if (!customBankName.trim()) return notify("Enter Bank Name");
+                      await saveSettings({ bankName: customBankName, accountNumber: customAccNo, ifsc: customIfsc });
+                      setAddingNewBank(false);
+                      setCustomBankName(""); setCustomAccNo(""); setCustomIfsc("");
+                    }}>Save Bank to Backend</button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-shortcuts-bar">
+              <span><strong>Keyboard Shortcuts:</strong> Select Bank Account <kbd>F7</kbd> Move between accounts <kbd>↑</kbd> <kbd>↓</kbd></span>
+            </div>
+
+            <div className="modal-foot">
+              <button type="button" className="secondary" onClick={() => setBankModalOpen(false)}>
+                Cancel [ESC]
+              </button>
+              <button
+                type="button"
+                className="primary save-bank-btn"
+                onClick={async () => {
+                  const b = bankAccountsList.find(x => x.id === selectedBankId) || bankAccountsList[0];
+                  if (b) {
+                    await saveSettings({ bankName: b.name, accountNumber: b.accountNo, ifsc: b.ifsc });
+                  }
+                  setBankModalOpen(false);
+                  notify("Bank account saved to backend & linked to invoice");
+                }}
+              >
+                Save [F7]
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Select Payment QR Code Modal */}
+      {qrModalOpen && (
+        <div className="modal-backdrop bank-select-backdrop" onClick={() => setQrModalOpen(false)}>
+          <div className="modal-card bank-select-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3>Select Payment QR Code</h3>
+              <button type="button" className="icon-close-btn" onClick={() => setQrModalOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="bank-options-list">
+              {qrAccountsList.map(qr => (
+                <label
+                  key={qr.id}
+                  className={`bank-option-row ${selectedQrId === qr.id ? "selected" : ""}`}
+                  onClick={() => setSelectedQrId(qr.id)}
+                >
+                  <div className="bank-info-left">
+                    <div className="bank-icon-box">
+                      <Building2 size={18} />
+                    </div>
+                    <span className="bank-name-text">{qr.name}</span>
+                  </div>
+                  <input
+                    type="radio"
+                    name="qrSelect"
+                    checked={selectedQrId === qr.id}
+                    onChange={() => setSelectedQrId(qr.id)}
+                  />
+                </label>
+              ))}
+
+              {!addingNewQr ? (
+                <button type="button" className="ref-link-btn" style={{ marginTop: 8 }} onClick={() => setAddingNewQr(true)}>
+                  + Add New UPI QR Details
+                </button>
+              ) : (
+                <div className="inline-add-bank-form">
+                  <h4>New UPI QR Code</h4>
+                  <input placeholder="UPI ID (e.g. 9842100000@paytm)" value={customUpiId} onChange={e => setCustomUpiId(e.target.value)} />
+                  <div className="form-row-btns">
+                    <button type="button" className="secondary compact" onClick={() => setAddingNewQr(false)}>Cancel</button>
+                    <button type="button" className="primary compact" onClick={async () => {
+                      if (!customUpiId.trim()) return notify("Enter UPI ID");
+                      await saveSettings({ upiId: customUpiId, qrText: `upi://pay?pa=${customUpiId}` });
+                      setAddingNewQr(false);
+                      setCustomUpiId("");
+                    }}>Save QR to Backend</button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-shortcuts-bar">
+              <span><strong>Keyboard Shortcuts:</strong> Select Payment QR Code <kbd>F7</kbd> Move between accounts <kbd>↑</kbd> <kbd>↓</kbd></span>
+            </div>
+
+            <div className="modal-foot">
+              <button type="button" className="secondary" onClick={() => setQrModalOpen(false)}>
+                Cancel [ESC]
+              </button>
+              <button
+                type="button"
+                className="primary save-bank-btn"
+                onClick={async () => {
+                  const q = qrAccountsList.find(x => x.id === selectedQrId) || qrAccountsList[0];
+                  if (q) {
+                    await saveSettings({ upiId: q.upiId, qrText: `upi://pay?pa=${q.upiId}` });
+                  }
+                  setQrModalOpen(false);
+                  notify("Payment QR saved to backend & linked to invoice");
+                }}
+              >
+                Save [F7]
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Shipping Address Modal */}
+      {showShippingModal && selectedParty && (
+        <div className="modal-backdrop bank-select-backdrop" onClick={() => setShowShippingModal(false)}>
+          <div className="modal-card shipping-modal-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3>Change Shipping Address</h3>
+              <button type="button" className="icon-close-btn" onClick={() => setShowShippingModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="shipping-modal-body">
+              <table className="shipping-address-table">
+                <thead>
+                  <tr>
+                    <th>Address</th>
+                    <th style={{ width: 60, textAlign: "center" }}>Edit</th>
+                    <th style={{ width: 60, textAlign: "center" }}>Select</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <strong>{selectedParty.name}</strong>
+                      <p className="shipping-addr-text">
+                        {selectedParty.address || selectedParty.shippingAddress || "No Address"}
+                      </p>
+                    </td>
+                    <td style={{ textAlign: "center" }}>
+                      <button
+                        type="button"
+                        className="icon-pencil-btn"
+                        title="Edit Customer Address in DB"
+                        onClick={() => {
+                          setEditingShippingAddress(selectedParty.address || selectedParty.shippingAddress || "");
+                          setIsEditingAddress(true);
+                        }}
+                      >
+                        <Pencil size={16} />
+                      </button>
+                    </td>
+                    <td style={{ textAlign: "center" }}>
+                      <input type="radio" name="shippingAddressRadio" defaultChecked />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* Inline Edit Form when clicking Pencil button */}
+              {isEditingAddress && (
+                <div className="inline-add-bank-form" style={{ marginTop: 12 }}>
+                  <h4>Edit Customer Shipping Address in DB</h4>
+                  <textarea
+                    rows={3}
+                    className="shipping-edit-textarea"
+                    value={editingShippingAddress}
+                    onChange={e => setEditingShippingAddress(e.target.value)}
+                    placeholder="Enter full shipping address..."
+                  />
+                  <div className="form-row-btns">
+                    <button type="button" className="secondary compact" onClick={() => setIsEditingAddress(false)}>
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="primary compact"
+                      onClick={async () => {
+                        try {
+                          const updated = await api.updateParty(selectedParty.id, {
+                            ...selectedParty,
+                            address: editingShippingAddress,
+                            shippingAddress: editingShippingAddress,
+                          });
+                          setSelectedParty(updated);
+                          setParties(parties.map(p => p.id === updated.id ? updated : p));
+                          setIsEditingAddress(false);
+                          notify("Shipping address updated in Customer Database");
+                        } catch (err) {
+                          notify(err instanceof Error ? err.message : "Failed to update customer address");
+                        }
+                      }}
+                    >
+                      Save to Customer DB
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!addingNewShipping && !isEditingAddress && (
+                <button
+                  type="button"
+                  className="ref-link-btn"
+                  style={{ marginTop: 12 }}
+                  onClick={() => {
+                    setNewShippingInput("");
+                    setAddingNewShipping(true);
+                  }}
+                >
+                  + Add New Shipping Address
+                </button>
+              )}
+
+              {addingNewShipping && (
+                <div className="inline-add-bank-form" style={{ marginTop: 12 }}>
+                  <h4>Add New Shipping Address to Customer DB</h4>
+                  <textarea
+                    rows={3}
+                    className="shipping-edit-textarea"
+                    value={newShippingInput}
+                    onChange={e => setNewShippingInput(e.target.value)}
+                    placeholder="Enter new shipping address..."
+                  />
+                  <div className="form-row-btns">
+                    <button type="button" className="secondary compact" onClick={() => setAddingNewShipping(false)}>
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="primary compact"
+                      onClick={async () => {
+                        if (!newShippingInput.trim()) return notify("Enter shipping address");
+                        try {
+                          const updated = await api.updateParty(selectedParty.id, {
+                            ...selectedParty,
+                            address: newShippingInput.trim(),
+                            shippingAddress: newShippingInput.trim(),
+                          });
+                          setSelectedParty(updated);
+                          setParties(parties.map(p => p.id === updated.id ? updated : p));
+                          setAddingNewShipping(false);
+                          setNewShippingInput("");
+                          notify("New shipping address saved to Customer DB");
+                        } catch (err) {
+                          notify(err instanceof Error ? err.message : "Failed to save shipping address");
+                        }
+                      }}
+                    >
+                      Save & Link to Customer
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-foot">
+              <button type="button" className="secondary" onClick={() => setShowShippingModal(false)}>
+                Cancel
+              </button>
+              <button type="button" className="primary save-main-btn" onClick={() => setShowShippingModal(false)}>
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Invoice Settings Modal */}
+      {settingsOpen && (
+        <div className="modal-backdrop bank-select-backdrop" onClick={() => setSettingsOpen(false)}>
+          <div className="modal-card quick-settings-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3>Quick Invoice Settings</h3>
+              <button type="button" className="icon-close-btn" onClick={() => setSettingsOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="quick-settings-body">
+              {/* Box 1: Prefix & Sequence Number */}
+              <div className="quick-setting-box">
+                <div className="box-top-row">
+                  <div>
+                    <strong className="box-title">Invoice Prefix & Sequence Number</strong>
+                    <p className="box-sub">Add your custom prefix & sequence for Invoice Numbering</p>
+                  </div>
+                  <label className="toggle-switch">
+                    <input type="checkbox" checked={enablePrefixSeq} onChange={e => setEnablePrefixSeq(e.target.checked)} />
+                    <span className="slider round"></span>
+                  </label>
+                </div>
+                {enablePrefixSeq && (
+                  <div className="prefix-inputs-row">
+                    <div className="input-group-col">
+                      <label>Prefix</label>
+                      <input value={quickPrefix} onChange={e => setQuickPrefix(e.target.value)} placeholder="HB/SL/26-27/" />
+                    </div>
+                    <div className="input-group-col">
+                      <label>Sequence Number</label>
+                      <input value={quickSeqNum} onChange={e => setQuickSeqNum(e.target.value)} placeholder="2400" />
+                    </div>
+                  </div>
+                )}
+                <div className="invoice-num-preview">
+                  <span>Invoice Number: <strong>{quickPrefix}{quickSeqNum}</strong></span>
+                </div>
+              </div>
+
+              {/* Box 2: Purchase Price */}
+              <div className="quick-setting-box horizontal">
+                <div>
+                  <strong className="box-title">Show Purchase Price while adding Items</strong>
+                  <p className="box-sub">Add purchase price while adding items</p>
+                </div>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={showPurchasePrice} onChange={e => setShowPurchasePrice(e.target.checked)} />
+                  <span className="slider round"></span>
+                </label>
+              </div>
+
+              {/* Box 3: Item Image */}
+              <div className="quick-setting-box horizontal">
+                <div>
+                  <strong className="box-title">Show Item Image on Invoice</strong>
+                  <p className="box-sub">This will apply to all vouchers except for Payment In and Payment Out</p>
+                </div>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={showItemImage} onChange={e => setShowItemImage(e.target.checked)} />
+                  <span className="slider round"></span>
+                </label>
+              </div>
+
+              {/* Box 4: Price History */}
+              <div className="quick-setting-box horizontal">
+                <div>
+                  <strong className="box-title">Price History <span className="blue-new-badge">New</span></strong>
+                  <p className="box-sub">Show last 5 sales / purchase prices of the item for the selected party in invoice</p>
+                </div>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={priceHistory} onChange={e => setPriceHistory(e.target.checked)} />
+                  <span className="slider round"></span>
+                </label>
+              </div>
+
+              {/* Box 5: Choose Invoice Theme */}
+              <div className="quick-setting-box horizontal">
+                <div>
+                  <strong className="box-title">Choose Invoice Theme</strong>
+                </div>
+                <select className="theme-select-dropdown" value={invoiceTheme} onChange={e => setInvoiceTheme(e.target.value)}>
+                  <option value="Luxury">Luxury</option>
+                  <option value="Stylish">Stylish</option>
+                  <option value="Modern">Modern</option>
+                  <option value="Classic">Classic</option>
+                </select>
+              </div>
+
+              {/* Banner Box */}
+              <div className="customise-banner-card">
+                <div>
+                  <h4>Now customise Invoice<br />with ease</h4>
+                  <button type="button" className="full-settings-btn" onClick={() => { setSettingsOpen(false); }}>
+                    Full Invoice Settings ➔
+                  </button>
+                </div>
+                <div className="banner-illus-box">
+                  <FileText size={48} color="#6366f1" />
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-foot">
+              <button type="button" className="secondary" onClick={() => setSettingsOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary save-main-btn"
+                onClick={async () => {
+                  await saveSettings({
+                    invoicePrefix: quickPrefix,
+                    sequenceNumber: quickSeqNum,
+                    showPurchasePrice,
+                    showItemImage,
+                    priceHistory,
+                    theme: invoiceTheme,
+                  });
+                  setSettingsOpen(false);
+                  notify("Quick Invoice Settings saved to backend");
+                }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Side Drawer Panel */}
+      {showShortcutsDrawer && (
+        <>
+          <div className="shortcuts-drawer-overlay" onClick={() => setShowShortcutsDrawer(false)} />
+          <div className="shortcuts-drawer-panel">
+            <div className="shortcuts-drawer-head">
+              <div>
+                <h3>Keyboard shortcuts</h3>
+                <p className="shortcuts-sub-text">
+                  Press <kbd>Alt</kbd> to open or close the shortcuts panel
+                </p>
+              </div>
+              <button
+                type="button"
+                className="icon-close-btn"
+                onClick={() => setShowShortcutsDrawer(false)}
+                title="Close (Esc)"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="shortcuts-drawer-body">
+              {/* Group 1: Invoice Form Actions */}
+              <div className="shortcut-group">
+                <h4>Invoice Form Actions</h4>
+                <div className="shortcut-item"><span>Add / Select Party</span><div className="kbd-combo"><kbd>Shift</kbd><kbd>Y</kbd></div></div>
+                <div className="shortcut-item"><span>Add Item Search</span><div className="kbd-combo"><kbd>Shift</kbd><kbd>M</kbd></div></div>
+                <div className="shortcut-item"><span>Scan Barcode</span><div className="kbd-combo"><kbd>Shift</kbd><kbd>B</kbd></div></div>
+                <div className="shortcut-item"><span>Save Invoice</span><div className="kbd-combo"><kbd>Alt</kbd><kbd>Enter</kbd></div></div>
+                <div className="shortcut-item"><span>Save & New</span><div className="kbd-combo"><kbd>Shift</kbd><kbd>Enter</kbd></div></div>
+                <div className="shortcut-item"><span>Cancel / Exit</span><div className="kbd-combo"><kbd>Escape</kbd></div></div>
+                <div className="shortcut-item"><span>Toggle Shortcuts Panel</span><div className="kbd-combo"><kbd>Alt</kbd></div></div>
+              </div>
+
+              {/* Group 2: Create / Navigation */}
+              <div className="shortcut-group">
+                <h4>Create & Navigation</h4>
+                <div className="shortcut-item"><span>Sales Invoice</span><div className="kbd-combo"><kbd>F2</kbd> <span>/</span> <kbd>Alt</kbd><kbd>S</kbd></div></div>
+                <div className="shortcut-item"><span>POS Billing</span><div className="kbd-combo"><kbd>Alt</kbd><kbd>B</kbd></div></div>
+                <div className="shortcut-item"><span>Purchase Invoice</span><div className="kbd-combo"><kbd>Alt</kbd><kbd>P</kbd></div></div>
+                <div className="shortcut-item"><span>Parties Page</span><div className="kbd-combo"><kbd>Alt</kbd><kbd>Y</kbd></div></div>
+                <div className="shortcut-item"><span>Items & Inventory</span><div className="kbd-combo"><kbd>Alt</kbd><kbd>M</kbd></div></div>
+                <div className="shortcut-item"><span>Payment In</span><div className="kbd-combo"><kbd>Alt</kbd><kbd>I</kbd></div></div>
+                <div className="shortcut-item"><span>Payment Out</span><div className="kbd-combo"><kbd>Alt</kbd><kbd>O</kbd></div></div>
+                <div className="shortcut-item"><span>Sales Return</span><div className="kbd-combo"><kbd>Alt</kbd><kbd>C</kbd></div></div>
+                <div className="shortcut-item"><span>Purchase Return</span><div className="kbd-combo"><kbd>Alt</kbd><kbd>R</kbd></div></div>
+                <div className="shortcut-item"><span>Quotation / Estimate</span><div className="kbd-combo"><kbd>Alt</kbd><kbd>Q</kbd></div></div>
+                <div className="shortcut-item"><span>Expense</span><div className="kbd-combo"><kbd>Alt</kbd><kbd>E</kbd></div></div>
+              </div>
+
+              {/* Group 3: Customer Support */}
+              <div className="shortcut-group">
+                <h4>Customer Support</h4>
+                <div className="shortcut-item"><span>WhatsApp Chat Support</span><div className="kbd-combo"><kbd>Alt</kbd><kbd>H</kbd></div></div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 function InvoiceSettingsEditor({setting,setSetting,onSave}:{setting:InvoiceSetting;setSetting:(x:InvoiceSetting)=>void;onSave:()=>void}){
@@ -1219,3 +2487,337 @@ function Staff(){return <><PageHeading title="Staff attendance & payroll" subtit
 function SettingsPage({notify}:{notify:(s:string)=>void}){return <><PageHeading title="Business settings" subtitle="Company, GST, invoice and access configuration."/><div className="settings-layout"><div className="settings-menu">{["Business profile","GST & tax","Invoice numbering","Print templates","Users & roles","Branches","Backup & audit"].map((x,i)=><button className={i===0?"active":""} key={x}>{x}</button>)}</div><article className="card settings-form"><h2>Business profile</h2><p>These details appear on GST invoices and receipts.</p><div className="form-grid"><label className="full">Business name<input defaultValue="Happy Bonding Men's Wear"/></label><label>Phone<input defaultValue="7708030903"/></label><label>Email<input placeholder="business@example.com"/></label><label className="full">Billing address<textarea defaultValue="No. 10/901, West Bus Stand, Near Railway Gate, Pavoorchatram - 627808"/></label><label>State<input defaultValue="Tamil Nadu"/></label><label>Pincode<input defaultValue="627808"/></label><label>GSTIN<input defaultValue="33CWZPS9715D1ZU"/></label><label>PAN<input defaultValue="CWZPS9715D"/></label></div><div className="save-line"><button className="primary" onClick={()=>notify("Business settings saved")}>Save changes</button></div></article></div></>}
 
 function Modal({title,onClose,children,wide=false}:{title:string;onClose:()=>void;children:React.ReactNode;wide?:boolean}){return <div className="modal-backdrop"><div className={`modal ${wide?"wide":""}`}><div className="modal-head"><h2>{title}</h2><button className="icon-button" onClick={onClose}><X/></button></div>{children}</div></div>}
+
+interface VoucherRecord {
+  id: string;
+  date: string;
+  number: string;
+  party: string;
+  amount: number;
+  status: string;
+  notes?: string;
+}
+
+function GenericVoucherPage({
+  title,
+  subtitle,
+  action,
+  icon: Icon,
+  type,
+  parties,
+  notify,
+}: {
+  title: string;
+  subtitle: string;
+  action: string;
+  icon: typeof LayoutDashboard;
+  type: string;
+  parties: Party[];
+  notify: (msg: string) => void;
+}) {
+  const [records, setRecords] = useState<VoucherRecord[]>(() => [
+    { id: "1", date: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }), number: `${type.toUpperCase().replace(/\s+/g, "").slice(0, 3)}/26-27/001`, party: "CHANDRAN (9842100112)", amount: 1250, status: "Active", notes: "Regular garment order" },
+    { id: "2", date: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }), number: `${type.toUpperCase().replace(/\s+/g, "").slice(0, 3)}/26-27/002`, party: "SARAVANAN (7708030903)", amount: 3400, status: "Completed", notes: "Branch delivery" },
+  ]);
+  const [query, setQuery] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [partyInput, setPartyInput] = useState("");
+  const [amountInput, setAmountInput] = useState("");
+  const [notesInput, setNotesInput] = useState("");
+
+  const filtered = records.filter(r => `${r.number} ${r.party} ${r.notes}`.toLowerCase().includes(query.toLowerCase()));
+  const totalAmount = records.reduce((s, r) => s + r.amount, 0);
+
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!partyInput.trim() || !amountInput || Number(amountInput) <= 0) {
+      notify("Please enter a valid party name and amount");
+      return;
+    }
+    const newRec: VoucherRecord = {
+      id: String(Date.now()),
+      date: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+      number: `${type.toUpperCase().replace(/\s+/g, "").slice(0, 3)}/26-27/${String(records.length + 1).padStart(3, "0")}`,
+      party: partyInput.trim(),
+      amount: Number(amountInput),
+      status: "Active",
+      notes: notesInput.trim() || "Created in ERP",
+    };
+    setRecords([newRec, ...records]);
+    setModalOpen(false);
+    setPartyInput("");
+    setAmountInput("");
+    setNotesInput("");
+    notify(`${type} ${newRec.number} created successfully`);
+  };
+
+  return (
+    <>
+      <PageHeading title={title} subtitle={subtitle} action={action} onAction={() => setModalOpen(true)} />
+      <div className="metrics-grid three">
+        <Metric label={`Total ${type} Value`} value={money(totalAmount)} icon={Icon} tone="green" />
+        <Metric label="Total Entries" value={`${records.length} Records`} icon={ClipboardList} tone="blue" />
+        <Metric label="Active Status" value="Live Sync" icon={BarChart3} tone="amber" />
+      </div>
+
+      <article className="card table-card">
+        <div className="card-title">
+          <div className="party-picker" style={{ margin: 0, width: 320 }}>
+            <Search size={16} />
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder={`Search ${title.toLowerCase()}...`} />
+          </div>
+          <button type="button" className="primary compact" onClick={() => setModalOpen(true)}>
+            <Plus size={15} /> {action}
+          </button>
+        </div>
+
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>DATE</th>
+                <th>DOCUMENT NO</th>
+                <th>PARTY NAME</th>
+                <th>NOTES / DETAILS</th>
+                <th>STATUS</th>
+                <th className="right">AMOUNT</th>
+                <th style={{ textAlign: "center" }}>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(row => (
+                <tr key={row.id}>
+                  <td>{row.date}</td>
+                  <td className="mono bold-invoice-num">{row.number}</td>
+                  <td><strong>{row.party}</strong></td>
+                  <td>{row.notes || "-"}</td>
+                  <td><span className={`pill ${row.status === "Completed" ? "green" : "neutral"}`}>{row.status}</span></td>
+                  <td className="right"><strong>{money(row.amount)}</strong></td>
+                  <td style={{ textAlign: "center" }}>
+                    <button type="button" className="secondary compact" onClick={() => notify(`${type} ${row.number} details viewed`)}>View</button>
+                    <button type="button" className="icon-pencil-btn" style={{ marginLeft: 6 }} onClick={() => notify(`${type} ${row.number} sent to print`)}><Printer size={15} /></button>
+                  </td>
+                </tr>
+              ))}
+              {!filtered.length && (
+                <tr>
+                  <td colSpan={7}>
+                    <EmptyState icon={Icon} title={`No ${title.toLowerCase()} entries`} text={`Click ${action} to create a new ${type.toLowerCase()} record.`} />
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      {modalOpen && (
+        <div className="modal-backdrop bank-select-backdrop" onClick={() => setModalOpen(false)}>
+          <div className="modal-card shipping-modal-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3>{action}</h3>
+              <button type="button" className="icon-close-btn" onClick={() => setModalOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCreate}>
+              <div className="shipping-modal-body" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4, font: "600 12px Manrope", color: "#334155" }}>
+                  Party Name / Customer / Supplier
+                  <input
+                    className="shipping-edit-textarea"
+                    style={{ height: 38 }}
+                    value={partyInput}
+                    onChange={e => setPartyInput(e.target.value)}
+                    placeholder="Enter party name or mobile number..."
+                    required
+                  />
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4, font: "600 12px Manrope", color: "#334155" }}>
+                  Amount (₹)
+                  <input
+                    type="number"
+                    className="shipping-edit-textarea"
+                    style={{ height: 38 }}
+                    value={amountInput}
+                    onChange={e => setAmountInput(e.target.value)}
+                    placeholder="₹ 0.00"
+                    required
+                  />
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4, font: "600 12px Manrope", color: "#334155" }}>
+                  Notes / Reference Details
+                  <textarea
+                    rows={3}
+                    className="shipping-edit-textarea"
+                    value={notesInput}
+                    onChange={e => setNotesInput(e.target.value)}
+                    placeholder="Enter notes or item details..."
+                  />
+                </label>
+              </div>
+              <div className="modal-foot">
+                <button type="button" className="secondary" onClick={() => setModalOpen(false)}>Cancel</button>
+                <button type="submit" className="primary">Save {type}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function ExpensesModule({ notify }: { notify: (msg: string) => void }) {
+  const [expenses, setExpenses] = useState([
+    { id: "1", date: "08 Aug 2026", category: "Shop Rent", amount: 15000, mode: "Bank", notes: "August Monthly Store Rent" },
+    { id: "2", date: "08 Aug 2026", category: "Tea & Refreshments", amount: 240, mode: "Cash", notes: "Daily staff tea" },
+    { id: "3", date: "07 Aug 2026", category: "Electricity Bill", amount: 3200, mode: "UPI", notes: "EB July consumption" },
+  ]);
+  const [query, setQuery] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [catInput, setCatInput] = useState("Shop Rent");
+  const [amtInput, setAmtInput] = useState("");
+  const [modeInput, setModeInput] = useState("Cash");
+  const [notesInput, setNotesInput] = useState("");
+
+  const filtered = expenses.filter(e => `${e.category} ${e.notes} ${e.mode}`.toLowerCase().includes(query.toLowerCase()));
+  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+
+  const handleAddExpense = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!amtInput || Number(amtInput) <= 0) return notify("Enter valid expense amount");
+    const newExp = {
+      id: String(Date.now()),
+      date: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+      category: catInput,
+      amount: Number(amtInput),
+      mode: modeInput,
+      notes: notesInput.trim() || "Store Expense",
+    };
+    setExpenses([newExp, ...expenses]);
+    setModalOpen(false);
+    setAmtInput("");
+    setNotesInput("");
+    notify(`Expense of ${money(newExp.amount)} added under ${newExp.category}`);
+  };
+
+  return (
+    <>
+      <PageHeading title="Expenses & Operating Costs" subtitle="Log daily store expenses like rent, tea, electricity & transport." action="+ Add Expense" onAction={() => setModalOpen(true)} />
+      <div className="metrics-grid three">
+        <Metric label="Total Expenses" value={money(totalExpenses)} icon={WalletCards} tone="red" />
+        <Metric label="Recorded Entries" value={`${expenses.length} Entries`} icon={ClipboardList} tone="blue" />
+        <Metric label="Payment Modes" value="Cash / UPI / Bank" icon={CreditCard} tone="green" />
+      </div>
+
+      <article className="card table-card">
+        <div className="card-title">
+          <div className="party-picker" style={{ margin: 0, width: 320 }}>
+            <Search size={16} />
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search expenses by category or notes..." />
+          </div>
+          <button type="button" className="primary compact" onClick={() => setModalOpen(true)}>
+            <Plus size={15} /> + Add Expense
+          </button>
+        </div>
+
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>DATE</th>
+                <th>EXPENSE CATEGORY</th>
+                <th>PAYMENT MODE</th>
+                <th>NOTES / DETAILS</th>
+                <th className="right">AMOUNT (₹)</th>
+                <th style={{ textAlign: "center" }}>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(row => (
+                <tr key={row.id}>
+                  <td>{row.date}</td>
+                  <td><strong>{row.category}</strong></td>
+                  <td><span className="pill neutral">{row.mode}</span></td>
+                  <td>{row.notes}</td>
+                  <td className="right"><strong style={{ color: "#e11d48" }}>{money(row.amount)}</strong></td>
+                  <td style={{ textAlign: "center" }}>
+                    <button type="button" className="trash-icon-btn" onClick={() => setExpenses(expenses.filter(x => x.id !== row.id))}>
+                      <Trash2 size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      {modalOpen && (
+        <div className="modal-backdrop bank-select-backdrop" onClick={() => setModalOpen(false)}>
+          <div className="modal-card shipping-modal-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3>+ Add Store Expense</h3>
+              <button type="button" className="icon-close-btn" onClick={() => setModalOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleAddExpense}>
+              <div className="shipping-modal-body" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4, font: "600 12px Manrope", color: "#334155" }}>
+                  Expense Category
+                  <select className="shipping-edit-textarea" style={{ height: 38 }} value={catInput} onChange={e => setCatInput(e.target.value)}>
+                    <option value="Shop Rent">Shop Rent</option>
+                    <option value="Tea & Refreshments">Tea & Refreshments</option>
+                    <option value="Electricity Bill">Electricity Bill</option>
+                    <option value="Freight & Transport">Freight & Transport</option>
+                    <option value="Staff Advance">Staff Advance</option>
+                    <option value="Stationery & Office">Stationery & Office</option>
+                    <option value="Maintenance & Repair">Maintenance & Repair</option>
+                    <option value="Other Expense">Other Expense</option>
+                  </select>
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4, font: "600 12px Manrope", color: "#334155" }}>
+                  Amount (₹)
+                  <input
+                    type="number"
+                    className="shipping-edit-textarea"
+                    style={{ height: 38 }}
+                    value={amtInput}
+                    onChange={e => setAmtInput(e.target.value)}
+                    placeholder="₹ 0.00"
+                    required
+                  />
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4, font: "600 12px Manrope", color: "#334155" }}>
+                  Payment Mode
+                  <select className="shipping-edit-textarea" style={{ height: 38 }} value={modeInput} onChange={e => setModeInput(e.target.value)}>
+                    <option value="Cash">Cash</option>
+                    <option value="UPI">UPI / GPay / PhonePe</option>
+                    <option value="Bank">Bank Transfer</option>
+                    <option value="Card">Credit / Debit Card</option>
+                  </select>
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4, font: "600 12px Manrope", color: "#334155" }}>
+                  Notes / Expense Description
+                  <textarea
+                    rows={3}
+                    className="shipping-edit-textarea"
+                    value={notesInput}
+                    onChange={e => setNotesInput(e.target.value)}
+                    placeholder="Enter expense details or bill voucher ref..."
+                  />
+                </label>
+              </div>
+              <div className="modal-foot">
+                <button type="button" className="secondary" onClick={() => setModalOpen(false)}>Cancel</button>
+                <button type="submit" className="primary">Save Expense</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
