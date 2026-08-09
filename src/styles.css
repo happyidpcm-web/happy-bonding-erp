@@ -3021,6 +3021,43 @@ input:checked + .slider:before {
   flex-shrink: 0 !important;
 }
 
+/* User Profile Badge in Topbar */
+.user-profile-badge {
+  display: flex !important;
+  align-items: center !important;
+  gap: 9px !important;
+  padding: 4px 12px 4px 6px !important;
+  background: #fffdf7 !important;
+  border: 1.5px solid #f0d47a !important;
+  border-radius: 999px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+  cursor: pointer !important;
+  transition: border-color 0.15s ease, background 0.15s ease !important;
+}
+
+.user-profile-badge:hover {
+  border-color: #d81f35 !important;
+  background: #ffffff !important;
+}
+
+.user-info-text {
+  display: flex !important;
+  flex-direction: column !important;
+  text-align: left !important;
+  line-height: 1.15 !important;
+}
+
+.user-info-text strong {
+  font: 700 12px 'Manrope', sans-serif !important;
+  color: #140d08 !important;
+}
+
+.user-info-text small {
+  font-size: 10px !important;
+  color: #8a5c00 !important;
+  font-weight: 600 !important;
+}
+
 
 
 

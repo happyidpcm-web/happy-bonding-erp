@@ -314,8 +314,17 @@ export default function App() {
     <main>
       <header className="topbar">
         <button className="icon-button menu-button" onClick={() => setSidebar(true)}><Menu/></button>
-        <div><strong>{nav.flatMap(n => n.items).find(n => n.id === page)?.label || (page.replace(/_/g, " ").toUpperCase())}</strong><span>{new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"long",year:"numeric",weekday:"long"})}</span></div>
-        <div className="top-actions"><button className="icon-button"><Search size={19}/></button><div className="avatar">SK</div></div>
+        <div><strong>Happy Bonding ERP</strong><span>{new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"long",year:"numeric",weekday:"long"})} · Pavoorchatram Store</span></div>
+        <div className="top-actions">
+          <button className="icon-button" title="Search ERP"><Search size={19}/></button>
+          <div className="user-profile-badge" title="Saravana Kumar (Store Admin)">
+            <div className="avatar">SK</div>
+            <div className="user-info-text">
+              <strong>Saravana Kumar</strong>
+              <small>Store Admin</small>
+            </div>
+          </div>
+        </div>
       </header>
       <section className={page === "pos" ? "page pos-page" : "page"}>
         {page === "dashboard" && <DashboardLive products={productRows} parties={partyRows} invoices={invoiceRows} onNewSale={openSalesInvoice} onSelectInvoice={inv => setActiveInvoiceModal(inv)} onSeeAllTransactions={() => setPage("sales")}/>} 
@@ -367,7 +376,7 @@ function SalesReportChartCard({ invoices }: { invoices: Invoice[] }) {
   const [viewMode, setViewMode] = useState<"Daily" | "Weekly">("Daily");
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  // Compute real last 7 days data from actual backend invoices
+  // Compute real last 7 days data from actual backend invoices (100% Real Data)
   const reportData = useMemo(() => {
     const now = new Date();
     const days: Array<{
@@ -396,19 +405,8 @@ function SalesReportChartCard({ invoices }: { invoices: Invoice[] }) {
     }
 
     let total7DayInvoices = 0;
-    const allInvoices = invoices.length
-      ? invoices
-      : [
-          { id: "1", date: "07 Aug 2026", number: "HB/SL/26-27/2398", party: "7904859933", amount: 27000, status: "Paid" as const },
-          { id: "2", date: "06 Aug 2026", number: "HB/SL/26-27/2397", party: "2.0 CHANDRAN", amount: 16800, status: "Paid" as const },
-          { id: "3", date: "05 Aug 2026", number: "HB/SL/26-27/2396", party: "2.0 mari", amount: 16000, status: "Paid" as const },
-          { id: "4", date: "04 Aug 2026", number: "HB/SL/26-27/2395", party: "AUG23 ESAKKI", amount: 17500, status: "Paid" as const },
-          { id: "5", date: "03 Aug 2026", number: "HB/SL/26-27/2394", party: "2.0 velmurugan", amount: 16500, status: "Paid" as const },
-          { id: "6", date: "02 Aug 2026", number: "HB/SL/26-27/2393", party: "SARAVANAN", amount: 8000, status: "Paid" as const },
-          { id: "7", date: "01 Aug 2026", number: "HB/SL/26-27/2392", party: "CHANDRAN", amount: 27000, status: "Paid" as const },
-        ];
 
-    allInvoices.forEach(inv => {
+    invoices.forEach(inv => {
       const match = days.find(day => {
         if (inv.date === day.formattedDate) return true;
         if (inv.date && inv.date.slice(0, 10) === day.dateStr) return true;
@@ -425,14 +423,14 @@ function SalesReportChartCard({ invoices }: { invoices: Invoice[] }) {
 
     const startDateStr = days[0].formattedDate;
     const endDateStr = days[days.length - 1].formattedDate;
-    const maxVal = Math.max(...days.map(d => d.sales), 5000);
-    const maxY = Math.max(30000, Math.ceil(maxVal / 5000) * 5000);
+    const maxVal = Math.max(...days.map(d => d.sales), 0);
+    const maxY = maxVal === 0 ? 1000 : Math.max(1000, Math.ceil(maxVal / 500) * 500);
 
     return {
       days,
       startDateStr,
       endDateStr,
-      total7DayInvoices: total7DayInvoices || allInvoices.length,
+      total7DayInvoices,
       maxY,
     };
   }, [invoices]);
@@ -459,7 +457,7 @@ function SalesReportChartCard({ invoices }: { invoices: Invoice[] }) {
   }
   const fillD = `${pathD} L ${points[points.length - 1].x},208 L ${points[0].x},208 Z`;
 
-  // Calculate Y-axis steps
+  // Dynamic Y-axis steps based on real sales value
   const ySteps = [maxY, (maxY * 5) / 6, (maxY * 4) / 6, (maxY * 3) / 6, (maxY * 2) / 6, maxY / 6, 0];
 
   return (
@@ -498,7 +496,7 @@ function SalesReportChartCard({ invoices }: { invoices: Invoice[] }) {
 
       <div className="sales-chart-wrapper">
         <div className="sales-chart-main">
-          {/* Y-Axis Dynamic Labels */}
+          {/* Dynamic Y-Axis Labels based on actual sales */}
           <div className="chart-y-axis">
             {ySteps.map((step, idx) => (
               <span key={idx}>₹ {Math.round(step).toLocaleString("en-IN")}</span>
@@ -564,19 +562,12 @@ function DashboardLive({
   onSelectInvoice: (inv: Invoice) => void;
   onSeeAllTransactions: () => void;
 }) {
-  const toCollect = parties.filter(r => r.balance > 0).reduce((a, b) => a + b.balance, 0) || 480448.76;
-  const toPay = Math.abs(parties.filter(r => r.balance < 0).reduce((a, b) => a + b.balance, 0)) || 195322.25;
-  const cashBalance = 22263323.04;
+  // Real calculation from backend database (No Dummy Data)
+  const toCollect = parties.filter(r => r.balance > 0).reduce((a, b) => a + b.balance, 0);
+  const toPay = Math.abs(parties.filter(r => r.balance < 0).reduce((a, b) => a + b.balance, 0));
+  const cashBalance = invoices.filter(i => i.status === "Paid").reduce((a, b) => a + b.amount, 0);
 
-  const displayList = invoices.length
-    ? invoices
-    : [
-        { id: "1", date: "07 Aug 2026", number: "HB/SL/26-27/2398", party: "7904859933", amount: 400, status: "Paid" as const },
-        { id: "2", date: "07 Aug 2026", number: "HB/SL/26-27/2397", party: "2.0 CHANDRAN", amount: 450, status: "Paid" as const },
-        { id: "3", date: "07 Aug 2026", number: "HB/SL/26-27/2396", party: "2.0 mari", amount: 500, status: "Paid" as const },
-        { id: "4", date: "07 Aug 2026", number: "HB/SL/26-27/2395", party: "AUG23 ESAKKI", amount: 1100, status: "Paid" as const },
-        { id: "5", date: "07 Aug 2026", number: "HB/SL/26-27/2394", party: "2.0 velmurugan", amount: 250, status: "Paid" as const },
-      ];
+  const displayList = invoices;
 
   return (
     <>
@@ -620,6 +611,13 @@ function DashboardLive({
                     <td className="right"><strong>{money(i.amount)}</strong></td>
                   </tr>
                 ))}
+                {!displayList.length && (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: "center", padding: "20px", color: "#64748b" }}>
+                      No transactions recorded yet. Click <strong>+ Create Sales Invoice</strong> to add a sale.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
