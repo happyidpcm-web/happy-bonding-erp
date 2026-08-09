@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft, BarChart3, Banknote, Boxes, Building2, ChevronDown, Eye, IndianRupee as CircleIndianRupee,
-  ClipboardList, CreditCard, Download, FileSpreadsheet, FileText, Keyboard, LayoutDashboard, Menu, MessageCircle, PackagePlus,
-  Pencil, Plus, Printer, ReceiptIndianRupee, Search, Settings, ShoppingBag, ShoppingCart, Trash2,
+  ArrowLeft, BarChart3, Banknote, Boxes, Building2, ChevronDown, Eye, Gift, IndianRupee as CircleIndianRupee,
+  ClipboardList, CreditCard, Download, FileSpreadsheet, FileText, Keyboard, LayoutDashboard, Menu, MessageCircle, MoreVertical, PackagePlus,
+  Pencil, Plus, Printer, ReceiptIndianRupee, Search, Settings, Share2, ShoppingBag, ShoppingCart, Trash2,
   TrendingUp, Upload, UserRoundPlus, Users, UsersRound, WalletCards, X,
 } from "lucide-react";
 import { money } from "./data";
@@ -285,6 +285,16 @@ export default function App() {
               {(item.id === "sales" || item.id === "purchases") && <ChevronDown size={14} style={{ marginLeft: "auto", transform: (item.id === "sales" && expandedNav === "sales") || (item.id === "purchases" && expandedNav === "purchases") ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }} />}
             </button>
 
+            {item.id === "parties" && (
+              <div className="nav-sub-items">
+                <button className={`nav-sub-item ${page === "parties" ? "active" : ""}`} onClick={() => go("parties")}>
+                  All Parties
+                </button>
+                <button className="nav-sub-item" onClick={() => notify("Shared Ledger Portal opened")}>
+                  SharedLedger <span className="pill warning" style={{ marginLeft: "auto", fontSize: 8, padding: "2px 5px" }}>New</span>
+                </button>
+              </div>
+            )}
             {item.id === "sales" && expandedNav === "sales" && (
               <div className="nav-sub-items">
                 <button className={`nav-sub-item ${page === "sales" ? "active" : ""}`} onClick={() => go("sales")}>Sales Invoices</button>
@@ -767,28 +777,291 @@ function PartyCreateForm({onSubmit,onCancel,saving,defaults}:{onSubmit:(e:React.
 }
 
 function Parties({ rows, setRows, notify, apiMode }: { rows: Party[]; setRows:(r:Party[])=>void; notify:(s:string)=>void; apiMode:boolean }) {
-  const [query,setQuery]=useState(""); const [modal,setModal]=useState(false); const [editing,setEditing]=useState<Party|undefined>(); const [saving,setSaving]=useState(false);
-  const [pageIndex,setPageIndex]=useState(0); const pageSize=100;
+  const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("All Categories");
+  const [modal, setModal] = useState(false);
+  const [editing, setEditing] = useState<Party|undefined>();
+  const [saving, setSaving] = useState(false);
+  const [reportsDropdownOpen, setReportsDropdownOpen] = useState(false);
+  const [bannerOpen, setBannerOpen] = useState(true);
+  const [pageIndex, setPageIndex] = useState(0);
+  const pageSize = 100;
   const importInput = useRef<HTMLInputElement>(null);
-  const filtered = useMemo(() => rows.filter(r=>`${r.name} ${r.phone}`.toLowerCase().includes(query.toLowerCase())), [rows, query]);
+
+  // Dynamic Metrics Calculated from Real Database
+  const totalPartiesCount = rows.length;
+  const toCollect = useMemo(() => rows.filter(r => r.balance > 0).reduce((a, b) => a + b.balance, 0), [rows]);
+  const toPay = useMemo(() => Math.abs(rows.filter(r => r.balance < 0).reduce((a, b) => a + b.balance, 0)), [rows]);
+
+  const categoriesList = useMemo(() => {
+    const catSet = new Set<string>();
+    rows.forEach(r => { if (r.category) catSet.add(r.category); });
+    return Array.from(catSet);
+  }, [rows]);
+
+  const filtered = useMemo(() => {
+    return rows.filter(r => {
+      const matchQuery = `${r.name} ${r.phone}`.toLowerCase().includes(query.toLowerCase());
+      const matchCat = categoryFilter === "All Categories" || r.category === categoryFilter;
+      return matchQuery && matchCat;
+    });
+  }, [rows, query, categoryFilter]);
+
   const totalPages = Math.ceil(filtered.length / pageSize) || 1;
   const visibleList = useMemo(() => query.trim() ? filtered.slice(0, 100) : filtered.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize), [filtered, query, pageIndex]);
 
-  const add=async(e:React.FormEvent<HTMLFormElement>)=>{e.preventDefault(); const input=partyPayloadFromForm(new FormData(e.currentTarget)); try{setSaving(true); if(apiMode){const saved=await api.createParty(input); setRows([...rows,saved]);} else setRows([...rows,{id:Date.now(),...input,balance:input.openingBalance||0} as Party]); setModal(false);notify("Party created successfully");}catch(error){notify(error instanceof Error ? error.message : "Party save failed");}finally{setSaving(false);}};
-  const update=async(e:React.FormEvent<HTMLFormElement>)=>{e.preventDefault(); if(!editing)return; const input=partyPayloadFromForm(new FormData(e.currentTarget)); try{setSaving(true); if(apiMode){const saved=await api.updateParty(editing.id,input); setRows(rows.map(row=>row.id===saved.id?saved:row));} else setRows(rows.map(row=>row.id===editing.id?({...row,...input,balance:input.openingBalance||0} as Party):row)); setEditing(undefined); notify("Party updated successfully");}catch(error){notify(error instanceof Error ? error.message : "Party update failed");}finally{setSaving(false);}};
-  const importContacts=async(file?:File)=>{if(!file)return;try{setSaving(true);const contacts=await parseContactsFile(file);if(!contacts.length)throw new Error("File-la contacts kandupidikka mudiyala");const result=await api.importParties(contacts);setRows(await api.parties());notify(`Imported ${result.imported}. Skipped ${result.skipped} duplicates/invalid.`);}catch(error){notify(error instanceof Error ? error.message : "Import failed");}finally{setSaving(false);if(importInput.current)importInput.current.value="";}};
-  return <><PageHeading title="Parties" subtitle="Customers, suppliers and outstanding balances." action="Add party" onAction={()=>setModal(true)}/><div className="metrics-grid three"><Metric label="Customers" value={String(rows.filter(r=>r.type==="Customer").length)} icon={UsersRound}/><Metric label="To collect" value={money(rows.filter(r=>r.balance>0).reduce((a,b)=>a+b.balance,0))} icon={CircleIndianRupee} tone="green"/><Metric label="To pay" value={money(Math.abs(rows.filter(r=>r.balance<0).reduce((a,b)=>a+b.balance,0)))} icon={CreditCard} tone="red"/></div><article className="card table-card"><div className="table-toolbar"><SearchRow value={query} onChange={v=>{setQuery(v);setPageIndex(0);}} placeholder="Search name or mobile number"/><div className="party-actions-group"><button className="secondary" title="Download Excel template for bulk customer import" onClick={downloadSampleTemplate}><Download size={14}/> Sample Template</button><button className="secondary" title="Export current customers to Excel" onClick={()=>exportCustomersToExcel(rows)}><FileSpreadsheet size={14}/> Export Customers</button><input ref={importInput} type="file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden onChange={e=>importContacts(e.target.files?.[0])}/><button className="primary" disabled={saving} onClick={()=>importInput.current?.click()}><Upload size={14}/> {saving?"Importing...":"Import Excel / CSV"}</button></div></div><div className="table-scroll"><table><thead><tr><th>Party</th><th>Mobile</th><th>Type</th><th>Email</th><th>GSTIN</th><th className="right">Balance</th><th></th></tr></thead><tbody>{visibleList.map(p=><tr key={p.id}><td><strong>{p.name}</strong><small>{p.category}</small></td><td>{p.phone}</td><td><span className="pill neutral">{p.type}</span></td><td>{p.email||"-"}</td><td>{p.gstin||"-"}</td><td className={`right ${p.balance<0?"negative":"positive"}`}>{p.balance<0?"Pay ":"Collect "}{money(Math.abs(p.balance))}</td><td className="right" style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-  {p.phone && (
-    <button type="button" className="whatsapp-btn small-btn" title="Open WhatsApp Chat" onClick={() => {
-      const num = p.phone.replace(/\D/g, "");
-      const target = num.length === 10 ? `91${num}` : num;
-      window.open(`https://wa.me/${target}?text=${encodeURIComponent(`Hello ${p.name}! Greeting from Happy Bonding Men's Wear Pavoorchatram.`)}`, "_blank");
-    }}>
-      <MessageCircle size={12} /> WhatsApp
-    </button>
-  )}
-  <button className="secondary small-btn" onClick={()=>setEditing(p)}>Edit</button>
-</td></tr>)}</tbody></table></div><div className="table-toolbar pagination-strip"><span>Showing {query ? visibleList.length : `${pageIndex * pageSize + 1} - ${Math.min((pageIndex + 1) * pageSize, filtered.length)}`} of {filtered.length} customers</span>{!query && <div className="tabs"><button disabled={pageIndex === 0} onClick={() => setPageIndex(p => Math.max(0, p - 1))}>Previous</button><button disabled={pageIndex >= totalPages - 1} onClick={() => setPageIndex(p => Math.min(totalPages - 1, p + 1))}>Next</button></div>}</div></article>{modal&&<Modal title="Create Party" onClose={()=>setModal(false)} wide><PartyCreateForm onSubmit={add} onCancel={()=>setModal(false)} saving={saving}/></Modal>}{editing&&<Modal title={`Edit Party - ${editing.name}`} onClose={()=>setEditing(undefined)} wide><PartyCreateForm onSubmit={update} onCancel={()=>setEditing(undefined)} saving={saving} defaults={editing}/></Modal>}</>;
+  const add = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const input = partyPayloadFromForm(new FormData(e.currentTarget));
+    try {
+      setSaving(true);
+      if (apiMode) {
+        const saved = await api.createParty(input);
+        setRows([...rows, saved]);
+      } else {
+        setRows([...rows, { id: Date.now(), ...input, balance: input.openingBalance || 0 } as Party]);
+      }
+      setModal(false);
+      notify("Party created successfully");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Party save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const update = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editing) return;
+    const input = partyPayloadFromForm(new FormData(e.currentTarget));
+    try {
+      setSaving(true);
+      if (apiMode) {
+        const saved = await api.updateParty(editing.id, input);
+        setRows(rows.map(row => row.id === saved.id ? saved : row));
+      } else {
+        setRows(rows.map(row => row.id === editing.id ? ({ ...row, ...input, balance: input.openingBalance || 0 } as Party) : row));
+      }
+      setEditing(undefined);
+      notify("Party updated successfully");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Party update failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const importContacts = async (file?: File) => {
+    if (!file) return;
+    try {
+      setSaving(true);
+      const contacts = await parseContactsFile(file);
+      if (!contacts.length) throw new Error("No contacts found in file");
+      const result = await api.importParties(contacts);
+      setRows(await api.parties());
+      notify(`Imported ${result.imported}. Skipped ${result.skipped} duplicates/invalid.`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Import failed");
+    } finally {
+      setSaving(false);
+      if (importInput.current) importInput.current.value = "";
+    }
+  };
+
+  return (
+    <>
+      {/* Top Heading Strip with Share Ledger Portal, Reports ▾, Print, Export & Settings */}
+      <div className="page-heading">
+        <div>
+          <h1>Parties</h1>
+        </div>
+        <div className="parties-header-actions">
+          <button
+            type="button"
+            className="secondary share-ledger-btn"
+            onClick={() => notify("Shared Ledger Portal link copied!")}
+          >
+            <Share2 size={15} /> ShareLedger Portal
+          </button>
+
+          <div className="parties-reports-dropdown">
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => setReportsDropdownOpen(!reportsDropdownOpen)}
+            >
+              <FileSpreadsheet size={15} /> Reports <ChevronDown size={14} />
+            </button>
+            {reportsDropdownOpen && (
+              <div className="parties-reports-menu">
+                <button onClick={() => { setReportsDropdownOpen(false); notify("Report: Partywise Outstanding opened"); }}>
+                  Partywise Outstanding
+                </button>
+                <button onClick={() => { setReportsDropdownOpen(false); notify("Report: Item Report By Party opened"); }}>
+                  Item Report By Party
+                </button>
+                <button onClick={() => { setReportsDropdownOpen(false); notify("Report: Receivable Ageing Report opened"); }}>
+                  Receivable Ageing Report
+                </button>
+              </div>
+            )}
+          </div>
+
+          <button className="icon-button" title="Print List" onClick={() => window.print()}>
+            <Printer size={17} />
+          </button>
+          <button className="icon-button" title="Export Excel" onClick={() => exportCustomersToExcel(rows)}>
+            <Download size={17} />
+          </button>
+          <button className="icon-button" title="Party Settings" onClick={() => notify("Party Settings opened")}>
+            <Settings size={17} />
+          </button>
+        </div>
+      </div>
+
+      {/* Referral Discount Info Banner */}
+      {bannerOpen && (
+        <div className="parties-referral-banner">
+          <div className="banner-gift-icon">
+            <Gift size={20} />
+          </div>
+          <div className="banner-info">
+            <strong>Earn ₹501/- for each Referral</strong>
+            <span>You gain ₹501 per referral, while they enjoy 15% off on any premium plan purchase.</span>
+          </div>
+          <button className="icon-button banner-close-btn" onClick={() => setBannerOpen(false)}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* 3 Metric Cards matching reference image */}
+      <div className="parties-metrics-row">
+        <article className="party-metric-box active-blue">
+          <span>All Parties</span>
+          <strong>{totalPartiesCount}</strong>
+        </article>
+
+        <article className="party-metric-box">
+          <span>↓ To Collect</span>
+          <strong style={{ color: "#16a34a" }}>₹ {toCollect.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong>
+        </article>
+
+        <article className="party-metric-box">
+          <span>↑ To Pay</span>
+          <strong style={{ color: "#dc2626" }}>₹ {toPay.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong>
+        </article>
+      </div>
+
+      {/* Parties Table Card */}
+      <article className="card table-card">
+        <div className="table-toolbar parties-toolbar">
+          <div className="parties-search-box">
+            <Search size={16} />
+            <input
+              value={query}
+              onChange={e => { setQuery(e.target.value); setPageIndex(0); }}
+              placeholder="Search party name or mobile number..."
+            />
+            <select
+              value={categoryFilter}
+              onChange={e => { setCategoryFilter(e.target.value); setPageIndex(0); }}
+            >
+              <option value="All Categories">Search Categories ▾</option>
+              {categoriesList.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          <div className="parties-toolbar-right" style={{ display: "flex", gap: 10 }}>
+            <button className="secondary" onClick={() => notify("Bulk Action option selected")}>
+              Bulk Action <ChevronDown size={14} />
+            </button>
+
+            <button className="primary purple-party-btn" onClick={() => setModal(true)}>
+              <Plus size={16} /> Create Party
+            </button>
+          </div>
+        </div>
+
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Party Name ⇅</th>
+                <th>Category</th>
+                <th>Mobile Number</th>
+                <th>Party type</th>
+                <th className="right">Balance ⇅</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleList.map(p => (
+                <tr key={p.id}>
+                  <td><strong>{p.name}</strong></td>
+                  <td>{p.category || "-"}</td>
+                  <td>{p.phone || "-"}</td>
+                  <td><span className="pill neutral">{p.type || "Customer"}</span></td>
+                  <td className={`right ${p.balance < 0 ? "negative" : "positive"}`}>
+                    {p.balance < 0 ? "↑ " : "↓ "}₹ {Math.abs(p.balance).toLocaleString("en-IN")}
+                  </td>
+                  <td className="right" style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
+                    {p.phone && (
+                      <button
+                        type="button"
+                        className="whatsapp-icon-btn"
+                        title="Send WhatsApp Message"
+                        onClick={() => {
+                          const num = p.phone.replace(/\D/g, "");
+                          const target = num.length === 10 ? `91${num}` : num;
+                          window.open(`https://wa.me/${target}?text=${encodeURIComponent(`Hello ${p.name}! Greeting from Happy Bonding Men's Wear Pavoorchatram.`)}`, "_blank");
+                        }}
+                      >
+                        <MessageCircle size={16} color="#25D366" />
+                      </button>
+                    )}
+                    <button className="icon-button" onClick={() => setEditing(p)} title="Edit Party">
+                      <MoreVertical size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+
+              {!visibleList.length && (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: "center", padding: "30px", color: "#64748b" }}>
+                    No parties found matching your search. Click <strong>+ Create Party</strong> to add a customer or supplier.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="table-toolbar pagination-strip">
+          <span>Showing {query ? visibleList.length : `${pageIndex * pageSize + 1} - ${Math.min((pageIndex + 1) * pageSize, filtered.length)}`} of {filtered.length} parties</span>
+          {!query && (
+            <div className="tabs">
+              <button disabled={pageIndex === 0} onClick={() => setPageIndex(p => Math.max(0, p - 1))}>Previous</button>
+              <button disabled={pageIndex >= totalPages - 1} onClick={() => setPageIndex(p => Math.min(totalPages - 1, p + 1))}>Next</button>
+            </div>
+          )}
+        </div>
+      </article>
+
+      {modal && (
+        <Modal title="Create Party" onClose={() => setModal(false)} wide>
+          <PartyCreateForm onSubmit={add} onCancel={() => setModal(false)} saving={saving} />
+        </Modal>
+      )}
+
+      {editing && (
+        <Modal title={`Edit Party - ${editing.name}`} onClose={() => setEditing(undefined)} wide>
+          <PartyCreateForm onSubmit={update} onCancel={() => setEditing(undefined)} saving={saving} defaults={editing} />
+        </Modal>
+      )}
+    </>
+  );
 }
 
 function Items({ rows,setRows,notify,apiMode }:{rows:Product[];setRows:(r:Product[])=>void;notify:(s:string)=>void;apiMode:boolean}) {
