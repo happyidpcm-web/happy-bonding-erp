@@ -1,13 +1,13 @@
 import type { Invoice, InvoiceSetting, Party, Product } from "./types";
 
 const getBaseUrl = () => {
-  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
   if (typeof window !== "undefined") {
-    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-      return "http://localhost:4000/api";
+    const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    if (!isLocal) {
+      return `${window.location.origin}/api`;
     }
-    return `${window.location.origin}/api`;
   }
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
   return "http://localhost:4000/api";
 };
 const baseUrl = getBaseUrl();
