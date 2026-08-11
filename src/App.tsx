@@ -7482,17 +7482,14 @@ function CreateQuotationScreen({
           {/* Dynamic Signature Block from Central Backend Settings */}
           <div style={{ marginTop: 20, textAlign: "right" }}>
             <span style={{ fontSize: 11, color: "#64748b", display: "block", marginBottom: 4 }}>
-              Authorized signatory for <strong>Happy Bonding Men's Wear</strong>
+              Authorized signatory for <strong>Happy Bonding Men's Wear</strong> ({signatoryName || "M. Saravanan"})
             </span>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              {signatureUrl ? (
-                <img src={signatureUrl} alt="Digital Signature" style={{ height: 48, objectFit: "contain" }} />
-              ) : (
-                <svg width="140" height="42" viewBox="0 0 160 50" style={{ opacity: 0.9 }}>
-                  <path d="M 15 35 Q 30 5, 45 35 T 75 20 Q 90 40, 110 15 T 145 30" fill="none" stroke="#0f172a" strokeWidth="2.5" strokeLinecap="round" />
-                  <text x="15" y="46" fontSize="11" fontWeight="bold" fontFamily="Manrope, sans-serif" fill="#0f172a">M. Saravanan</text>
-                </svg>
-              )}
+              <img
+                src={signatureUrl || localStorage.getItem("hb_digital_signature") || defaultSignatureUrl}
+                alt="Digital Signature"
+                style={{ height: 48, objectFit: "contain" }}
+              />
             </div>
           </div>
         </div>
