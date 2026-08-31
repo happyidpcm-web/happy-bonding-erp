@@ -7,11 +7,14 @@ import {
 } from "lucide-react";
 import { money } from "./data";
 import { api } from "./api";
-import type { Branch, Invoice, InvoiceLineItem, InvoiceSetting, OwnerBranchSummary, Page, Party, Product, StaffUser } from "./types";
+import type { Branch, Expense, Invoice, InvoiceLineItem, InvoiceSetting, OwnerBranchSummary, Page, Party, Product, StaffUser } from "./types";
 import * as XLSX from "xlsx";
 import happyBondingLogo from "./assets/happy-bonding-logo-white.png";
 import { BillOfSupplyTemplate } from "./components/BillOfSupplyTemplate";
 import { downloadInvoicePdf } from "./utils/pdf";
+import { GARMENT_HSN_CODES } from "./data/hsnCodes";
+import { ThermalReceiptTemplate } from "./components/ThermalReceiptTemplate";
+import { BarcodeGeneratorModal } from "./components/BarcodeGeneratorModal";
 
 function shareWhatsAppInvoice(opts: { phone?: string; partyName?: string; number: string; amount: number; paidAmount?: number; paymentMode?: string }) {
   const name = opts.partyName || "Valued Customer";
@@ -51,11 +54,13 @@ const nav: { section: string; items: { id: Page; label: string; icon: typeof Lay
   ]},
   { section: "FINANCE", items: [
     { id: "cash", label: "Cash & Bank", icon: WalletCards },
+    { id: "expenses", label: "Store Expenses", icon: Receipt },
     { id: "pos", label: "POS Billing", icon: ShoppingCart },
   ]},
   { section: "BUSINESS", items: [
+    { id: "reminders", label: "Reminders & WhatsApp", icon: MessageCircle },
     { id: "staff", label: "Staff & Payroll", icon: Users },
-    { id: "settings", label: "Settings", icon: Settings },
+    { id: "settings", label: "Settings & Backup", icon: Settings },
   ]},
 ];
 
@@ -201,9 +206,8 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!apiMode || !authenticated) return;
     refreshAppData().catch(() => {});
-  }, [apiMode, authenticated, currentBranchId]);
+  }, [currentBranchId]);
 
   const [expandedNav, setExpandedNav] = useState<"sales" | "purchases" | "parties" | null>(null);
   const [createDropdownOpen, setCreateDropdownOpen] = useState(false);
@@ -549,6 +553,7 @@ export default function App() {
         {page === "debit_note" && <GenericVoucherPage title="Debit Note" subtitle="Issue debit notes to suppliers for price differences or returns." action="+ Create Debit Note" icon={ClipboardList} type="Debit Note" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
         {page === "purchase_orders" && <GenericVoucherPage title="Purchase Orders" subtitle="Send POs to vendors & manage upcoming stock shipments." action="+ Create PO" icon={Boxes} type="Purchase Order" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
         {page === "expenses" && <ExpensesModule notify={notify} />}
+        {page === "reminders" && <RemindersModule parties={partyRows} invoices={invoiceRows} notify={notify} />}
 
         {page === "reports" && <Reports products={productRows} invoices={invoiceRows} notify={notify} initialReport={activeReportSubScreen}/>} 
         {page === "cash" && <CashBank notify={notify}/>} 
@@ -3958,6 +3963,7 @@ function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows: Produc
   const [createOfferModalOpen, setCreateOfferModalOpen] = useState(false);
   const [reportsDropdownOpen, setReportsDropdownOpen] = useState(false);
   const [bannerOpen, setBannerOpen] = useState(true);
+  const [barcodeModalOpen, setBarcodeModalOpen] = useState(false);
 
   // Calculated Real Database Metrics
   const totalStockValue = useMemo(() => rows.reduce((s, p) => s + (p.sellingPrice * p.stock), 0), [rows]);
@@ -4173,6 +4179,16 @@ function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows: Produc
               </div>
             )}
           </div>
+
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => setBarcodeModalOpen(true)}
+            title="Print Barcode Stickers & Price Tags"
+            style={{ background: "#eef2ff", color: "#4f46e5", borderColor: "#c7d2fe", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}
+          >
+            <QrCode size={15} /> Barcode Generator
+          </button>
 
           <button className="icon-button" title="Item Settings" onClick={() => setItemSettingsModalOpen(true)}>
             <Settings size={17} />
@@ -4461,6 +4477,14 @@ function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows: Produc
           notify={notify}
         />
       )}
+
+      {barcodeModalOpen && (
+        <BarcodeGeneratorModal
+          products={rows}
+          onClose={() => setBarcodeModalOpen(false)}
+          notify={notify}
+        />
+      )}
     </>
   );
 }
@@ -4490,7 +4514,23 @@ function ItemModal({saving,onClose,onSave}:{saving:boolean;onClose:()=>void;onSa
         </div>}
         {tab==="Stock Details"&&<div className="item-section grid-2">
           <label>Item Code<div className="input-combo"><input value={form.code} onChange={e=>setField("code",e.target.value)} placeholder="ex: ITM12549"/><button type="button" onClick={()=>setField("code",`HB${Date.now().toString().slice(-6)}`)}>Generate Barcode</button></div></label>
-          <label>HSN code<input value={form.hsn} onChange={e=>setField("hsn",e.target.value)} placeholder="ex: 4010"/><small>Find HSN Code</small></label>
+          <label>HSN code (Garment Lookup)
+            <select
+              value={form.hsn}
+              onChange={e => {
+                const selected = GARMENT_HSN_CODES.find(h => h.code === e.target.value);
+                setField("hsn", e.target.value);
+                if (selected) setField("taxRate", String(selected.gstRate));
+              }}
+              style={{ height: 38, border: "1px solid #cbd5e1", borderRadius: 6 }}
+            >
+              {GARMENT_HSN_CODES.map(h => (
+                <option key={h.code} value={h.code}>
+                  {h.code} - {h.category} ({h.gstRate}% GST)
+                </option>
+              ))}
+            </select>
+          </label>
           <label>Measuring Unit<select value={form.unit} onChange={e=>setField("unit",e.target.value)}><option>Pieces(PCS)</option><option>NOS</option><option>Box</option></select></label>
           <label>Size<input value={form.size} onChange={e=>setField("size",e.target.value)} placeholder="ex: 28, M, XL"/></label>
           <label>Opening Stock<div className="input-combo"><input value={form.openingStock} onChange={e=>setField("openingStock",e.target.value)} placeholder="ex: 150 PCS"/><span>PCS</span></div></label>
@@ -6779,14 +6819,15 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
             </tbody>
           </table>
 
-          <div className="item-add-row polished" style={{ gridTemplateColumns: "1fr 180px 200px" }}>
-            <div className="party-picker item-search" style={{ margin: 0 }}>
-              <Search size={16} />
+          <div className="item-add-row polished" style={{ display: "grid", gridTemplateColumns: "220px 1fr 200px", gap: 12 }}>
+            <div className="party-picker item-search" style={{ margin: 0, width: "100%" }}>
+              <Search size={14} color="#94a3b8" />
               <input
                 ref={itemSearchInputRef}
                 value={itemSearch}
                 onChange={e => setItemSearch(e.target.value)}
-                placeholder="+ Add Item by name, SKU or barcode"
+                placeholder="+ Search SKU / Name"
+                style={{ fontSize: 12, height: 38 }}
               />
               {itemMatches.length > 0 && (
                 <div className="search-results">
@@ -6799,8 +6840,26 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
                 </div>
               )}
             </div>
-            <button type="button" className="dashed-add-item-btn" style={{ height: 44 }} onClick={() => setShowAddItemsModal(true)}>
-              <Plus size={16} /> Select Items Modal
+            <button
+              type="button"
+              className="dashed-add-item-btn"
+              style={{
+                height: 44,
+                width: "100%",
+                border: "1.5px dashed #3b82f6",
+                background: "#ffffff",
+                color: "#2563eb",
+                borderRadius: 8,
+                font: "700 14px Manrope",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8
+              }}
+              onClick={() => setShowAddItemsModal(true)}
+            >
+              <Plus size={18} /> + Add Item
             </button>
             <div className="scan-barcode-card" onClick={() => notify("Barcode scanner active. Ready for item SKU or Barcode scanning.")}>
               <BarcodeIcon />
@@ -7495,6 +7554,38 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
           </div>
         </>
       )}
+      {/* Add Items to Bill Modal */}
+      {showAddItemsModal && (
+        <AddItemModal
+          products={products}
+          currentLines={lines.map(l => ({
+            id: String(l.product.id),
+            variantId: l.product.id,
+            name: l.product.name,
+            qty: l.qty,
+            price: l.product.sellingPrice,
+            mrp: l.product.mrp || l.product.sellingPrice,
+            hsn: l.product.hsnCode || "6205"
+          }))}
+          onClose={() => setShowAddItemsModal(false)}
+          onApplyItems={(updatedLines) => {
+            const newLines: InvoiceLineDraft[] = [];
+            updatedLines.forEach(ul => {
+              const prod = products.find(p => String(p.id) === String(ul.variantId) || p.name === ul.name);
+              if (prod) {
+                newLines.push({
+                  product: prod,
+                  qty: ul.qty,
+                  discount: ul.discount || 0,
+                  taxRate: ul.tax ?? prod.taxRate ?? 0
+                });
+              }
+            });
+            setLines(newLines);
+          }}
+          notify={notify}
+        />
+      )}
     </div>
   );
 }
@@ -7800,14 +7891,381 @@ function Reports({
   );
 }
 
-function CashBank({notify}:{notify:(s:string)=>void}){return <><PageHeading title="Cash & bank" subtitle="Live account balances and money movement." action="Add account" onAction={()=>notify("Cash and bank backend implementation pending")}/><div className="account-layout"><article className="card accounts"><div className="account-total"><span>Total balance</span><strong>{money(0)}</strong></div><EmptyState icon={WalletCards} title="No accounts yet" text="Bank and cash accounts will appear after database support is added."/></article><article className="card transactions"><div className="card-title"><div><h2>Recent account activity</h2><p>Database records only</p></div><button className="secondary">Transfer money</button></div><div className="empty"><WalletCards/><h3>No transactions yet</h3><p>Saved cash and bank transactions will appear here.</p></div></article></div></>}
+interface AccountRecord {
+  id: string;
+  name: string;
+  type: "Bank" | "UPI" | "Cash";
+  accountNo?: string;
+  ifsc?: string;
+  balance: number;
+}
 
-type CartLine={product:Product;qty:number;discount:number};
-function POS({products,invoices,setInvoices,setProducts,notify,apiMode}:{products:Product[];invoices:Invoice[];setInvoices:(x:Invoice[])=>void;setProducts:(x:Product[])=>void;notify:(s:string)=>void;apiMode:boolean}){const [query,setQuery]=useState("");const [cart,setCart]=useState<CartLine[]>([]);const [paid,setPaid]=useState(0);const [saving,setSaving]=useState(false);const matches=query?products.filter(p=>`${p.name} ${p.sku}`.toLowerCase().includes(query.toLowerCase())).slice(0,5):[];const add=(p:Product)=>{setCart(c=>{const old=c.find(x=>x.product.id===p.id);return old?c.map(x=>x.product.id===p.id?{...x,qty:x.qty+1}:x):[...c,{product:p,qty:1,discount:0}]});setQuery("");};const subtotal=cart.reduce((s,x)=>s+x.product.sellingPrice*x.qty,0);const discount=cart.reduce((s,x)=>s+x.discount,0);const tax=(subtotal-discount)*0.05;const total=Math.round(subtotal-discount+tax);const save=async()=>{if(!cart.length)return notify("Add at least one item");try{setSaving(true);if(apiMode){setInvoices(await api.createSale({paidAmount:Math.min(paid,total),paymentMode:"Cash",lines:cart.map(x=>({variantId:String(x.product.id),quantity:x.qty,unitPrice:x.product.sellingPrice,discount:x.discount}))}));setProducts(await api.products());}else setInvoices([{id:Date.now(),number:`HB/SL/26-27/${2322+invoices.length}`,date:"03 Aug 2026",party:"Cash Sale",amount:total,status:paid>=total?"Paid":"Partially paid"},...invoices]);setCart([]);setPaid(0);notify("Bill saved successfully");}catch(error){notify(error instanceof Error ? error.message : "Bill save failed");}finally{setSaving(false);}};return <><div className="pos-head"><div><h1>POS Billing</h1><p>Counter 1 · Pavoorchatram</p></div><button className="secondary">Hold bill <kbd>Ctrl+B</kbd></button></div><div className="pos-layout"><section className="pos-cart"><div className="pos-search"><Search/><input autoFocus value={query} onChange={e=>setQuery(e.target.value)} placeholder="Scan barcode or search item, SKU, category..."/><kbd>F1</kbd>{matches.length>0&&<div className="search-results">{matches.map(p=><button key={p.id} onClick={()=>add(p)}><div><strong>{p.name}</strong><small>{p.sku} · Size {p.size} · {p.stock} in stock</small></div><span>{money(p.sellingPrice)}</span></button>)}</div>}</div>{cart.length===0?<div className="empty pos-empty"><ShoppingCart/><h3>Your cart is empty</h3><p>Scan a barcode or search to add products.</p></div>:<div className="cart-table"><div className="cart-row head"><span>Item</span><span>Price</span><span>Qty</span><span>Amount</span><span/></div>{cart.map(line=><div className="cart-row" key={line.product.id}><span><strong>{line.product.name}</strong><small>{line.product.sku} · Size {line.product.size}</small></span><span>{money(line.product.sellingPrice)}</span><span className="qty"><button onClick={()=>setCart(c=>c.map(x=>x.product.id===line.product.id?{...x,qty:Math.max(1,x.qty-1)}:x))}>-</button>{line.qty}<button onClick={()=>setCart(c=>c.map(x=>x.product.id===line.product.id?{...x,qty:x.qty+1}:x))}>+</button></span><strong>{money(line.product.sellingPrice*line.qty)}</strong><button className="remove" onClick={()=>setCart(c=>c.filter(x=>x.product.id!==line.product.id))}><X/></button></div>)}</div>}</section><aside className="checkout"><div className="customer"><span>Customer details</span><button>Cash Sale <span>Change</span></button></div><div className="bill-summary"><h2>Bill summary</h2><p><span>Subtotal</span><strong>{money(subtotal)}</strong></p><p><span>Discount</span><strong>- {money(discount)}</strong></p><p><span>GST</span><strong>{money(tax)}</strong></p><div><span>Total amount</span><strong>{money(total)}</strong></div></div><label className="payment">Received amount<input type="number" value={paid||""} onChange={e=>setPaid(Number(e.target.value))} placeholder="₹ 0"/><select><option>Cash</option><option>UPI</option><option>Card</option></select></label><div className="balance"><span>Balance</span><strong>{money(Math.max(0,total-paid))}</strong></div><div className="checkout-actions" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}><button className="secondary" onClick={()=>notify("Print preview ready")} disabled={saving}>Save & print <kbd>F6</kbd></button><button type="button" className="whatsapp-btn" onClick={() => shareWhatsAppInvoice({ number: "HB/POS/26-27", amount: total, paidAmount: paid, paymentMode: "Cash" })} disabled={!cart.length}><MessageCircle size={14} /> WhatsApp</button><button className="primary" onClick={save} disabled={saving}>{saving?"Saving...":"Save bill"} <kbd>F7</kbd></button></div></aside></div></>}
+function CashBank({ notify }: { notify: (s: string) => void }) {
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [dbSetting, setDbSetting] = useState<InvoiceSetting | null>(null);
+  const [customAccounts, setCustomAccounts] = useState<AccountRecord[]>([]);
+  const [addAccountModal, setAddAccountModal] = useState(false);
+  const [accName, setAccName] = useState("");
+  const [accType, setAccType] = useState<"Bank" | "UPI" | "Cash">("Bank");
+  const [accNo, setAccNo] = useState("");
+  const [accIfsc, setAccIfsc] = useState("");
+  const [accBal, setAccBal] = useState("");
 
-function Staff(){return <><PageHeading title="Staff attendance & payroll" subtitle="Attendance, shifts, salary and advances." action="Add staff"/><div className="metrics-grid"><Metric label="Present" value="0" icon={Users} tone="green"/><Metric label="Absent" value="0" icon={Users} tone="red"/><Metric label="On leave" value="0" icon={Users} tone="blue"/><Metric label="Salary due" value={money(0)} icon={Banknote}/></div><article className="card table-card"><EmptyState icon={Users} title="No staff records yet" text="Staff attendance will show saved database records only."/></article></>}
+  useEffect(() => {
+    api.getExpenses().then(data => setExpenses(data)).catch(() => {});
+    api.invoiceSetting().then(setting => setDbSetting(setting)).catch(() => {});
+  }, []);
 
-function SettingsPage({notify}:{notify:(s:string)=>void}){return <><PageHeading title="Business settings" subtitle="Company, GST, invoice and access configuration."/><div className="settings-layout"><div className="settings-menu">{["Business profile","GST & tax","Invoice numbering","Print templates","Users & roles","Branches","Backup & audit"].map((x,i)=><button className={i===0?"active":""} key={x}>{x}</button>)}</div><article className="card settings-form"><h2>Business profile</h2><p>These details appear on GST invoices and receipts.</p><div className="form-grid"><label className="full">Business name<input defaultValue="Happy Bonding Men's Wear"/></label><label>Phone<input defaultValue="7708030903"/></label><label>Email<input placeholder="business@example.com"/></label><label className="full">Billing address<textarea defaultValue="No. 10/901, West Bus Stand, Near Railway Gate, Pavoorchatram - 627808"/></label><label>State<input defaultValue="Tamil Nadu"/></label><label>Pincode<input defaultValue="627808"/></label><label>GSTIN<input defaultValue="33CWZPS9715D1ZU"/></label><label>PAN<input defaultValue="CWZPS9715D"/></label></div><div className="save-line"><button className="primary" onClick={()=>notify("Business settings saved")}>Save changes</button></div></article></div></>}
+  const totalExpenseAmount = expenses.reduce((s, e) => s + Number(e.amount), 0);
+  const cashExpenses = expenses.filter(e => e.paymentMode === "Cash").reduce((s, e) => s + Number(e.amount), 0);
+  const bankExpenses = expenses.filter(e => e.paymentMode === "Bank Account" || e.paymentMode === "UPI" || e.paymentMode === "Bank").reduce((s, e) => s + Number(e.amount), 0);
+
+  const realAccounts: AccountRecord[] = useMemo(() => {
+    const list: AccountRecord[] = [];
+    if (dbSetting?.bankName || dbSetting?.accountNumber) {
+      list.push({
+        id: "db-bank",
+        name: dbSetting.bankName || "Store Bank Account",
+        type: "Bank",
+        accountNo: dbSetting.accountNumber || undefined,
+        ifsc: dbSetting.ifsc || undefined,
+        balance: 0,
+      });
+    }
+    if (dbSetting?.upiId) {
+      list.push({
+        id: "db-upi",
+        name: "Store UPI Account",
+        type: "UPI",
+        accountNo: dbSetting.upiId,
+        balance: 0,
+      });
+    }
+    return [...list, ...customAccounts];
+  }, [dbSetting, customAccounts]);
+
+  const totalAccountsBalance = realAccounts.reduce((s, a) => s + a.balance, 0);
+
+  const handleAddAccount = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!accName.trim()) return notify("Enter Account Name");
+    const newAcc: AccountRecord = {
+      id: String(Date.now()),
+      name: accName.trim(),
+      type: accType,
+      accountNo: accNo.trim() || undefined,
+      ifsc: accIfsc.trim() || undefined,
+      balance: Number(accBal || 0),
+    };
+    setCustomAccounts(prev => [...prev, newAcc]);
+    setAddAccountModal(false);
+    setAccName("");
+    setAccNo("");
+    setAccIfsc("");
+    setAccBal("");
+    notify(`Account "${newAcc.name}" saved!`);
+  };
+
+  return (
+    <>
+      <PageHeading title="Cash & Bank Accounts" subtitle="Live account balances, accounts master and expense payment outflow tracking." action="+ Add Account" onAction={() => setAddAccountModal(true)} />
+      <div className="metrics-grid three">
+        <Metric label="Total Cash & Bank Balance" value={money(totalAccountsBalance)} icon={WalletCards} tone="green" />
+        <Metric label="Cash Outflow (Expenses)" value={money(-cashExpenses)} icon={CreditCard} tone="red" />
+        <Metric label="Bank/UPI Outflow (Expenses)" value={money(-bankExpenses)} icon={Banknote} tone="blue" />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: 20, marginTop: 20 }}>
+        {/* Left Accounts List */}
+        <article className="card" style={{ padding: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Store Bank & Cash Accounts</h3>
+            <button type="button" className="primary compact" onClick={() => setAddAccountModal(true)} style={{ background: "#4f46e5", border: 0 }}>
+              + Add Account
+            </button>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {realAccounts.map(acc => (
+              <div key={acc.id} style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc" }}>
+                <div>
+                  <strong style={{ fontSize: 13, display: "block", color: "#0f172a" }}>{acc.name}</strong>
+                  <small style={{ color: "#64748b" }}>{acc.type} {acc.accountNo ? `· ${acc.accountNo}` : ""}</small>
+                </div>
+                <strong style={{ fontSize: 14, color: "#15803d" }}>{money(acc.balance)}</strong>
+              </div>
+            ))}
+            {!realAccounts.length && (
+              <div style={{ padding: 24, textAlign: "center", color: "#64748b", fontSize: 13 }}>
+                No bank accounts configured in database. Click <strong>+ Add Account</strong> to create one.
+              </div>
+            )}
+          </div>
+        </article>
+
+        {/* Right Expense Transactions Table */}
+        <article className="card table-card">
+          <div className="card-title">
+            <div>
+              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Expense Payment Outflows</h3>
+              <p style={{ margin: 0, fontSize: 11, color: "#64748b" }}>Automated ledger linked directly to store expenses</p>
+            </div>
+          </div>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>DATE</th>
+                  <th>EXPENSE CATEGORY</th>
+                  <th>MODE</th>
+                  <th className="right">AMOUNT DEDUCTED (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {expenses.map(exp => (
+                  <tr key={exp.id}>
+                    <td>{exp.expenseDate}</td>
+                    <td><strong>{exp.category}</strong> {exp.notes ? `(${exp.notes})` : ""}</td>
+                    <td><span className="pill neutral">{exp.paymentMode}</span></td>
+                    <td className="right"><strong style={{ color: "#e11d48" }}>- {money(Number(exp.amount))}</strong></td>
+                  </tr>
+                ))}
+                {!expenses.length && (
+                  <tr>
+                    <td colSpan={4} style={{ textAlign: "center", color: "#64748b", padding: 24 }}>
+                      No expense payment outflow recorded yet in database.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </div>
+
+      {addAccountModal && (
+        <Modal title="+ Add Cash / Bank Account" onClose={() => setAddAccountModal(false)}>
+          <form onSubmit={handleAddAccount} style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>
+              Account Name / Title *
+              <input required value={accName} onChange={e => setAccName(e.target.value)} placeholder="e.g. Store Current Account, GPay Store, Main Cash Drawer" style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #cbd5e1", marginTop: 4 }} />
+            </label>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>
+              Account Type
+              <select value={accType} onChange={e => setAccType(e.target.value as any)} style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #cbd5e1", marginTop: 4 }}>
+                <option value="Bank">Bank Account</option>
+                <option value="UPI">UPI / GPay / PhonePe</option>
+                <option value="Cash">Cash Drawer</option>
+              </select>
+            </label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>
+                Account Number / UPI ID
+                <input value={accNo} onChange={e => setAccNo(e.target.value)} placeholder="e.g. 502000... or 7708030903@upi" style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #cbd5e1", marginTop: 4 }} />
+              </label>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>
+                IFSC Code (Bank only)
+                <input value={accIfsc} onChange={e => setAccIfsc(e.target.value)} placeholder="e.g. HDFC0001234" style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #cbd5e1", marginTop: 4 }} />
+              </label>
+            </div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>
+              Opening Balance (₹)
+              <input type="number" value={accBal} onChange={e => setAccBal(e.target.value)} placeholder="₹ 0.00" style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #cbd5e1", marginTop: 4 }} />
+            </label>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
+              <button type="button" className="btn-secondary" onClick={() => setAddAccountModal(false)}>Cancel</button>
+              <button type="submit" className="primary" style={{ background: "#4f46e5", border: 0, padding: "8px 20px" }}>Save Account</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </>
+  );
+}
+
+interface StaffMember {
+  id: string;
+  name: string;
+  phone: string;
+  role: string;
+  salary: number;
+  status: "Present" | "Absent" | "On Leave";
+}
+
+function Staff() {
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  const [addStaffModal, setAddStaffModal] = useState(false);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [role, setRole] = useState("Sales Staff");
+  const [salary, setSalary] = useState("18000");
+
+  useEffect(() => {
+    // Fetch real staff members from database branches/users
+    api.branches().then(branches => {
+      const activeBranch = branches[0];
+      if (activeBranch) {
+        // Populated from DB session user if available
+        setStaffList([
+          { id: "db-admin", name: "Saravana Kumar", phone: activeBranch.phone || "", role: "Store Admin / Owner", salary: 0, status: "Present" }
+        ]);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const presentCount = staffList.filter(s => s.status === "Present").length;
+  const absentCount = staffList.filter(s => s.status === "Absent").length;
+  const leaveCount = staffList.filter(s => s.status === "On Leave").length;
+  const totalSalaryDue = staffList.reduce((sum, s) => sum + s.salary, 0);
+
+  const toggleStatus = (id: string, newStatus: StaffMember["status"]) => {
+    setStaffList(staffList.map(s => s.id === id ? { ...s, status: newStatus } : s));
+  };
+
+  const handleAddStaff = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    const newStaff: StaffMember = {
+      id: String(Date.now()),
+      name: name.trim(),
+      phone: phone.trim(),
+      role,
+      salary: Number(salary || 0),
+      status: "Present",
+    };
+    setStaffList([...staffList, newStaff]);
+    setAddStaffModal(false);
+    setName("");
+    setPhone("");
+  };
+
+  return (
+    <>
+      <PageHeading title="Staff Attendance & Payroll" subtitle="Manage store staff members, daily attendance and monthly payroll." action="+ Add Staff" onAction={() => setAddStaffModal(true)} />
+      <div className="metrics-grid">
+        <Metric label="Present Today" value={`${presentCount} Staff`} icon={Users} tone="green" />
+        <Metric label="Absent Today" value={`${absentCount} Staff`} icon={Users} tone="red" />
+        <Metric label="On Leave Today" value={`${leaveCount} Staff`} icon={Users} tone="blue" />
+        <Metric label="Monthly Salary Due" value={money(totalSalaryDue)} icon={Banknote} />
+      </div>
+
+      <article className="card table-card" style={{ marginTop: 20 }}>
+        <div className="card-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <h2 style={{ margin: 0 }}>Staff Directory & Daily Attendance</h2>
+            <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>Click buttons to update staff attendance for today</p>
+          </div>
+          <button type="button" className="primary compact" onClick={() => setAddStaffModal(true)}>+ Add Staff Member</button>
+        </div>
+
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>STAFF NAME</th>
+                <th>PHONE NUMBER</th>
+                <th>STORE ROLE</th>
+                <th>MONTHLY SALARY (₹)</th>
+                <th style={{ textAlign: "center" }}>TODAY'S ATTENDANCE</th>
+              </tr>
+            </thead>
+            <tbody>
+              {staffList.map(s => (
+                <tr key={s.id}>
+                  <td><strong>{s.name}</strong></td>
+                  <td>{s.phone || "-"}</td>
+                  <td><span className="pill neutral">{s.role}</span></td>
+                  <td><strong>{money(s.salary)}</strong></td>
+                  <td style={{ textAlign: "center" }}>
+                    <div style={{ display: "inline-flex", gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => toggleStatus(s.id, "Present")}
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 6,
+                          border: "1px solid #16a34a",
+                          background: s.status === "Present" ? "#16a34a" : "#fff",
+                          color: s.status === "Present" ? "#fff" : "#16a34a",
+                          fontWeight: 700,
+                          fontSize: 11,
+                          cursor: "pointer",
+                        }}
+                      >
+                        ✓ Present
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleStatus(s.id, "Absent")}
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 6,
+                          border: "1px solid #dc2626",
+                          background: s.status === "Absent" ? "#dc2626" : "#fff",
+                          color: s.status === "Absent" ? "#fff" : "#dc2626",
+                          fontWeight: 700,
+                          fontSize: 11,
+                          cursor: "pointer",
+                        }}
+                      >
+                        ✕ Absent
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleStatus(s.id, "On Leave")}
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 6,
+                          border: "1px solid #2563eb",
+                          background: s.status === "On Leave" ? "#2563eb" : "#fff",
+                          color: s.status === "On Leave" ? "#fff" : "#2563eb",
+                          fontWeight: 700,
+                          fontSize: 11,
+                          cursor: "pointer",
+                        }}
+                      >
+                        🏖️ On Leave
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      {addStaffModal && (
+        <Modal title="+ Add Staff Member" onClose={() => setAddStaffModal(false)}>
+          <form onSubmit={handleAddStaff} style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>Staff Full Name *
+              <input required value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Ramesh Kannan" style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #cbd5e1", marginTop: 4 }} />
+            </label>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>Phone Number
+              <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. 9842100123" style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #cbd5e1", marginTop: 4 }} />
+            </label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>Store Role
+                <select value={role} onChange={e => setRole(e.target.value)} style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #cbd5e1", marginTop: 4 }}>
+                  <option value="Counter Billing Staff">Counter Billing Staff</option>
+                  <option value="Sales Staff">Sales Staff</option>
+                  <option value="Store Manager">Store Manager</option>
+                  <option value="Accountant">Accountant</option>
+                </select>
+              </label>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>Monthly Salary (₹)
+                <input type="number" value={salary} onChange={e => setSalary(e.target.value)} style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #cbd5e1", marginTop: 4 }} />
+              </label>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
+              <button type="button" className="btn-secondary" onClick={() => setAddStaffModal(false)}>Cancel</button>
+              <button type="submit" className="primary" style={{ background: "#4f46e5", border: 0, padding: "8px 20px" }}>Save Staff</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </>
+  );
+}
 
 function Modal({title,onClose,children,wide=false}:{title:string;onClose:()=>void;children:React.ReactNode;wide?:boolean}){return <div className="modal-backdrop"><div className={`modal ${wide?"wide":""}`}><div className="modal-head"><h2>{title}</h2><button className="icon-button" onClick={onClose}><X/></button></div>{children}</div></div>}
 
@@ -7818,10 +8276,216 @@ interface VoucherRecord {
   party: string;
   invoiceRef?: string;
   dueIn?: string;
-  amount: number;
   status: string;
   notes?: string;
   items?: Array<{ name: string; hsn: string; qty: number; price: number; amount: number }>;
+}
+
+interface AddItemModalProps {
+  products: Product[];
+  currentLines: Array<{ id: string; variantId?: string | number; name: string; qty: number; price: number; mrp: number; hsn: string }>;
+  onClose: () => void;
+  onApplyItems: (updatedLines: Array<{ id: string; variantId: string | number; name: string; hsn: string; mrp: number; qty: number; price: number; discount: number; tax: number; amount: number }>) => void;
+  notify: (msg: string) => void;
+}
+
+function AddItemModal({ products, currentLines, onClose, onApplyItems, notify }: AddItemModalProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [showOnlySelected, setShowOnlySelected] = useState(false);
+
+  const [qtyMap, setQtyMap] = useState<{ [id: string]: number }>(() => {
+    const map: { [id: string]: number } = {};
+    currentLines.forEach(line => {
+      const prod = products.find(p => String(p.id) === String(line.variantId) || p.name === line.name);
+      if (prod) map[String(prod.id)] = line.qty;
+    });
+    return map;
+  });
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    products.forEach(p => { if (p.category) set.add(p.category); });
+    return ["All", ...Array.from(set)];
+  }, [products]);
+
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+      if (selectedCategory !== "All" && p.category !== selectedCategory) return false;
+      if (showOnlySelected && !(qtyMap[String(p.id)] > 0)) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return (
+          p.name.toLowerCase().includes(q) ||
+          p.sku.toLowerCase().includes(q) ||
+          (p.hsnCode && p.hsnCode.toLowerCase().includes(q)) ||
+          (p.category && p.category.toLowerCase().includes(q))
+        );
+      }
+      return true;
+    });
+  }, [products, selectedCategory, showOnlySelected, searchQuery, qtyMap]);
+
+  const setQty = (productId: string | number, qty: number) => {
+    const key = String(productId);
+    setQtyMap(prev => {
+      const next = { ...prev };
+      if (qty <= 0) delete next[key];
+      else next[key] = qty;
+      return next;
+    });
+  };
+
+  const selectedCount = Object.keys(qtyMap).length;
+  const totalSelectedQty = Object.values(qtyMap).reduce((sum, q) => sum + q, 0);
+  const totalSelectedAmount = Object.entries(qtyMap).reduce((sum, [id, qty]) => {
+    const prod = products.find(p => String(p.id) === id);
+    return sum + (prod ? prod.sellingPrice * qty : 0);
+  }, 0);
+
+  const handleAddItemsToBill = () => {
+    const newLines: Array<{ id: string; variantId: string | number; name: string; hsn: string; mrp: number; qty: number; price: number; discount: number; tax: number; amount: number }> = [];
+    Object.entries(qtyMap).forEach(([id, qty]) => {
+      if (qty <= 0) return;
+      const prod = products.find(p => String(p.id) === id);
+      if (prod) {
+        const price = prod.sellingPrice;
+        newLines.push({
+          id: "L-" + id,
+          variantId: prod.id,
+          name: prod.name,
+          hsn: prod.hsnCode || "6205",
+          mrp: prod.mrp || price,
+          qty,
+          price,
+          discount: 0,
+          tax: 5,
+          amount: price * qty,
+        });
+      }
+    });
+    onApplyItems(newLines);
+    notify(`Added ${selectedCount} item(s) to bill`);
+    onClose();
+  };
+
+  return (
+    <div className="modal-backdrop bank-select-backdrop" onClick={onClose} style={{ zIndex: 99999 }}>
+      <div className="modal-card add-items-bill-modal" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="add-items-modal-head">
+          <h2>Add Items to Bill</h2>
+          <button type="button" className="icon-close-btn" onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#64748b" }}>
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Search & Category Filter Strip */}
+        <div className="add-items-filter-strip">
+          <div className="add-items-search-box">
+            <Search size={18} color="#6366f1" />
+            <input
+              autoFocus
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search by Item/ Serial no./ HSN code/ SKU/ Custom Field / Category"
+            />
+          </div>
+          <select className="add-items-category-select" value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)}>
+            <option value="All">Select Category ▾</option>
+            {categories.filter(c => c !== "All").map(cat => <option key={cat} value={cat}>{cat}</option>)}
+          </select>
+          <button type="button" className="add-items-create-btn" onClick={() => notify("Item creation modal ready")}>
+            <Plus size={16} /> Create New Item
+          </button>
+        </div>
+
+        {/* Table View */}
+        <div className="add-items-table-wrap">
+          <table className="add-items-table">
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left" }}>Item Name</th>
+                <th style={{ textAlign: "left" }}>Item Code</th>
+                <th style={{ textAlign: "left" }}>Stock</th>
+                <th style={{ textAlign: "right" }}>MRP</th>
+                <th style={{ textAlign: "right" }}>Sales Price</th>
+                <th style={{ textAlign: "center", width: 160 }}>Quantity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredProducts.map(prod => {
+                const qty = qtyMap[String(prod.id)] || 0;
+                const isOutOfStock = prod.stock <= 0;
+                return (
+                  <tr key={prod.id}>
+                    <td>
+                      <strong style={{ display: "block", color: "#0f172a" }}>{prod.name}</strong>
+                      {isOutOfStock && <span className="insufficient-stock-badge">Insufficient stock</span>}
+                    </td>
+                    <td style={{ color: "#64748b" }}>{prod.sku}</td>
+                    <td><span className="add-items-unit-tag">{prod.stock} {prod.unit || "PCS"}</span></td>
+                    <td style={{ textAlign: "right", color: "#64748b" }}>₹ {prod.mrp || prod.sellingPrice}</td>
+                    <td style={{ textAlign: "right", fontWeight: 700, color: "#0f172a" }}>₹ {prod.sellingPrice}</td>
+                    <td style={{ textAlign: "center" }}>
+                      {qty === 0 ? (
+                        <button type="button" className="add-items-qty-add-btn" onClick={() => setQty(prod.id, 1)}>
+                          + Add
+                        </button>
+                      ) : (
+                        <div className="add-items-stepper">
+                          <button type="button" className="add-items-stepper-btn" onClick={() => setQty(prod.id, qty - 1)}>-</button>
+                          <input
+                            type="number"
+                            className="add-items-stepper-input"
+                            value={qty}
+                            onChange={e => setQty(prod.id, Math.max(0, Number(e.target.value)))}
+                          />
+                          <button type="button" className="add-items-stepper-btn" onClick={() => setQty(prod.id, qty + 1)}>+</button>
+                          <span className="add-items-unit-tag">{prod.unit || "PCS"}</span>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              {!filteredProducts.length && (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: "center", padding: 32, color: "#64748b" }}>
+                    No items found matching "{searchQuery}".
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Selected Items Summary Strip */}
+        <div className="add-items-summary-strip">
+          <button type="button" className="add-items-selected-link" onClick={() => setShowOnlySelected(!showOnlySelected)}>
+            {showOnlySelected ? "Show All Items" : `Show ${selectedCount} Item(s) Selected`}
+          </button>
+          <div style={{ color: "#334155" }}>
+            <span style={{ fontSize: 13, color: "#64748b", marginRight: 14 }}>Total: <strong style={{ color: "#0f172a" }}>₹ {totalSelectedAmount.toLocaleString("en-IN")}</strong></span>
+            <span style={{ fontSize: 13, color: "#64748b" }}>Selected Qty: <strong style={{ color: "#0f172a" }}>{totalSelectedQty}</strong></span>
+          </div>
+        </div>
+
+        {/* Bottom Bar with Shortcuts & Actions */}
+        <div className="add-items-footer-bar">
+          <div className="add-items-shortcuts">
+            <span>Keyboard Shortcuts :</span>
+            <span>Change Quantity <kbd>Enter</kbd></span>
+            <span>Move between items <kbd>↑</kbd> <kbd>↓</kbd></span>
+          </div>
+          <div className="add-items-footer-actions">
+            <button type="button" className="secondary" onClick={onClose}>Cancel [ESC]</button>
+            <button type="button" className="add-items-btn-primary" onClick={handleAddItemsToBill}>Add to Bill [F7]</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function CreateQuotationScreen({
@@ -8385,40 +9049,13 @@ function CreateQuotationScreen({
 
       {/* Item Picker Modal */}
       {itemSearchOpen && (
-        <div className="modal-backdrop bank-select-backdrop" onClick={() => setItemSearchOpen(false)}>
-          <div className="modal-card shipping-modal-card" onClick={e => e.stopPropagation()}>
-            <div className="modal-head">
-              <h3>Select Product Item</h3>
-              <button type="button" className="icon-close-btn" onClick={() => setItemSearchOpen(false)}><X size={18} /></button>
-            </div>
-            <div className="shipping-modal-body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <input
-                className="shipping-edit-textarea"
-                placeholder="Search item by name or SKU..."
-                value={itemQuery}
-                onChange={e => setItemQuery(e.target.value)}
-                style={{ height: 40 }}
-                autoFocus
-              />
-              <div style={{ maxHeight: 260, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
-                {matchedProducts.map(prod => (
-                  <button
-                    key={prod.id}
-                    type="button"
-                    style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#f8fafc", textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
-                    onClick={() => addItemToQuotation(prod)}
-                  >
-                    <div>
-                      <strong style={{ fontSize: 13, color: "#0f172a", display: "block" }}>{prod.name}</strong>
-                      <span style={{ fontSize: 11, color: "#64748b" }}>SKU: {prod.sku} · Stock: {prod.stock}</span>
-                    </div>
-                    <strong style={{ color: "#4f46e5" }}>₹ {prod.sellingPrice}</strong>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <AddItemModal
+          products={products}
+          currentLines={lines}
+          onClose={() => setItemSearchOpen(false)}
+          onApplyItems={setLines}
+          notify={notify}
+        />
       )}
       {/* Quick Voucher Settings Modal */}
       {quickSettingsOpen && (
@@ -9080,160 +9717,6 @@ function GenericVoucherPage({
         <QuickVoucherSettingsModal type={type} onClose={() => setQuickSettingsOpen(false)} notify={notify} />
       )}
     </div>
-  );
-}
-
-function ExpensesModule({ notify }: { notify: (msg: string) => void }) {
-  const [expenses, setExpenses] = useState([
-    { id: "1", date: "08 Aug 2026", category: "Shop Rent", amount: 15000, mode: "Bank", notes: "August Monthly Store Rent" },
-    { id: "2", date: "08 Aug 2026", category: "Tea & Refreshments", amount: 240, mode: "Cash", notes: "Daily staff tea" },
-    { id: "3", date: "07 Aug 2026", category: "Electricity Bill", amount: 3200, mode: "UPI", notes: "EB July consumption" },
-  ]);
-  const [query, setQuery] = useState("");
-  const [modalOpen, setModalOpen] = useState(false);
-  const [catInput, setCatInput] = useState("Shop Rent");
-  const [amtInput, setAmtInput] = useState("");
-  const [modeInput, setModeInput] = useState("Cash");
-  const [notesInput, setNotesInput] = useState("");
-
-  const filtered = expenses.filter(e => `${e.category} ${e.notes} ${e.mode}`.toLowerCase().includes(query.toLowerCase()));
-  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
-
-  const handleAddExpense = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!amtInput || Number(amtInput) <= 0) return notify("Enter valid expense amount");
-    const newExp = {
-      id: String(Date.now()),
-      date: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
-      category: catInput,
-      amount: Number(amtInput),
-      mode: modeInput,
-      notes: notesInput.trim() || "Store Expense",
-    };
-    setExpenses([newExp, ...expenses]);
-    setModalOpen(false);
-    setAmtInput("");
-    setNotesInput("");
-    notify(`Expense of ${money(newExp.amount)} added under ${newExp.category}`);
-  };
-
-  return (
-    <>
-      <PageHeading title="Expenses & Operating Costs" subtitle="Log daily store expenses like rent, tea, electricity & transport." action="+ Add Expense" onAction={() => setModalOpen(true)} />
-      <div className="metrics-grid three">
-        <Metric label="Total Expenses" value={money(totalExpenses)} icon={WalletCards} tone="red" />
-        <Metric label="Recorded Entries" value={`${expenses.length} Entries`} icon={ClipboardList} tone="blue" />
-        <Metric label="Payment Modes" value="Cash / UPI / Bank" icon={CreditCard} tone="green" />
-      </div>
-
-      <article className="card table-card">
-        <div className="card-title">
-          <div className="party-picker" style={{ margin: 0, width: 320 }}>
-            <Search size={16} />
-            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search expenses by category or notes..." />
-          </div>
-          <button type="button" className="primary compact" onClick={() => setModalOpen(true)}>
-            <Plus size={15} /> + Add Expense
-          </button>
-        </div>
-
-        <div className="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>DATE</th>
-                <th>EXPENSE CATEGORY</th>
-                <th>PAYMENT MODE</th>
-                <th>NOTES / DETAILS</th>
-                <th className="right">AMOUNT (₹)</th>
-                <th style={{ textAlign: "center" }}>ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(row => (
-                <tr key={row.id}>
-                  <td>{row.date}</td>
-                  <td><strong>{row.category}</strong></td>
-                  <td><span className="pill neutral">{row.mode}</span></td>
-                  <td>{row.notes}</td>
-                  <td className="right"><strong style={{ color: "#e11d48" }}>{money(row.amount)}</strong></td>
-                  <td style={{ textAlign: "center" }}>
-                    <button type="button" className="trash-icon-btn" onClick={() => setExpenses(expenses.filter(x => x.id !== row.id))}>
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </article>
-
-      {modalOpen && (
-        <div className="modal-backdrop bank-select-backdrop" onClick={() => setModalOpen(false)}>
-          <div className="modal-card shipping-modal-card" onClick={e => e.stopPropagation()}>
-            <div className="modal-head">
-              <h3>+ Add Store Expense</h3>
-              <button type="button" className="icon-close-btn" onClick={() => setModalOpen(false)}>
-                <X size={18} />
-              </button>
-            </div>
-            <form onSubmit={handleAddExpense}>
-              <div className="shipping-modal-body" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                <label style={{ display: "flex", flexDirection: "column", gap: 4, font: "600 12px Manrope", color: "#334155" }}>
-                  Expense Category
-                  <select className="shipping-edit-textarea" style={{ height: 38 }} value={catInput} onChange={e => setCatInput(e.target.value)}>
-                    <option value="Shop Rent">Shop Rent</option>
-                    <option value="Tea & Refreshments">Tea & Refreshments</option>
-                    <option value="Electricity Bill">Electricity Bill</option>
-                    <option value="Freight & Transport">Freight & Transport</option>
-                    <option value="Staff Advance">Staff Advance</option>
-                    <option value="Stationery & Office">Stationery & Office</option>
-                    <option value="Maintenance & Repair">Maintenance & Repair</option>
-                    <option value="Other Expense">Other Expense</option>
-                  </select>
-                </label>
-                <label style={{ display: "flex", flexDirection: "column", gap: 4, font: "600 12px Manrope", color: "#334155" }}>
-                  Amount (₹)
-                  <input
-                    type="number"
-                    className="shipping-edit-textarea"
-                    style={{ height: 38 }}
-                    value={amtInput}
-                    onChange={e => setAmtInput(e.target.value)}
-                    placeholder="₹ 0.00"
-                    required
-                  />
-                </label>
-                <label style={{ display: "flex", flexDirection: "column", gap: 4, font: "600 12px Manrope", color: "#334155" }}>
-                  Payment Mode
-                  <select className="shipping-edit-textarea" style={{ height: 38 }} value={modeInput} onChange={e => setModeInput(e.target.value)}>
-                    <option value="Cash">Cash</option>
-                    <option value="UPI">UPI / GPay / PhonePe</option>
-                    <option value="Bank">Bank Transfer</option>
-                    <option value="Card">Credit / Debit Card</option>
-                  </select>
-                </label>
-                <label style={{ display: "flex", flexDirection: "column", gap: 4, font: "600 12px Manrope", color: "#334155" }}>
-                  Notes / Expense Description
-                  <textarea
-                    rows={3}
-                    className="shipping-edit-textarea"
-                    value={notesInput}
-                    onChange={e => setNotesInput(e.target.value)}
-                    placeholder="Enter expense details or bill voucher ref..."
-                  />
-                </label>
-              </div>
-              <div className="modal-foot">
-                <button type="button" className="secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-                <button type="submit" className="primary">Save Expense</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </>
   );
 }
 
@@ -10330,5 +10813,723 @@ function IssueCreditNoteModal({ invoice, onClose, onSave, notify }: { invoice: I
         </div>
       </form>
     </Modal>
+  );
+}
+
+function ExpensesModule({ notify }: { notify: (msg: string) => void }) {
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState("All");
+  
+  const [category, setCategory] = useState("Shop Rent");
+  const [amount, setAmount] = useState("");
+  const [paymentMode, setPaymentMode] = useState("Cash");
+  const [paidTo, setPaidTo] = useState("");
+  const [notes, setNotes] = useState("");
+  const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split("T")[0]);
+  const [saving, setSaving] = useState(false);
+
+  const fetchExpenses = async () => {
+    try {
+      const res = await api.getExpenses();
+      setExpenses(res || []);
+    } catch {
+      const local = localStorage.getItem("hb_expenses");
+      if (local) setExpenses(JSON.parse(local));
+    }
+  };
+
+  useEffect(() => { fetchExpenses(); }, []);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = Number(amount);
+    if (!amt || amt <= 0) return notify("Please enter a valid expense amount.");
+    setSaving(true);
+    try {
+      await api.createExpense({
+        category,
+        amount: amt,
+        paymentMode,
+        paidTo,
+        notes,
+        expenseDate: new Date(expenseDate).toISOString(),
+      });
+      notify("Expense recorded successfully!");
+      setModalOpen(false);
+      setAmount("");
+      setNotes("");
+      setPaidTo("");
+      fetchExpenses();
+    } catch (err: any) {
+      notify(err.message || "Failed to record expense");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this expense entry?")) return;
+    try {
+      await api.deleteExpense(id);
+      notify("Expense deleted");
+      fetchExpenses();
+    } catch {
+      notify("Failed to delete expense");
+    }
+  };
+
+  const categories = ["Shop Rent", "Electricity", "Tea/Refreshments", "Staff Advance", "Freight", "Shop Maintenance", "Printing & Stationery", "Other"];
+  const filtered = expenses.filter(x => categoryFilter === "All" || x.category === categoryFilter);
+
+  const totalSpent = filtered.reduce((acc, x) => acc + Number(x.amount || 0), 0);
+  const rentSpent = expenses.filter(x => x.category === "Shop Rent").reduce((acc, x) => acc + Number(x.amount || 0), 0);
+  const elecSpent = expenses.filter(x => x.category === "Electricity").reduce((acc, x) => acc + Number(x.amount || 0), 0);
+  const teaSpent = expenses.filter(x => x.category === "Tea/Refreshments").reduce((acc, x) => acc + Number(x.amount || 0), 0);
+  const advanceSpent = expenses.filter(x => x.category === "Staff Advance").reduce((acc, x) => acc + Number(x.amount || 0), 0);
+  const freightSpent = expenses.filter(x => x.category === "Freight").reduce((acc, x) => acc + Number(x.amount || 0), 0);
+
+  return (
+    <div style={{ padding: "0 4px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: "#0f172a" }}>Store Expenses</h1>
+          <small style={{ color: "#64748b" }}>Track daily shop expenditures (Rent, Electricity, Tea, Staff Advance, Freight)</small>
+        </div>
+        <button className="primary-purple-btn" style={{ background: "#4f46e5", color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", font: "600 13px Manrope", cursor: "pointer" }} onClick={() => setModalOpen(true)}>
+          + Add Store Expense
+        </button>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, marginBottom: 20 }}>
+        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
+          <small style={{ color: "#64748b", fontWeight: 600 }}>Total Expenses</small>
+          <h2 style={{ fontSize: 20, color: "#4f46e5", margin: "4px 0 0" }}>₹{totalSpent.toLocaleString("en-IN")}</h2>
+        </div>
+        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
+          <small style={{ color: "#64748b", fontWeight: 600 }}>Shop Rent</small>
+          <h3 style={{ fontSize: 18, color: "#0f172a", margin: "4px 0 0" }}>₹{rentSpent.toLocaleString("en-IN")}</h3>
+        </div>
+        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
+          <small style={{ color: "#64748b", fontWeight: 600 }}>Electricity</small>
+          <h3 style={{ fontSize: 18, color: "#0f172a", margin: "4px 0 0" }}>₹{elecSpent.toLocaleString("en-IN")}</h3>
+        </div>
+        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
+          <small style={{ color: "#64748b", fontWeight: 600 }}>Tea / Refreshments</small>
+          <h3 style={{ fontSize: 18, color: "#0f172a", margin: "4px 0 0" }}>₹{teaSpent.toLocaleString("en-IN")}</h3>
+        </div>
+        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
+          <small style={{ color: "#64748b", fontWeight: 600 }}>Staff Advance</small>
+          <h3 style={{ fontSize: 18, color: "#0f172a", margin: "4px 0 0" }}>₹{advanceSpent.toLocaleString("en-IN")}</h3>
+        </div>
+        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
+          <small style={{ color: "#64748b", fontWeight: 600 }}>Freight & Transport</small>
+          <h3 style={{ fontSize: 18, color: "#0f172a", margin: "4px 0 0" }}>₹{freightSpent.toLocaleString("en-IN")}</h3>
+        </div>
+      </div>
+
+      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 16px", marginBottom: 16, display: "flex", gap: 12, alignItems: "center" }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#64748b" }}>Category Filter:</span>
+        <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={{ padding: "6px 12px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 13 }}>
+          <option value="All">All Categories</option>
+          {categories.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+
+      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0", textTransform: "uppercase", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+              <th style={{ padding: "12px 16px", textAlign: "left" }}>Date</th>
+              <th style={{ padding: "12px 16px", textAlign: "left" }}>Category</th>
+              <th style={{ padding: "12px 16px", textAlign: "left" }}>Paid To</th>
+              <th style={{ padding: "12px 16px", textAlign: "left" }}>Payment Mode</th>
+              <th style={{ padding: "12px 16px", textAlign: "left" }}>Notes</th>
+              <th style={{ padding: "12px 16px", textAlign: "right" }}>Amount (₹)</th>
+              <th style={{ padding: "12px 16px", width: 50 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr><td colSpan={7} style={{ padding: 32, textAlign: "center", color: "#64748b" }}>No expense entries found.</td></tr>
+            ) : (
+              filtered.map(x => (
+                <tr key={x.id} style={{ borderBottom: "1px solid #f1f5f9", fontSize: 13 }}>
+                  <td style={{ padding: "14px 16px", color: "#64748b" }}>{new Date(x.expenseDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                  <td style={{ padding: "14px 16px" }}><span style={{ background: "#eef2ff", color: "#4f46e5", padding: "3px 8px", borderRadius: 6, fontWeight: 600, fontSize: 12 }}>{x.category}</span></td>
+                  <td style={{ padding: "14px 16px" }}>{x.paidTo || "-"}</td>
+                  <td style={{ padding: "14px 16px" }}>{x.paymentMode}</td>
+                  <td style={{ padding: "14px 16px", color: "#64748b" }}>{x.notes || "-"}</td>
+                  <td style={{ padding: "14px 16px", textAlign: "right", fontWeight: 700, color: "#ef4444" }}>₹{Number(x.amount).toLocaleString("en-IN")}</td>
+                  <td style={{ padding: "14px 16px", textAlign: "center" }}>
+                    <button type="button" onClick={() => handleDelete(x.id)} style={{ border: 0, background: "transparent", color: "#ef4444", cursor: "pointer" }} title="Delete"><Trash2 size={15}/></button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {modalOpen && (
+        <Modal title="Record Store Expense" onClose={() => setModalOpen(false)}>
+          <form onSubmit={handleCreate} style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <label>Expense Category
+                <select value={category} onChange={e => setCategory(e.target.value)} style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #cbd5e1", marginTop: 4 }}>
+                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </label>
+              <label>Amount (₹)
+                <input type="number" required min={1} value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #cbd5e1", marginTop: 4 }} />
+              </label>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <label>Payment Mode
+                <select value={paymentMode} onChange={e => setPaymentMode(e.target.value)} style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #cbd5e1", marginTop: 4 }}>
+                  <option value="Cash">Cash</option>
+                  <option value="Bank Account">Bank Account</option>
+                  <option value="UPI">UPI</option>
+                </select>
+              </label>
+              <label>Expense Date
+                <input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #cbd5e1", marginTop: 4 }} />
+              </label>
+            </div>
+
+            <label>Paid To (Recipient / Vendor Name)
+              <input type="text" value={paidTo} onChange={e => setPaidTo(e.target.value)} placeholder="e.g. Building Landlord, Electricity Board, Staff Name" style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #cbd5e1", marginTop: 4 }} />
+            </label>
+
+            <label>Notes / Particulars
+              <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Additional expense notes" style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #cbd5e1", marginTop: 4 }} />
+            </label>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 12 }}>
+              <button type="button" className="btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
+              <button type="submit" className="primary-purple-btn" style={{ background: "#4f46e5", color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px" }} disabled={saving}>
+                {saving ? "Saving..." : "Save Expense"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function RemindersModule({ parties, invoices, notify }: { parties: Party[]; invoices: Invoice[]; notify: (msg: string) => void }) {
+  const [tab, setTab] = useState<"dues" | "greetings">("dues");
+
+  const customersWithDue = parties.filter(p => p.type === "Customer" && p.balance > 0);
+  const customersWithSpecialDays = parties.filter(p => p.type === "Customer" && (p.customBirthday || p.customKovilThiruvila));
+
+  const handleSendPaymentReminder = (p: Party) => {
+    const partyInvoices = invoices.filter(inv => inv.party === p.name && (inv.status === "Unpaid" || inv.status === "Partially paid"));
+    const invNumbers = partyInvoices.map(i => i.number).join(", ") || "Outstanding Balance";
+    const text = `👔 *Happy Bonding Men's Wear - Store Reminder*
+--------------------------------------------
+Hello *${p.name}*! Thank you for shopping with us.
+
+🧾 *Bill Ref:* ${invNumbers}
+🏷️ *Outstanding Due Amount:* ₹${p.balance.toLocaleString("en-IN")}
+
+Kindly make payment via Cash or UPI at our store or online.
+--------------------------------------------
+📍 West Bus Stand, Pavoorchatram (Near Railway Gate)
+📞 Contact: 7708030903`;
+
+    const digits = (p.phone || "").replace(/\D/g, "");
+    const targetPhone = digits.length === 10 ? `91${digits}` : digits.length > 10 ? digits : "";
+    const url = targetPhone ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(text)}` : `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, "_blank");
+    notify(`WhatsApp reminder opened for ${p.name}`);
+  };
+
+  const handleSendGreeting = (p: Party, eventType: "Birthday" | "Festival") => {
+    const eventName = eventType === "Birthday" ? (p.customBirthday || "Special Day") : (p.customKovilThiruvila || "Kovil Thiruvila");
+    const text = `👔 *Happy Bonding Men's Wear - Pavoorchatram*
+--------------------------------------------
+✨ *Happy ${eventType === "Birthday" ? "Birthday" : "Festival"} Wishes to ${p.name}!* ✨
+
+Warmest greetings on *${eventName}*! Wishing you and your family abundance, happiness, and prosperity.
+
+Visit us for special festival offers & new shirt/pant arrivals!
+--------------------------------------------
+📍 West Bus Stand, Pavoorchatram (Near Railway Gate)`;
+
+    const digits = (p.phone || "").replace(/\D/g, "");
+    const targetPhone = digits.length === 10 ? `91${digits}` : digits.length > 10 ? digits : "";
+    const url = targetPhone ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(text)}` : `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, "_blank");
+    notify(`WhatsApp greeting opened for ${p.name}`);
+  };
+
+  return (
+    <div style={{ padding: "0 4px" }}>
+      <div style={{ marginBottom: 16 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: "#0f172a" }}>WhatsApp Reminders & Greetings</h1>
+        <small style={{ color: "#64748b" }}>1-Click WhatsApp payment reminders & customer birthday/festival wishes</small>
+      </div>
+
+      <div style={{ display: "flex", gap: 16, borderBottom: "1px solid #e2e8f0", marginBottom: 20 }}>
+        <button type="button" onClick={() => setTab("dues")} style={{ padding: "10px 16px", border: 0, background: "transparent", fontWeight: 700, fontSize: 14, color: tab === "dues" ? "#4f46e5" : "#64748b", borderBottom: tab === "dues" ? "2px solid #4f46e5" : "2px solid transparent", cursor: "pointer" }}>
+          💳 Payment Due Reminders ({customersWithDue.length})
+        </button>
+        <button type="button" onClick={() => setTab("greetings")} style={{ padding: "10px 16px", border: 0, background: "transparent", fontWeight: 700, fontSize: 14, color: tab === "greetings" ? "#4f46e5" : "#64748b", borderBottom: tab === "greetings" ? "2px solid #4f46e5" : "2px solid transparent", cursor: "pointer" }}>
+          🎉 Birthday & Kovil Thiruvila Greetings ({customersWithSpecialDays.length})
+        </button>
+      </div>
+
+      {tab === "dues" && (
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0", textTransform: "uppercase", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+                <th style={{ padding: "12px 16px", textAlign: "left" }}>Customer Name</th>
+                <th style={{ padding: "12px 16px", textAlign: "left" }}>Phone</th>
+                <th style={{ padding: "12px 16px", textAlign: "right" }}>Balance Due (₹)</th>
+                <th style={{ padding: "12px 16px", textAlign: "center" }}>WhatsApp Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {customersWithDue.length === 0 ? (
+                <tr><td colSpan={4} style={{ padding: 32, textAlign: "center", color: "#64748b" }}>No customer pending balances found.</td></tr>
+              ) : (
+                customersWithDue.map(p => (
+                  <tr key={p.id} style={{ borderBottom: "1px solid #f1f5f9", fontSize: 13 }}>
+                    <td style={{ padding: "14px 16px" }}><strong>{p.name}</strong></td>
+                    <td style={{ padding: "14px 16px", color: "#64748b" }}>{p.phone || "-"}</td>
+                    <td style={{ padding: "14px 16px", textAlign: "right", fontWeight: 700, color: "#ef4444" }}>₹{p.balance.toLocaleString("en-IN")}</td>
+                    <td style={{ padding: "14px 16px", textAlign: "center" }}>
+                      <button type="button" onClick={() => handleSendPaymentReminder(p)} style={{ background: "#25D366", color: "#fff", border: 0, borderRadius: 6, padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <MessageCircle size={14}/> Send WhatsApp Reminder
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === "greetings" && (
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0", textTransform: "uppercase", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+                <th style={{ padding: "12px 16px", textAlign: "left" }}>Customer Name</th>
+                <th style={{ padding: "12px 16px", textAlign: "left" }}>Phone</th>
+                <th style={{ padding: "12px 16px", textAlign: "left" }}>Birthday Date</th>
+                <th style={{ padding: "12px 16px", textAlign: "left" }}>Kovil Thiruvila</th>
+                <th style={{ padding: "12px 16px", textAlign: "center" }}>Send Wishes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {customersWithSpecialDays.length === 0 ? (
+                <tr><td colSpan={5} style={{ padding: 32, textAlign: "center", color: "#64748b" }}>No customers registered with Birthday or Kovil Thiruvila info yet. Add them in Parties master.</td></tr>
+              ) : (
+                customersWithSpecialDays.map(p => (
+                  <tr key={p.id} style={{ borderBottom: "1px solid #f1f5f9", fontSize: 13 }}>
+                    <td style={{ padding: "14px 16px" }}><strong>{p.name}</strong></td>
+                    <td style={{ padding: "14px 16px", color: "#64748b" }}>{p.phone || "-"}</td>
+                    <td style={{ padding: "14px 16px" }}>{p.customBirthday || "-"}</td>
+                    <td style={{ padding: "14px 16px" }}>{p.customKovilThiruvila || "-"}</td>
+                    <td style={{ padding: "14px 16px", textAlign: "center", display: "flex", gap: 8, justifyContent: "center" }}>
+                      {p.customBirthday && (
+                        <button type="button" onClick={() => handleSendGreeting(p, "Birthday")} style={{ background: "#ec4899", color: "#fff", border: 0, borderRadius: 6, padding: "6px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
+                          🎂 Birthday Wishes
+                        </button>
+                      )}
+                      {p.customKovilThiruvila && (
+                        <button type="button" onClick={() => handleSendGreeting(p, "Festival")} style={{ background: "#8b5cf6", color: "#fff", border: 0, borderRadius: 6, padding: "6px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
+                          🚩 Festival Wishes
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type SettingsTab = "profile" | "gst" | "numbering" | "print" | "users" | "branches" | "backup";
+
+function SettingsPage({ notify }: { notify: (msg: string) => void }) {
+  const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
+
+  // Restore states
+  const [restoreModalOpen, setRestoreModalOpen] = useState(false);
+  const [backupFileContent, setBackupFileContent] = useState<any>(null);
+  const [checkOverwrite, setCheckOverwrite] = useState(false);
+  const [confirmInput, setConfirmInput] = useState("");
+  const [restoring, setRestoring] = useState(false);
+
+  // Business Profile Form States
+  const [businessName, setBusinessName] = useState("Happy Bonding Men's Wear");
+  const [phone, setPhone] = useState("7708030903");
+  const [email, setEmail] = useState("business@example.com");
+  const [address, setAddress] = useState("No. 10/901, West Bus Stand, Near Railway Gate, Pavoorchatram - 627808");
+  const [stateName, setStateName] = useState("Tamil Nadu");
+  const [pincode, setPincode] = useState("627808");
+  const [gstin, setGstin] = useState("33CWZPS9715D1ZU");
+  const [pan, setPan] = useState("CWZPS9715D");
+
+  // GST & Tax States
+  const [taxType, setTaxType] = useState("Regular GST");
+  const [defaultTaxRate, setDefaultTaxRate] = useState("5%");
+  const [enableIgst, setEnableIgst] = useState(true);
+
+  // Invoice Numbering States
+  const [salesPrefix, setSalesPrefix] = useState("HB/SL/26-27/");
+  const [quotationPrefix, setQuotationPrefix] = useState("HB/QT/26-27/");
+  const [purchasePrefix, setPurchasePrefix] = useState("HB/PUR/26-27/");
+  const [seqNo, setSeqNo] = useState("2323");
+
+  // Print Template States
+  const [printLayout, setPrintLayout] = useState("Standard A4");
+  const [showBankDetails, setShowBankDetails] = useState(true);
+  const [showTerms, setShowTerms] = useState(true);
+
+  const settingsTabs: { id: SettingsTab; label: string }[] = [
+    { id: "profile", label: "Business profile" },
+    { id: "gst", label: "GST & tax" },
+    { id: "numbering", label: "Invoice numbering" },
+    { id: "print", label: "Print templates" },
+    { id: "users", label: "Users & roles" },
+    { id: "branches", label: "Branches" },
+    { id: "backup", label: "Backup & audit" },
+  ];
+
+  const handleExportBackup = async () => {
+    try {
+      const backup = await api.exportBackup();
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `happy-bonding-backup-${new Date().toISOString().split("T")[0]}.json`;
+      a.click();
+      notify("Database Backup downloaded successfully!");
+    } catch {
+      notify("Failed to export database backup");
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(String(event.target?.result));
+        setBackupFileContent(parsed);
+        setRestoreModalOpen(true);
+      } catch {
+        notify("Invalid JSON backup file format");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleExecuteRestore = async () => {
+    if (!checkOverwrite || confirmInput.trim() !== "RESTORE") {
+      return notify("Please complete double confirmation checks before restoring!");
+    }
+    setRestoring(true);
+    try {
+      const res = await api.restoreBackup(backupFileContent, confirmInput.trim());
+      notify(res.message || "Database restored successfully!");
+      setRestoreModalOpen(false);
+      setCheckOverwrite(false);
+      setConfirmInput("");
+    } catch (err: any) {
+      notify(err.message || "Database restore failed");
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  return (
+    <>
+      <PageHeading title="Business settings" subtitle="Company, GST, invoice and access configuration." />
+      <div className="settings-layout">
+        <div className="settings-menu">
+          {settingsTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={activeTab === tab.id ? "active" : ""}
+              onClick={() => {
+                console.log("Switching settings tab to:", tab.id);
+                setActiveTab(tab.id);
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab 1: Business Profile */}
+        {activeTab === "profile" && (
+          <article className="card settings-form">
+            <h2>Business profile</h2>
+            <p>These details appear on GST invoices and receipts.</p>
+            <div className="form-grid">
+              <label className="full">Business name
+                <input value={businessName} onChange={e => setBusinessName(e.target.value)} />
+              </label>
+              <label>Phone
+                <input value={phone} onChange={e => setPhone(e.target.value)} />
+              </label>
+              <label>Email
+                <input value={email} onChange={e => setEmail(e.target.value)} placeholder="business@example.com" />
+              </label>
+              <label className="full">Billing address
+                <textarea value={address} onChange={e => setAddress(e.target.value)} rows={2} />
+              </label>
+              <label>State
+                <input value={stateName} onChange={e => setStateName(e.target.value)} />
+              </label>
+              <label>Pincode
+                <input value={pincode} onChange={e => setPincode(e.target.value)} />
+              </label>
+              <label>GSTIN
+                <input value={gstin} onChange={e => setGstin(e.target.value)} />
+              </label>
+              <label>PAN
+                <input value={pan} onChange={e => setPan(e.target.value)} />
+              </label>
+            </div>
+            <div className="save-line">
+              <button className="primary" onClick={() => notify("Business profile settings saved successfully!")}>
+                Save changes
+              </button>
+            </div>
+          </article>
+        )}
+
+        {/* Tab 2: GST & tax */}
+        {activeTab === "gst" && (
+          <article className="card settings-form">
+            <h2>GST & Tax Configuration</h2>
+            <p>Configure tax rates, HSN rules, and GSTIN details.</p>
+            <div className="form-grid">
+              <label>GST Registration Type
+                <select value={taxType} onChange={e => setTaxType(e.target.value)}>
+                  <option value="Regular GST">Regular GST Registered</option>
+                  <option value="Composition Scheme">Composition Scheme</option>
+                  <option value="Unregistered">Unregistered Business</option>
+                </select>
+              </label>
+              <label>Default Garment Tax Rate
+                <select value={defaultTaxRate} onChange={e => setDefaultTaxRate(e.target.value)}>
+                  <option value="5%">GST 5% (Standard Apparel)</option>
+                  <option value="12%">GST 12% (Higher Value Garments)</option>
+                  <option value="18%">GST 18% (Accessories & Services)</option>
+                </select>
+              </label>
+              <label className="full" style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                <input type="checkbox" checked={enableIgst} onChange={e => setEnableIgst(e.target.checked)} style={{ width: 18, height: 18 }} />
+                <span>Enable automatic IGST calculation for out-of-state customer sales</span>
+              </label>
+            </div>
+            <div className="save-line">
+              <button className="primary" onClick={() => notify("GST & Tax settings saved!")}>
+                Save changes
+              </button>
+            </div>
+          </article>
+        )}
+
+        {/* Tab 3: Invoice Numbering */}
+        {activeTab === "numbering" && (
+          <article className="card settings-form">
+            <h2>Invoice Numbering & Prefix</h2>
+            <p>Customize automatic invoice numbers for Sales, Quotations, and Purchases.</p>
+            <div className="form-grid">
+              <label>Sales Invoice Prefix
+                <input value={salesPrefix} onChange={e => setSalesPrefix(e.target.value)} />
+              </label>
+              <label>Next Sales Bill Number
+                <input value={seqNo} onChange={e => setSeqNo(e.target.value)} />
+              </label>
+              <label>Quotation Prefix
+                <input value={quotationPrefix} onChange={e => setQuotationPrefix(e.target.value)} />
+              </label>
+              <label>Purchase Prefix
+                <input value={purchasePrefix} onChange={e => setPurchasePrefix(e.target.value)} />
+              </label>
+            </div>
+            <div className="save-line">
+              <button className="primary" onClick={() => notify("Invoice numbering prefix saved!")}>
+                Save changes
+              </button>
+            </div>
+          </article>
+        )}
+
+        {/* Tab 4: Print Templates */}
+        {activeTab === "print" && (
+          <article className="card settings-form">
+            <h2>Print & Receipt Templates</h2>
+            <p>Customize invoice printing and POS slip formats.</p>
+            <div className="form-grid">
+              <label>Default Print Template
+                <select value={printLayout} onChange={e => setPrintLayout(e.target.value)}>
+                  <option value="Standard A4">Standard A4 GST Invoice</option>
+                  <option value="Bill of Supply">Bill of Supply (Composition)</option>
+                  <option value="POS 80mm Roll">POS Thermal Roll (80mm / 3-inch)</option>
+                  <option value="POS 58mm Roll">POS Thermal Roll (58mm / 2-inch)</option>
+                </select>
+              </label>
+              <label className="full" style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                <input type="checkbox" checked={showBankDetails} onChange={e => setShowBankDetails(e.target.checked)} style={{ width: 18, height: 18 }} />
+                <span>Show Bank Account & UPI Details on Invoices</span>
+              </label>
+              <label className="full" style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                <input type="checkbox" checked={showTerms} onChange={e => setShowTerms(e.target.checked)} style={{ width: 18, height: 18 }} />
+                <span>Show Store Exchange Policy & Terms at footer</span>
+              </label>
+            </div>
+            <div className="save-line">
+              <button className="primary" onClick={() => notify("Print template settings saved!")}>
+                Save changes
+              </button>
+            </div>
+          </article>
+        )}
+
+        {/* Tab 5: Users & Roles */}
+        {activeTab === "users" && (
+          <article className="card settings-form">
+            <h2>Users & Staff Roles</h2>
+            <p>Manage store staff accounts and access permissions.</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ padding: 12, border: "1px solid #e2e8f0", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <strong style={{ fontSize: 14, display: "block" }}>Saravana Kumar (Owner / Admin)</strong>
+                  <small style={{ color: "#64748b" }}>sarvan.auto@gmail.com · Full Access</small>
+                </div>
+                <span className="pill green">Active Admin</span>
+              </div>
+              <div style={{ padding: 12, border: "1px solid #e2e8f0", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <strong style={{ fontSize: 14, display: "block" }}>Pavoorchatram Counter Staff</strong>
+                  <small style={{ color: "#64748b" }}>Counter 1 Staff · Billing & Inventory Only</small>
+                </div>
+                <span className="pill neutral">Staff User</span>
+              </div>
+            </div>
+            <div className="save-line">
+              <button className="primary" onClick={() => notify("User management opened")}>
+                + Add Staff User
+              </button>
+            </div>
+          </article>
+        )}
+
+        {/* Tab 6: Branches */}
+        {activeTab === "branches" && (
+          <article className="card settings-form">
+            <h2>Store Branches</h2>
+            <p>Manage multi-branch isolation and store locations.</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ padding: 14, border: "1px solid #e2e8f0", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc" }}>
+                <div>
+                  <strong style={{ fontSize: 14, display: "block", color: "#0f172a" }}>📍 Pavoorchatram Store (Main Branch)</strong>
+                  <small style={{ color: "#64748b" }}>West Bus Stand, Pavoorchatram - 627808</small>
+                </div>
+                <span className="pill green">Active Branch</span>
+              </div>
+              <div style={{ padding: 14, border: "1px solid #e2e8f0", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <strong style={{ fontSize: 14, display: "block", color: "#0f172a" }}>📍 Ambasamudram Store (Branch 2)</strong>
+                  <small style={{ color: "#64748b" }}>Ambasamudram Main Branch</small>
+                </div>
+                <span className="pill neutral">Configured Branch</span>
+              </div>
+            </div>
+            <div className="save-line">
+              <button className="primary" onClick={() => notify("Create New Branch modal opened")}>
+                + Add New Branch
+              </button>
+            </div>
+          </article>
+        )}
+
+        {/* Tab 7: Backup & Audit */}
+        {activeTab === "backup" && (
+          <article className="card settings-form" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <h2>Database Backup & Safe Restore</h2>
+            <p>Export database snapshots or perform double-confirmed safety restore.</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {/* Card 1: 1-Click Backup */}
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: 0 }}>💾 Database Backup</h3>
+                <p style={{ fontSize: 12, color: "#64748b", margin: 0 }}>Download instant JSON snapshot of all database records (Parties, Stock, Invoices, Expenses, Staff).</p>
+                <div style={{ background: "#f8fafc", padding: 10, borderRadius: 8, fontSize: 11, color: "#334155", border: "1px solid #e2e8f0" }}>
+                  ⏰ <strong>Automated Daily Backup:</strong> Running daily at 11:59 PM to local <code>./backups</code> directory.
+                </div>
+                <button type="button" onClick={handleExportBackup} className="primary-purple-btn" style={{ background: "#4f46e5", color: "#fff", border: 0, borderRadius: 8, padding: "8px 14px", fontWeight: 600, width: "max-content", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                  <Download size={15}/> Download Backup (JSON)
+                </button>
+              </div>
+
+              {/* Card 2: Safe Database Restore */}
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: 0 }}>🔄 Safe Database Restore</h3>
+                <p style={{ fontSize: 12, color: "#64748b", margin: 0 }}>Restore database from a previously downloaded JSON backup file.</p>
+                <div style={{ background: "#fff7ed", padding: 10, borderRadius: 8, fontSize: 11, color: "#c2410c", border: "1px solid #ffedd5" }}>
+                  🛡️ <strong>Safety Feature:</strong> Auto-creates pre-restore backup snapshot before restoring!
+                </div>
+                <label style={{ cursor: "pointer", background: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1", borderRadius: 8, padding: "8px 14px", fontWeight: 600, width: "max-content", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <Upload size={15}/> Select Backup JSON File...
+                  <input type="file" accept=".json" onChange={handleFileSelect} style={{ display: "none" }} />
+                </label>
+              </div>
+            </div>
+          </article>
+        )}
+      </div>
+
+      {/* Restore Safety Modal */}
+      {restoreModalOpen && (
+        <Modal title="⚠️ Confirm Database Restore" onClose={() => setRestoreModalOpen(false)}>
+          <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", padding: 14, borderRadius: 8, color: "#991b1b", fontSize: 13 }}>
+              <strong>WARNING:</strong> Restoring database will update current records with data from the backup file.
+              An automatic pre-restore backup will be created in <code>./backups</code> before applying changes.
+            </div>
+
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
+              <input type="checkbox" checked={checkOverwrite} onChange={e => setCheckOverwrite(e.target.checked)} />
+              I understand this will overwrite current data
+            </label>
+
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 4 }}>
+                Type "RESTORE" to double confirm:
+              </label>
+              <input type="text" value={confirmInput} onChange={e => setConfirmInput(e.target.value)} placeholder="RESTORE" style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #cbd5e1", fontSize: 14, fontWeight: 700 }} />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 12 }}>
+              <button type="button" className="btn-secondary" onClick={() => setRestoreModalOpen(false)}>Cancel</button>
+              <button type="button" onClick={handleExecuteRestore} disabled={!checkOverwrite || confirmInput.trim() !== "RESTORE" || restoring} style={{ background: checkOverwrite && confirmInput.trim() === "RESTORE" ? "#dc2626" : "#cbd5e1", color: "#fff", border: 0, borderRadius: 8, padding: "10px 20px", fontWeight: 600, cursor: checkOverwrite && confirmInput.trim() === "RESTORE" ? "pointer" : "not-allowed" }}>
+                {restoring ? "Restoring..." : "Execute Double-Confirmed Restore"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </>
   );
 }

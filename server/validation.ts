@@ -55,4 +55,13 @@ export const invoiceSettingInput = z.object({
   signatureUrl: optString(500000),
 });
 
+export const expenseInput = z.object({
+  category: z.string().trim().min(2).max(100),
+  amount: z.coerce.number().positive(),
+  paymentMode: z.enum(["Cash", "Bank Account", "UPI"]).default("Cash"),
+  paidTo: optString(120),
+  notes: optString(500),
+  expenseDate: z.coerce.date().default(() => new Date()),
+});
+
 export function parseInput<T>(schema: z.ZodType<T>, value: unknown): T { return schema.parse(value); }

@@ -1,11 +1,10 @@
-import type { Branch, Invoice, InvoiceSetting, OwnerBranchSummary, Party, Product, StaffUser } from "./types";
+import type { Branch, Expense, Invoice, InvoiceSetting, OwnerBranchSummary, Party, Product, StaffUser } from "./types";
 
 const getBaseUrl = () => {
-  if (typeof window !== "undefined") {
-    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
-    return `${window.location.origin}/api`;
+  if (typeof window !== "undefined" && import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
   }
-  return "http://localhost:4000/api";
+  return "/api";
 };
 const baseUrl = getBaseUrl();
 const TOKEN_KEY = "hb_erp_token";
@@ -453,6 +452,28 @@ export const api = {
     const errJson = await res.json().catch(() => ({}));
     const errMsg = errJson.message || errJson.code || `Brevo HTTP error ${res.status}`;
     throw new Error(`Brevo Error: ${errMsg}`);
+  },
+
+  async getExpenses() {
+    return request<Expense[]>("/expenses");
+  },
+  async createExpense(data: Omit<Expense, "id">) {
+    return request<Expense>("/expenses", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+  async deleteExpense(id: string) {
+    return request<{ ok: boolean }>(`/expenses/${id}`, { method: "DELETE" });
+  },
+  async exportBackup() {
+    return request<any>("/backup/export");
+  },
+  async restoreBackup(backupData: any, understandingText: string) {
+    return request<{ ok: boolean; message: string }>("/backup/restore", {
+      method: "POST",
+      body: JSON.stringify({ backupData, doubleConfirmation: true, understandingText }),
+    });
   },
 };
 

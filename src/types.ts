@@ -1,7 +1,17 @@
 export type Page =
   | "dashboard" | "parties" | "items" | "sales" | "purchases" | "reports" | "cash" | "pos" | "staff" | "settings"
   | "quotation" | "payment_in" | "sales_return" | "credit_note" | "delivery_challan" | "proforma_invoice"
-  | "payment_out" | "purchase_return" | "debit_note" | "purchase_orders" | "expenses";
+  | "payment_out" | "purchase_return" | "debit_note" | "purchase_orders" | "expenses" | "reminders";
+
+export interface Expense {
+  id: string;
+  category: string;
+  amount: number;
+  paymentMode: string;
+  paidTo?: string;
+  notes?: string;
+  expenseDate: string;
+}
 
 export interface Product {
   id: string | number; name: string; sku: string; category: string; size: string;

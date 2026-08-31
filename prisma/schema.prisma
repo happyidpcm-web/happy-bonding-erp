@@ -63,6 +63,7 @@ model Organization {
   auditEvents AuditEvent[]
   syncQueue   OfflineSyncQueue[]
   creditNotes CreditNote[]
+  expenses    Expense[]
 }
 
 model Branch {
@@ -79,6 +80,7 @@ model Branch {
   movements          StockMovement[]
   invoices           SalesInvoice[]
   creditNotes        CreditNote[]
+  expenses           Expense[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -421,4 +423,22 @@ model OfflineSyncQueue {
   organization   Organization @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId, branchId, status, createdAt])
+}
+
+model Expense {
+  id             String       @id @default(cuid())
+  organizationId String
+  branchId       String
+  category       String
+  amount         Decimal      @db.Decimal(14, 2)
+  paymentMode    String       @default("Cash")
+  paidTo         String?
+  notes          String?
+  expenseDate    DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  branch         Branch       @relation(fields: [branchId], references: [id])
+
+  @@index([organizationId, branchId, expenseDate])
 }

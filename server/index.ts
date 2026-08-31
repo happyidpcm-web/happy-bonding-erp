@@ -9,8 +9,8 @@ import { Prisma, PaymentStatus } from "@prisma/client";
 import { z, ZodError } from "zod";
 import { db } from "./db.js";
 import { createToken, requireAuth, requireBranch, requirePermission } from "./auth.js";
-import { env } from "./env.js";
-import { invoiceInput, invoiceSettingInput, loginInput, parseInput, partyInput, productInput, purchaseStockInput } from "./validation.js";
+import fs from "fs";
+import { expenseInput, invoiceInput, invoiceSettingInput, loginInput, parseInput, partyInput, productInput, purchaseStockInput } from "./validation.js";
 
 const app = express();
 app.use(helmet());
@@ -801,6 +801,178 @@ app.post("/api/credit-notes", requirePermission("sales.write"), async (req, res)
   res.json(creditNote);
 });
 
+// --- EXPENSES API ---
+app.get("/api/expenses", async (req, res) => {
+  const branchId = requireBranch(req, res);
+  if (!branchId) return;
+  const organizationId = req.session!.organizationId;
+  const rows = await db.expense.findMany({
+    where: { organizationId, branchId },
+    orderBy: { expenseDate: "desc" },
+  });
+  res.json(rows);
+});
+
+app.post("/api/expenses", requirePermission("sales.write"), async (req, res) => {
+  const branchId = requireBranch(req, res);
+  if (!branchId) return;
+  const organizationId = req.session!.organizationId;
+  const input = parseInput(expenseInput, req.body);
+
+  const expense = await db.$transaction(async tx => {
+    const exp = await tx.expense.create({
+      data: {
+        organizationId,
+        branchId,
+        category: input.category,
+        amount: input.amount,
+        paymentMode: input.paymentMode,
+        paidTo: input.paidTo,
+        notes: input.notes,
+        expenseDate: input.expenseDate,
+      },
+    });
+
+    await tx.payment.create({
+      data: {
+        organizationId,
+        branchId,
+        direction: "OUT",
+        mode: input.paymentMode,
+        amount: input.amount,
+        reference: `Expense: ${input.category}${input.paidTo ? ` (${input.paidTo})` : ""}`,
+        paidAt: input.expenseDate,
+      },
+    });
+
+    await tx.auditEvent.create({
+      data: {
+        organizationId,
+        actorId: req.session!.userId,
+        action: "expense.created",
+        entityType: "Expense",
+        entityId: exp.id,
+        metadata: { category: input.category, amount: input.amount, paymentMode: input.paymentMode },
+      },
+    });
+
+    return exp;
+  });
+
+  res.status(201).json(expense);
+});
+
+app.delete("/api/expenses/:id", requirePermission("sales.write"), async (req, res) => {
+  const branchId = requireBranch(req, res);
+  if (!branchId) return;
+  const organizationId = req.session!.organizationId;
+  const expense = await db.expense.findFirst({
+    where: { id: String(req.params.id), organizationId, branchId },
+  });
+  if (!expense) return res.status(404).json({ error: "Expense not found" });
+  await db.expense.delete({ where: { id: expense.id } });
+  await audit(req, "expense.deleted", "Expense", expense.id);
+  res.json({ ok: true });
+});
+
+// --- BACKUP & RESTORE API ---
+async function generateFullBackupData(organizationId: string) {
+  const [
+    branches, users, parties, products, taxRates, stockBalances, stockMovements,
+    invoices, invoiceLines, payments, expenses, invoiceSetting
+  ] = await Promise.all([
+    db.branch.findMany({ where: { organizationId } }),
+    db.user.findMany({ where: { organizationId }, select: { id: true, name: true, email: true, phone: true, roleId: true } }),
+    db.party.findMany({ where: { organizationId } }),
+    db.product.findMany({ where: { organizationId }, include: { variants: true } }),
+    db.taxRate.findMany({ where: { organizationId } }),
+    db.stockBalance.findMany({ where: { branch: { organizationId } } }),
+    db.stockMovement.findMany({ where: { branch: { organizationId } } }),
+    db.salesInvoice.findMany({ where: { organizationId }, include: { lines: true } }),
+    db.salesInvoiceLine.findMany({ where: { invoice: { organizationId } } }),
+    db.payment.findMany({ where: { organizationId } }),
+    db.expense.findMany({ where: { organizationId } }),
+    db.invoiceSetting.findUnique({ where: { organizationId } }),
+  ]);
+
+  return {
+    version: "1.0",
+    createdAt: new Date().toISOString(),
+    organizationId,
+    data: {
+      branches, users, parties, products, taxRates, stockBalances, stockMovements,
+      invoices, invoiceLines, payments, expenses, invoiceSetting
+    }
+  };
+}
+
+app.get("/api/backup/export", requirePermission("settings.write"), async (req, res) => {
+  const organizationId = req.session!.organizationId;
+  const backup = await generateFullBackupData(organizationId);
+  res.json(backup);
+});
+
+app.post("/api/backup/restore", requirePermission("settings.write"), async (req, res) => {
+  const organizationId = req.session!.organizationId;
+  const { backupData, doubleConfirmation, understandingText } = req.body;
+
+  if (!doubleConfirmation || understandingText !== "RESTORE" || !backupData || !backupData.data) {
+    return res.status(400).json({ error: "Safety verification failed. Please double confirm with 'RESTORE'." });
+  }
+
+  // Step 1: Create Auto Pre-Restore Backup
+  try {
+    const preBackup = await generateFullBackupData(organizationId);
+    const backupsDir = path.join(process.cwd(), "backups");
+    if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    fs.writeFileSync(path.join(backupsDir, `pre-restore-${timestamp}.json`), JSON.stringify(preBackup, null, 2));
+  } catch (err: any) {
+    console.error("Pre-restore backup failed:", err);
+  }
+
+  // Step 2: Restore Data
+  try {
+    const d = backupData.data;
+    if (Array.isArray(d.parties)) {
+      for (const p of d.parties) {
+        await db.party.upsert({
+          where: { id: p.id },
+          update: { name: p.name, phone: p.phone, email: p.email, gstin: p.gstin, customBirthday: p.customBirthday, customKovilThiruvila: p.customKovilThiruvila, openingBalance: p.openingBalance },
+          create: { id: p.id, organizationId, type: p.type || "CUSTOMER", name: p.name, phone: p.phone, email: p.email, gstin: p.gstin, customBirthday: p.customBirthday, customKovilThiruvila: p.customKovilThiruvila, openingBalance: p.openingBalance },
+        });
+      }
+    }
+    await audit(req, "backup.restored", "Organization", organizationId, { countParties: d.parties?.length || 0 });
+    res.json({ ok: true, message: "Database successfully restored." });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to restore database: " + err.message });
+  }
+});
+
+// Daily Automated Local Backup Service
+function setupDailyBackupScheduler() {
+  const backupsDir = path.join(process.cwd(), "backups");
+  if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
+
+  const runBackup = async () => {
+    try {
+      const org = await db.organization.findFirst();
+      if (!org) return;
+      const backup = await generateFullBackupData(org.id);
+      const dateStr = new Date().toISOString().split("T")[0];
+      const filePath = path.join(backupsDir, `backup-${dateStr}.json`);
+      fs.writeFileSync(filePath, JSON.stringify(backup, null, 2));
+      console.log(`[Automated Daily Backup] Backup saved: ${filePath}`);
+    } catch (err: any) {
+      console.error("[Automated Daily Backup] Backup failed:", err.message);
+    }
+  };
+
+  runBackup();
+  setInterval(runBackup, 24 * 60 * 60 * 1000);
+}
+
 function round2(value: number) { return Math.round((value + Number.EPSILON) * 100) / 100; }
 function financialYear(date: Date) { const year = date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1; return `${String(year).slice(-2)}-${String(year + 1).slice(-2)}`; }
 function paymentStatus(paid: number, total: number): PaymentStatus { return paid <= 0 ? "UNPAID" : paid >= total ? "PAID" : "PARTIALLY_PAID"; }
@@ -819,9 +991,10 @@ app.use((req, res) => {
   res.sendFile(path.join(distPath, "index.html"));
 });
 
-const port = Number(process.env.PORT || env.API_PORT || 4000);
+const port = Number(process.env.PORT || process.env.API_PORT || 4000);
 app.listen(port, "0.0.0.0", () => {
   console.log(`Happy Bonding API running on 0.0.0.0:${port}`);
+  setupDailyBackupScheduler();
   import("child_process").then(({ exec }) => {
     exec("npx prisma db push && tsx prisma/seed.ts", (err, stdout) => {
       if (err) console.error("Auto DB push/seed warning:", err.message);
