@@ -2,12 +2,9 @@ import type { Branch, Invoice, InvoiceSetting, OwnerBranchSummary, Party, Produc
 
 const getBaseUrl = () => {
   if (typeof window !== "undefined") {
-    const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-    if (!isLocal) {
-      return `${window.location.origin}/api`;
-    }
+    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+    return `${window.location.origin}/api`;
   }
-  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
   return "http://localhost:4000/api";
 };
 const baseUrl = getBaseUrl();
@@ -360,6 +357,14 @@ export const api = {
       return [];
     }
   },
+  async createCreditNote(input: { partyId: string; salesInvoiceId: string; date: Date; amount: number; notes?: string; lines: Array<{ variantId: string; itemName: string; quantity: number; unitPrice: number; taxRate: number; total: number }> }) {
+    try {
+      const res = await request<any>("/credit-notes", { method: "POST", body: JSON.stringify(input) });
+      return res;
+    } catch {
+      throw new Error("Failed to create credit note");
+    }
+  },
   async paymentIns(): Promise<PaymentInRow[]> {
     try {
       return await request<PaymentInRow[]>("/payments/in");
@@ -459,6 +464,7 @@ function saleFromApi(x: SalesRow): Invoice {
     number: x.invoiceNumber,
     date: new Date(x.invoiceDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
     party: x.party?.name ?? "Cash Sale",
+    partyId: (x as any).partyId,
     partyPhone: x.party?.phone ?? "",
     partyAddress: x.party?.address ?? "",
     partyGstin: x.party?.gstin ?? "",
@@ -481,7 +487,7 @@ function saleFromApi(x: SalesRow): Invoice {
       hsnCode: l.hsnCode ?? "",
       quantity: Number(l.quantity),
       unitPrice: Number(l.unitPrice),
-      purchasePrice: Number(l.variant?.purchasePrice ?? 0),
+      purchasePrice: Number((l as any).purchasePriceAtSale ?? l.variant?.purchasePrice ?? 0),
       discount: Number(l.discount),
       taxRate: Number(l.taxRate),
       taxableAmount: Number(l.taxableAmount ?? 0),

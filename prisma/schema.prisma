@@ -62,6 +62,7 @@ model Organization {
   invoiceSetting InvoiceSetting?
   auditEvents AuditEvent[]
   syncQueue   OfflineSyncQueue[]
+  creditNotes CreditNote[]
 }
 
 model Branch {
@@ -77,6 +78,7 @@ model Branch {
   balances           StockBalance[]
   movements          StockMovement[]
   invoices           SalesInvoice[]
+  creditNotes        CreditNote[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -152,6 +154,7 @@ model Party {
   createdAt      DateTime       @default(now())
   organization   Organization   @relation(fields: [organizationId], references: [id])
   invoices       SalesInvoice[]
+  creditNotes    CreditNote[]
 
   @@index([organizationId, name])
   @@index([organizationId, phone])
@@ -189,6 +192,7 @@ model ProductVariant {
   balances      StockBalance[]
   movements     StockMovement[]
   invoiceLines  SalesInvoiceLine[]
+  creditNoteLines CreditNoteLine[]
 
   @@unique([productId, sku])
   @@index([barcode])
@@ -263,6 +267,7 @@ model SalesInvoice {
   party          Party?              @relation(fields: [partyId], references: [id])
   lines          SalesInvoiceLine[]
   payments       PaymentAllocation[]
+  creditNotes    CreditNote[]        @relation("CreditNoteSalesInvoice")
 
   @@unique([organizationId, invoiceNumber])
   @@unique([organizationId, idempotencyKey])
@@ -278,6 +283,8 @@ model SalesInvoiceLine {
   hsnCode       String
   quantity      Decimal        @db.Decimal(14, 3)
   unitPrice     Decimal        @db.Decimal(14, 2)
+  purchasePriceAtSale Decimal? @db.Decimal(14, 2)
+  totalCostAtSale     Decimal? @db.Decimal(14, 2)
   discount      Decimal        @default(0) @db.Decimal(14, 2)
   taxableAmount Decimal        @db.Decimal(14, 2)
   taxRate       Decimal        @db.Decimal(5, 2)
@@ -314,6 +321,42 @@ model PaymentAllocation {
   salesInvoice   SalesInvoice @relation(fields: [salesInvoiceId], references: [id])
 
   @@unique([paymentId, salesInvoiceId])
+}
+
+model CreditNote {
+  id             String             @id @default(cuid())
+  organizationId String
+  branchId       String
+  partyId        String
+  salesInvoiceId String
+  creditNoteNumber String
+  date           DateTime
+  amount         Decimal            @db.Decimal(14, 2)
+  notes          String?
+  createdAt      DateTime           @default(now())
+  
+  organization   Organization       @relation(fields: [organizationId], references: [id])
+  branch         Branch             @relation(fields: [branchId], references: [id])
+  party          Party              @relation(fields: [partyId], references: [id])
+  salesInvoice   SalesInvoice       @relation(fields: [salesInvoiceId], references: [id], name: "CreditNoteSalesInvoice")
+  lines          CreditNoteLine[]
+
+  @@unique([organizationId, creditNoteNumber])
+  @@index([organizationId, branchId, partyId])
+}
+
+model CreditNoteLine {
+  id            String     @id @default(cuid())
+  creditNoteId  String
+  variantId     String
+  itemName      String
+  quantity      Decimal    @db.Decimal(14, 3)
+  unitPrice     Decimal    @db.Decimal(14, 2)
+  taxRate       Decimal    @default(0) @db.Decimal(5, 2)
+  total         Decimal    @db.Decimal(14, 2)
+  
+  creditNote    CreditNote @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
+  variant       ProductVariant @relation(fields: [variantId], references: [id])
 }
 
 model DocumentSequence {

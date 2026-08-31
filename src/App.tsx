@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft, BarChart3, Banknote, Boxes, Building2, Calendar, CheckSquare, ChevronDown, ExternalLink, Eye, EyeOff, Gift, IndianRupee as CircleIndianRupee,
   ClipboardList, CreditCard, Download, FileSpreadsheet, FileText, Keyboard, LayoutDashboard, Mail, Menu, MessageCircle, MessageSquare, MoreVertical, PackagePlus,
-  Pencil, Percent, Plus, Printer, Receipt, ReceiptIndianRupee, Search, Settings, Share2, ShoppingBag, ShoppingCart, Star, Tag, Trash2,
-  TrendingUp, Upload, UserRoundPlus, Users, UsersRound, WalletCards, X, XCircle, QrCode
+  Pencil, Percent, Plus, Printer, Receipt, ReceiptIndianRupee, Search, Settings, Share2, ShieldCheck, ShoppingBag, ShoppingCart, Sparkles, Star, Tag, Trash2,
+  TrendingUp, Upload, UserRoundPlus, Users, UsersRound, WalletCards, X, XCircle, QrCode, History
 } from "lucide-react";
 import { money } from "./data";
 import { api } from "./api";
@@ -65,6 +65,95 @@ const defaultInvoiceSetting: InvoiceSetting = { invoicePrefix: "HB/SL", paymentT
 
 function BarcodeIcon() {
   return <div className="barcode-icon" title="Barcode Scanner"><span/><span/><span/><span/><span/><span/><span/></div>;
+}
+
+function PartyLedgerModal({ party, onClose }: { party: Party; onClose: () => void }) {
+  const [ledger, setLedger] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.partyLedger(party.id).then(res => {
+      setLedger(res);
+      setLoading(false);
+    });
+  }, [party.id]);
+
+  const rows = useMemo(() => {
+    if (!ledger) return [];
+    const items: any[] = [];
+    ledger.invoices?.forEach((inv: any) => {
+      items.push({
+        id: `inv-${inv.id}`,
+        date: new Date(inv.invoiceDate),
+        type: "Sales Invoice",
+        refNo: inv.invoiceNumber,
+        debit: inv.grandTotal,
+        credit: 0,
+      });
+    });
+    ledger.payments?.forEach((pay: any) => {
+      items.push({
+        id: `pay-${pay.id}`,
+        date: new Date(pay.paidAt),
+        type: "Payment In",
+        refNo: pay.mode,
+        debit: 0,
+        credit: pay.amount,
+      });
+    });
+    items.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    let runningBalance = ledger.openingBalance || 0;
+    return items.map(item => {
+      runningBalance += item.debit - item.credit;
+      return { ...item, runningBalance };
+    });
+  }, [ledger]);
+
+  return (
+    <Modal title={`Party Ledger - ${party.name}`} onClose={onClose}>
+      {loading ? (
+        <div style={{ padding: 40, textAlign: "center" }}>Loading Ledger...</div>
+      ) : (
+        <div className="table-scroll" style={{ maxHeight: "70vh", overflowY: "auto" }}>
+          <table className="report-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Ref No</th>
+                <th className="right">Debit (₹)</th>
+                <th className="right">Credit (₹)</th>
+                <th className="right">Running Balance (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style={{ background: "#f8fafc" }}>
+                <td colSpan={5}><strong>Opening Balance</strong></td>
+                <td className="right"><strong>{money(ledger?.openingBalance || 0)}</strong></td>
+              </tr>
+              {rows.map(row => (
+                <tr key={row.id}>
+                  <td>{row.date.toLocaleDateString()}</td>
+                  <td>{row.type}</td>
+                  <td>{row.refNo}</td>
+                  <td className="right" style={{ color: "#e11d48" }}>{row.debit > 0 ? money(row.debit) : ""}</td>
+                  <td className="right" style={{ color: "#16a34a" }}>{row.credit > 0 ? money(row.credit) : ""}</td>
+                  <td className="right" style={{ fontWeight: 600 }}>{money(row.runningBalance)} {row.runningBalance > 0 ? "Dr" : row.runningBalance < 0 ? "Cr" : ""}</td>
+                </tr>
+              ))}
+              <tr style={{ background: "#f1f5f9", fontWeight: 700 }}>
+                <td colSpan={3}>Closing Balance</td>
+                <td className="right">{money(ledger?.invoiceTotal || 0)}</td>
+                <td className="right">{money(ledger?.paidTotal || 0)}</td>
+                <td className="right">{money(ledger?.balance || 0)} {Number(ledger?.balance) > 0 ? "Dr" : Number(ledger?.balance) < 0 ? "Cr" : ""}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Modal>
+  );
 }
 
 export default function App() {
@@ -1609,6 +1698,7 @@ function Parties({
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Party|undefined>();
+  const [ledgerParty, setLedgerParty] = useState<Party | null>(null);
   const [saving, setSaving] = useState(false);
   const [reportsDropdownOpen, setReportsDropdownOpen] = useState(false);
   const [bulkActionDropdownOpen, setBulkActionDropdownOpen] = useState(false);
@@ -1847,6 +1937,9 @@ function Parties({
                         <MessageCircle size={16} color="#25D366" />
                       </button>
                     )}
+                    <button className="icon-button" onClick={() => setLedgerParty(p)} title="View Ledger">
+                      <ClipboardList size={16} />
+                    </button>
                     <button className="icon-button" onClick={() => setEditing(p)} title="Edit Party">
                       <MoreVertical size={16} />
                     </button>
@@ -1903,6 +1996,10 @@ function Parties({
           onClose={() => setBulkModalOpen(false)}
           notify={notify}
         />
+      )}
+
+      {ledgerParty && (
+        <PartyLedgerModal party={ledgerParty} onClose={() => setLedgerParty(null)} />
       )}
     </>
   );
@@ -4677,14 +4774,30 @@ function InvoiceDetailModal({
                 <span>Invoice Amount</span>
                 <strong>{money(total)}</strong>
               </div>
-              <div className="history-item green">
-                <span>Initial Amount Received</span>
-                <strong>{money(paid)}</strong>
-              </div>
-              <div className="history-item">
-                <span>Total Amount Received</span>
-                <strong>{money(paid)}</strong>
-              </div>
+              {invoice.payments && invoice.payments.length > 0 ? (
+                <>
+                  <div className="history-item" style={{ borderBottom: "1px solid #e2e8f0", paddingBottom: 8, marginBottom: 8, marginTop: 12 }}>
+                    <span style={{ fontWeight: 600, color: "#0f172a" }}>Payment Allocations</span>
+                  </div>
+                  {invoice.payments.map((p, i) => (
+                    <div key={i} className="history-item" style={{ fontSize: "0.9em" }}>
+                      <span>
+                        {new Date(p.payment.paidAt).toLocaleDateString()} - {p.payment.mode}
+                      </span>
+                      <strong className="positive">{money(p.amount)}</strong>
+                    </div>
+                  ))}
+                  <div className="history-item" style={{ borderTop: "1px solid #e2e8f0", paddingTop: 8, marginTop: 8 }}>
+                    <span>Total Amount Received</span>
+                    <strong className="positive">{money(paid)}</strong>
+                  </div>
+                </>
+              ) : (
+                <div className="history-item green">
+                  <span>Total Amount Received</span>
+                  <strong>{money(paid)}</strong>
+                </div>
+              )}
               <div className="history-item highlight">
                 <span>Balance Amount</span>
                 <strong className={balance > 0 ? "negative" : "positive"}>{money(balance)}</strong>
@@ -4756,63 +4869,85 @@ type CustomDateRange = { from: string; to: string };
 
 function isInvoiceInDateRange(r: { date: string }, filter: string, customRange?: CustomDateRange): boolean {
   const d = parseInvoiceDate(r.date);
-  const now = new Date(2026, 7, 15); // 15 Aug 2026
+  const now = new Date();
 
   const isSameDay = (d1: Date, d2: Date) =>
     d1.getFullYear() === d2.getFullYear() &&
     d1.getMonth() === d2.getMonth() &&
     d1.getDate() === d2.getDate();
 
+  const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const endOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+
   if (filter === "Today") {
     return isSameDay(d, now);
   }
   if (filter === "Yesterday") {
-    const yest = new Date(2026, 7, 14);
+    const yest = new Date(now);
+    yest.setDate(yest.getDate() - 1);
     return isSameDay(d, yest);
   }
   if (filter === "This Week") {
-    const start = new Date(2026, 7, 10);
-    const end = new Date(2026, 7, 15);
+    const start = startOfDay(new Date(now));
+    start.setDate(start.getDate() - start.getDay()); // Sunday
+    const end = startOfDay(new Date(start));
+    end.setDate(end.getDate() + 6); // Saturday
+    end.setHours(23, 59, 59, 999);
     return d >= start && d <= end;
   }
   if (filter === "Last Week") {
-    const start = new Date(2026, 7, 3);
-    const end = new Date(2026, 7, 9);
+    const start = startOfDay(new Date(now));
+    start.setDate(start.getDate() - start.getDay() - 7);
+    const end = startOfDay(new Date(start));
+    end.setDate(end.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
     return d >= start && d <= end;
   }
   if (filter === "Last 7 Days") {
-    const start = new Date(2026, 7, 9);
-    return d >= start && d <= now;
+    const start = startOfDay(new Date(now));
+    start.setDate(start.getDate() - 6);
+    return d >= start && d <= endOfDay(now);
   }
   if (filter === "This Month") {
-    return d.getMonth() === 7 && d.getFullYear() === 2026; // Aug 2026
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   }
   if (filter === "Previous Month") {
-    return d.getMonth() === 6 && d.getFullYear() === 2026; // Jul 2026
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return d.getMonth() === prev.getMonth() && d.getFullYear() === prev.getFullYear();
   }
   if (filter === "Last 30 Days") {
-    const start = new Date(2026, 6, 17);
-    return d >= start && d <= now;
+    const start = startOfDay(new Date(now));
+    start.setDate(start.getDate() - 29);
+    return d >= start && d <= endOfDay(now);
   }
   if (filter === "This Quarter") {
-    return d.getMonth() >= 6 && d.getMonth() <= 8 && d.getFullYear() === 2026; // Q3 2026 (Jul-Sep)
+    const currentQ = Math.floor(now.getMonth() / 3);
+    const q = Math.floor(d.getMonth() / 3);
+    return q === currentQ && d.getFullYear() === now.getFullYear();
   }
   if (filter === "Previous Quarter") {
-    return d.getMonth() >= 3 && d.getMonth() <= 5 && d.getFullYear() === 2026; // Q2 2026 (Apr-Jun)
+    const currentQ = Math.floor(now.getMonth() / 3);
+    const prevQ = currentQ === 0 ? 3 : currentQ - 1;
+    const year = currentQ === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    const q = Math.floor(d.getMonth() / 3);
+    return q === prevQ && d.getFullYear() === year;
   }
   if (filter === "Current Fiscal Year") {
-    const start = new Date(2026, 3, 1);
-    const end = new Date(2027, 2, 31);
+    const year = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+    const start = new Date(year, 3, 1);
+    const end = new Date(year + 1, 2, 31, 23, 59, 59, 999);
     return d >= start && d <= end;
   }
   if (filter === "Previous Fiscal Year") {
-    const start = new Date(2025, 3, 1);
-    const end = new Date(2026, 2, 31);
+    const year = now.getMonth() >= 3 ? now.getFullYear() - 1 : now.getFullYear() - 2;
+    const start = new Date(year, 3, 1);
+    const end = new Date(year + 1, 2, 31, 23, 59, 59, 999);
     return d >= start && d <= end;
   }
   if (filter === "Last 365 Days") {
-    const start = new Date(2025, 7, 16);
-    return d >= start && d <= now;
+    const start = startOfDay(new Date(now));
+    start.setDate(start.getDate() - 364);
+    return d >= start && d <= endOfDay(now);
   }
   if (filter === "Custom Range") {
     if (!customRange?.from || !customRange?.to) return true;
@@ -4827,17 +4962,17 @@ function isInvoiceInDateRange(r: { date: string }, filter: string, customRange?:
 const REPORT_DATE_OPTIONS = [
   { label: "Today", sub: "" },
   { label: "Yesterday", sub: "" },
-  { label: "This Week", sub: "10 Aug 2026 - 15 Aug 2026" },
-  { label: "Last Week", sub: "03 Aug 2026 - 09 Aug 2026" },
-  { label: "Last 7 Days", sub: "09 Aug 2026 - 15 Aug 2026" },
-  { label: "This Month", sub: "01 Aug 2026 - 31 Aug 2026" },
-  { label: "Previous Month", sub: "01 Jul 2026 - 31 Jul 2026" },
-  { label: "Last 30 Days", sub: "17 Jul 2026 - 15 Aug 2026" },
-  { label: "This Quarter", sub: "01 Jul 2026 - 30 Sep 2026" },
-  { label: "Previous Quarter", sub: "01 Apr 2026 - 30 Jun 2026" },
-  { label: "Current Fiscal Year", sub: "01 Apr 2026 - 31 Mar 2027" },
-  { label: "Previous Fiscal Year", sub: "01 Apr 2025 - 31 Mar 2026" },
-  { label: "Last 365 Days", sub: "16 Aug 2025 - 15 Aug 2026" },
+  { label: "This Week", sub: "" },
+  { label: "Last Week", sub: "" },
+  { label: "Last 7 Days", sub: "" },
+  { label: "This Month", sub: "" },
+  { label: "Previous Month", sub: "" },
+  { label: "Last 30 Days", sub: "" },
+  { label: "This Quarter", sub: "" },
+  { label: "Previous Quarter", sub: "" },
+  { label: "Current Fiscal Year", sub: "" },
+  { label: "Previous Fiscal Year", sub: "" },
+  { label: "Last 365 Days", sub: "" },
   { label: "Custom Range", sub: "" },
 ];
 
@@ -4903,6 +5038,8 @@ function SalesInvoicesListView({
   onDeleteInvoice,
   onCancelInvoice,
   onDuplicateInvoice,
+  onShowEditHistory,
+  onIssueCreditNote,
   onOpenReportView,
   onOpenQuickSettings,
   notify,
@@ -4914,6 +5051,8 @@ function SalesInvoicesListView({
   onDeleteInvoice: (inv: Invoice) => void;
   onCancelInvoice: (inv: Invoice) => void;
   onDuplicateInvoice: (inv: Invoice) => void;
+  onShowEditHistory?: (inv: Invoice) => void;
+  onIssueCreditNote?: (inv: Invoice) => void;
   onOpenReportView: (reportName: string) => void;
   onOpenQuickSettings: () => void;
   notify: (msg: string) => void;
@@ -4925,23 +5064,8 @@ function SalesInvoicesListView({
   const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
   const [openMenuId, setOpenMenuId] = useState<string | number | null>(null);
 
-  // 14 Date Options with exact date sub-ranges matching reference images 1 & 2
-  const dateOptions = [
-    { label: "Today", sub: "" },
-    { label: "Yesterday", sub: "" },
-    { label: "This Week", sub: "10 Aug 2026 - 15 Aug 2026" },
-    { label: "Last Week", sub: "03 Aug 2026 - 09 Aug 2026" },
-    { label: "Last 7 Days", sub: "09 Aug 2026 - 15 Aug 2026" },
-    { label: "This Month", sub: "01 Aug 2026 - 31 Aug 2026" },
-    { label: "Previous Month", sub: "01 Jul 2026 - 31 Jul 2026" },
-    { label: "Last 30 Days", sub: "17 Jul 2026 - 15 Aug 2026" },
-    { label: "This Quarter", sub: "01 Jul 2026 - 30 Sep 2026" },
-    { label: "Previous Quarter", sub: "01 Apr 2026 - 30 Jun 2026" },
-    { label: "Current Fiscal Year", sub: "01 Apr 2026 - 31 Mar 2027" },
-    { label: "Previous Fiscal Year", sub: "01 Apr 2025 - 31 Mar 2026" },
-    { label: "Last 365 Days", sub: "16 Aug 2025 - 15 Aug 2026" },
-    { label: "Custom Range", sub: "" },
-  ];
+  // 14 Date Options matching reports
+  const dateOptions = REPORT_DATE_OPTIONS;
 
   // Strictly display rows fetched from backend PostgreSQL database
   const displayRows = useMemo(() => {
@@ -5314,6 +5438,30 @@ function SalesInvoicesListView({
                           >
                             <Pencil size={14} /> Edit
                           </button>
+
+                          {onShowEditHistory && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                onShowEditHistory(inv);
+                              }}
+                            >
+                              <History size={14} /> Edit History
+                            </button>
+                          )}
+
+                          {onIssueCreditNote && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                onIssueCreditNote(inv);
+                              }}
+                            >
+                              <Receipt size={14} /> Issue Credit Note
+                            </button>
+                          )}
 
                           <button
                             type="button"
@@ -5975,6 +6123,9 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   const [query,setQuery]=useState("");
   const [creating,setCreating]=useState(false);
   const [editingInvoice,setEditingInvoice]=useState<Invoice|null>(null);
+  const [historyInvoice, setHistoryInvoice] = useState<Invoice | null>(null);
+  const [creditNoteInvoice, setCreditNoteInvoice] = useState<Invoice | null>(null);
+  const [auditEvents, setAuditEvents] = useState<any[]>([]);
 
   if (activeReportView === "sales_summary") {
     return (
@@ -6246,6 +6397,12 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
     if(!lines.length)return notify("Add at least one item");
     try{
 {/* ... */}
+      if (editingInvoice) {
+        const existingPaymentTotal = editingInvoice.payments?.reduce((sum, p) => sum + Number(p.amount), 0) ?? 0;
+        if (total < existingPaymentTotal) {
+           return notify(`Edited total (₹${total.toLocaleString("en-IN")}) cannot be less than already received amount (₹${existingPaymentTotal.toLocaleString("en-IN")}). Please issue refund/credit note instead.`);
+        }
+      }
       setSaving(true);
       let partyId=selectedParty?.id ? String(selectedParty.id) : undefined;
       const received=markPaid?total:paid;
@@ -6270,12 +6427,33 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
     try {
       const next = await api.cancelSale(inv.id);
       setRows(next.length ? next : rows.map(row => row.id === inv.id ? { ...row, status: "Cancelled" as const } : row));
-      setProducts(await api.products());
       notify(`Sales invoice ${inv.number} cancelled`);
     } catch (error) {
       notify(error instanceof Error ? error.message : "Sales invoice cancel failed");
     }
   };
+
+  const showEditHistory = async (inv: Invoice) => {
+    setHistoryInvoice(inv);
+    try {
+      const res = await fetch(`/api/sales/${inv.id}/history`).then(r => r.json());
+      setAuditEvents(res);
+    } catch (e) {
+      notify("Failed to fetch edit history");
+      setAuditEvents([]);
+    }
+  };
+
+  const issueCreditNote = async (data: any) => {
+    try {
+      await api.createCreditNote(data);
+      notify("Credit Note issued successfully. Stock returned and party balance reduced.");
+      setCreditNoteInvoice(null);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "Failed to issue credit note");
+    }
+  };
+
   const duplicateInvoice = (inv: Invoice) => {
     const copiedLines = (inv.lines ?? []).map(line => {
       const product = products.find(p => String(p.id) === String((line as InvoiceLineItem & { productId?: string }).productId) || p.sku === line.sku);
@@ -6326,6 +6504,14 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
         onDeleteInvoice={deleteInvoice}
         onCancelInvoice={cancelInvoice}
         onDuplicateInvoice={duplicateInvoice}
+        onShowEditHistory={showEditHistory}
+        onIssueCreditNote={(inv) => {
+          if (!inv.partyId) {
+            notify("Cannot issue credit note. This invoice is not linked to any party.");
+            return;
+          }
+          setCreditNoteInvoice(inv);
+        }}
         onOpenReportView={(reportName: string) => {
           if (onNavigateReports) {
             onNavigateReports(reportName);
@@ -6347,22 +6533,63 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
           notify={notify}
         />
       )}
+      {historyInvoice && (
+        <Modal title={`Edit History - ${historyInvoice.number}`} onClose={() => setHistoryInvoice(null)}>
+          <div className="table-scroll" style={{ maxHeight: "60vh", overflowY: "auto" }}>
+            <table className="report-table">
+              <thead>
+                <tr>
+                  <th>Date & Time</th>
+                  <th>Action</th>
+                  <th>Actor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditEvents.length > 0 ? auditEvents.map((ev, i) => (
+                  <tr key={i}>
+                    <td>{new Date(ev.occurredAt).toLocaleString()}</td>
+                    <td>{ev.action === "sales.updated" ? "Edited" : ev.action === "sales.created" ? "Created" : ev.action}</td>
+                    <td>{ev.actor?.name || "System"}</td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan={3} style={{ textAlign: "center", padding: 20 }}>No history found for this invoice.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Modal>
+      )}
+
+      {creditNoteInvoice && (
+        <IssueCreditNoteModal
+          invoice={creditNoteInvoice}
+          onClose={() => setCreditNoteInvoice(null)}
+          onSave={issueCreditNote}
+          notify={notify}
+        />
+      )}
     </>
   );
   return (
     <div className="full-screen-invoice-page">
       <div className="ref-top-header-bar">
         <div className="top-title-left">
-          <button type="button" className="icon-back-btn" onClick={() => setCreating(false)}>
+          <button type="button" className="icon-back-btn" onClick={() => { setCreating(false); setEditingInvoice(null); resetInvoiceForm(); }}>
             <ArrowLeft size={18} />
           </button>
-          <h2>Create Sales Invoice</h2>
+          <h2>
+            {editingInvoice ? `Edit Sales Invoice - ${editingInvoice.number}` : "Create Sales Invoice"}
+            {editingInvoice && <span style={{ marginLeft: 10, fontSize: "0.55em", background: "#f59e0b", color: "#fff", padding: "2px 8px", borderRadius: 4, verticalAlign: "middle", fontWeight: "bold" }}>EDIT MODE</span>}
+          </h2>
         </div>
         <div className="top-header-actions">
+          {editingInvoice && <button type="button" className="secondary" onClick={() => { setCreating(false); setEditingInvoice(null); resetInvoiceForm(); }}>Cancel Edit</button>}
           <button type="button" className="icon-shortcut-btn" title="Keyboard Shortcuts (Alt)" onClick={() => setShowShortcutsDrawer(prev => !prev)}><Keyboard size={16} /></button>
           <button type="button" className="secondary" onClick={() => setSettingsOpen(!settingsOpen)}><Settings size={15} /> Settings</button>
-          <button type="button" className="secondary" onClick={() => saveInvoice(true)} disabled={saving || !lines.length}>{saving ? "Saving..." : "Save & New"}</button>
-          <button type="button" className="primary save-main-btn" onClick={() => saveInvoice(false)} disabled={saving || !lines.length}>{saving ? "Saving..." : "Save"}</button>
+          {!editingInvoice && <button type="button" className="secondary" onClick={() => saveInvoice(true)} disabled={saving || !lines.length}>{saving ? "Saving..." : "Save & New"}</button>}
+          <button type="button" className="primary save-main-btn" onClick={() => saveInvoice(false)} disabled={saving || !lines.length}>{saving ? "Saving..." : (editingInvoice ? "Update Invoice" : "Save")}</button>
         </div>
       </div>
 
@@ -7323,6 +7550,8 @@ function Reports({
   initialReport?: string | null;
 }) {
   const [activeReport, setActiveReport] = useState<string | null>(initialReport || null);
+  const [activeFilterTag, setActiveFilterTag] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (initialReport) {
@@ -7350,7 +7579,12 @@ function Reports({
     );
   }
 
-  if (activeReport === "Sales summary" || activeReport === "Sales by staff" || activeReport === "Sales returns" || activeReport === "GSTR-1 sales") {
+  if (
+    activeReport === "Sales summary" ||
+    activeReport === "Sales by staff" ||
+    activeReport === "Sales returns" ||
+    activeReport === "GSTR-1 sales"
+  ) {
     return (
       <SalesSummaryReportScreen
         invoices={invoices}
@@ -7400,31 +7634,167 @@ function Reports({
     );
   }
 
-  const groups = {
-    "Sales & profit": ["Sales summary", "Bill-wise profit", "Sales by staff", "Sales returns"],
-    "Inventory": ["Stock summary", "Low stock", "Stock valuation", "Fast & slow moving"],
-    "GST": ["GSTR-1 sales", "GSTR-2 purchases", "GSTR-3B summary", "HSN-wise summary"],
-    "Accounts": ["Profit & loss", "Balance sheet", "Party outstanding", "Cash & bank report"],
+  const filterTags = ["Party", "Category", "Payment Collection", "Item", "Invoice Details", "Summary"];
+
+  const sections = [
+    {
+      col: 1,
+      id: "favourite",
+      title: "Favourite",
+      icon: Sparkles,
+      items: [
+        { name: "Balance Sheet", targetKey: "Balance sheet", tags: ["Summary"], isFavourite: true },
+        { name: "Bill Wise Profit", targetKey: "Bill-wise profit", tags: ["Summary", "Invoice Details"], isFavourite: true },
+        { name: "Cash and Bank Report (All Payments)", targetKey: "Cash & bank report", tags: ["Payment Collection", "Transaction"], isFavourite: true },
+        { name: "GSTR-1 (Sales)", targetKey: "GSTR-1 sales", tags: ["Invoice Details", "Summary"], isFavourite: true },
+        { name: "Party Wise Outstanding", targetKey: "Party outstanding", tags: ["Party", "Category", "Payment Collection"], isFavourite: true },
+        { name: "Profit And Loss Report", targetKey: "Profit & loss", tags: ["Summary"], isFavourite: true },
+        { name: "Sales Summary - Staff Wise", targetKey: "Sales by staff", tags: ["Summary", "Invoice Details"], isFavourite: true },
+      ],
+    },
+    {
+      col: 1,
+      id: "item",
+      title: "Item",
+      icon: Boxes,
+      items: [
+        { name: "Item Report By Party", targetKey: "Fast & slow moving", tags: ["Party", "Category", "Item"] },
+        { name: "Item Sales and Purchase Summary", targetKey: "Fast & slow moving", tags: ["Category", "Item", "Summary"] },
+        { name: "Low Stock Summary", targetKey: "Low stock", tags: ["Item"] },
+        { name: "Rate List", targetKey: "Stock summary", tags: ["Item"] },
+        { name: "Stock Detail Report", targetKey: "Stock valuation", tags: ["Item"] },
+        { name: "Stock Summary", targetKey: "Stock summary", tags: ["Category", "Item", "Summary"] },
+      ],
+    },
+    {
+      col: 2,
+      id: "gst",
+      title: "GST",
+      icon: Percent,
+      items: [
+        { name: "GSTR-2 (Purchase)", targetKey: "GSTR-2 purchases", tags: ["Invoice Details", "Summary"] },
+        { name: "GSTR-3b", targetKey: "GSTR-3B summary", tags: ["Summary"] },
+        { name: "GST Purchase (With HSN)", targetKey: "GSTR-2 purchases", tags: ["Item", "Invoice Details"] },
+        { name: "GST Sales (With HSN)", targetKey: "GSTR-1 sales", tags: ["Item", "Invoice Details"] },
+        { name: "HSN Wise Sales Summary", targetKey: "HSN-wise summary", tags: ["Item", "Summary"] },
+        { name: "TDS Payable", targetKey: "DayBook", tags: ["Transaction"] },
+        { name: "TDS Receivable", targetKey: "DayBook", tags: ["Transaction"] },
+        { name: "TCS Payable", targetKey: "DayBook", tags: ["Transaction"] },
+        { name: "TCS Receivable", targetKey: "DayBook", tags: ["Transaction"] },
+      ],
+    },
+    {
+      col: 2,
+      id: "party",
+      title: "Party",
+      icon: Users,
+      items: [
+        { name: "Receivable Ageing Report", targetKey: "Party outstanding", tags: ["Party", "Payment Collection"] },
+        { name: "Party Report By Item", targetKey: "Party outstanding", tags: ["Party", "Item"] },
+        { name: "Party Statement (Ledger)", targetKey: "Party outstanding", tags: ["Party"] },
+        { name: "Sales Summary - Category Wise", targetKey: "Sales summary", tags: ["Party", "Category"] },
+      ],
+    },
+    {
+      col: 3,
+      id: "transaction",
+      title: "Transaction",
+      icon: FileText,
+      items: [
+        { name: "Audit Trail", targetKey: "DayBook", tags: ["Transaction"] },
+        { name: "Daybook - Staff Wise", targetKey: "DayBook", tags: ["Transaction", "Invoice Details"] },
+        { name: "Expense Category Report", targetKey: "DayBook", tags: ["Category", "Transaction"] },
+        { name: "Expense Transaction Report", targetKey: "DayBook", tags: ["Category", "Transaction"] },
+        { name: "Purchase Summary", targetKey: "DayBook", tags: ["Invoice Details", "Summary"] },
+      ],
+    },
+  ];
+
+  const renderSection = (sec: typeof sections[0]) => {
+    const filteredItems = sec.items.filter(item => {
+      const matchesTag = activeFilterTag ? item.tags.includes(activeFilterTag) : true;
+      const matchesQuery = searchQuery.trim() ? item.name.toLowerCase().includes(searchQuery.toLowerCase()) : true;
+      return matchesTag && matchesQuery;
+    });
+
+    return (
+      <div className="report-section-block" key={sec.id}>
+        <div className="report-section-header">
+          <sec.icon />
+          <span>{sec.title}</span>
+        </div>
+        <div className="report-items-list">
+          {filteredItems.length > 0 ? (
+            filteredItems.map(x => (
+              <button
+                className="report-item-row"
+                key={x.name}
+                onClick={() => setActiveReport(x.targetKey)}
+              >
+                <span className="report-item-name">
+                  {x.name}
+                </span>
+                {(x as any).isFavourite && <Star className="report-item-star" />}
+              </button>
+            ))
+          ) : (
+            <div className="no-reports-msg">No Reports Found</div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
     <>
       <PageHeading title="Reports" subtitle="Accurate operational, GST and financial insights." />
-      <div className="report-grid">
-        {Object.entries(groups).map(([title, items]) => (
-          <article className="card report-card" key={title}>
-            <div className="report-icon">
-              <FileText />
-            </div>
-            <h2>{title}</h2>
-            {items.map(x => (
-              <button key={x} onClick={() => setActiveReport(x)}>
-                {x}
-                <span>→</span>
+      <div className="reports-hub-wrapper">
+        <div className="reports-hub-topbar">
+          <h1 className="reports-hub-title">Reports</h1>
+          <button className="ca-reports-btn" onClick={() => notify("CA Reports Sharing feature active")}>
+            <ShieldCheck size={16} /> CA Reports Sharing
+          </button>
+        </div>
+
+        <div className="reports-filter-bar">
+          <span className="filter-label">Filter By</span>
+          {filterTags.map(tag => {
+            const isActive = activeFilterTag === tag;
+            return (
+              <button
+                key={tag}
+                className={`filter-pill-btn ${isActive ? "active" : ""}`}
+                onClick={() => setActiveFilterTag(isActive ? null : tag)}
+              >
+                {tag}
+                {isActive && <span className="close-icon">✕</span>}
               </button>
-            ))}
-          </article>
-        ))}
+            );
+          })}
+        </div>
+
+        <div className="reports-3col-grid">
+          <div className="reports-column">
+            {sections.filter(s => s.col === 1).map(renderSection)}
+          </div>
+          <div className="reports-column">
+            {sections.filter(s => s.col === 2).map(renderSection)}
+          </div>
+          <div className="reports-column">
+            {sections.filter(s => s.col === 3).map(renderSection)}
+          </div>
+        </div>
+
+        <div className="reports-bottom-bar">
+          <div className="reports-search-box">
+            <input
+              placeholder="Find Report"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+            <kbd>Ctrl + F</kbd>
+          </div>
+        </div>
       </div>
     </>
   );
@@ -8332,19 +8702,7 @@ function GenericVoucherPage({
       notes: `${type} generated for ${inv.party} - Ref ${inv.number}`,
     }));
 
-    if (dbDerived.length > 0) return dbDerived;
-
-    // Fallback records derived from parties database
-    return parties.slice(0, 5).map((p, idx) => ({
-      id: `party-${p.id}`,
-      date: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
-      number: `HB/${code}/26-27/${String(idx + 1).padStart(3, "0")}`,
-      party: `${p.name}${p.phone ? ` (${p.phone})` : ""}`,
-      dueIn: "7 Days",
-      amount: Math.abs(p.balance || 1500),
-      status: "Open",
-      notes: `${type} record for ${p.name}`,
-    }));
+    return dbDerived;
   });
 
   const [query, setQuery] = useState("");
@@ -9854,6 +10212,7 @@ function PaymentInModule({
               <tr style={{ background: "#f8fafc", fontWeight: 700, fontSize: 13, color: "#0f172a" }}>
                 <td colSpan={4} style={{ padding: "12px 16px" }}>Total</td>
                 <td style={{ padding: "12px 16px", textAlign: "right" }}>₹ {settledTotals.toLocaleString("en-IN")}</td>
+                <td style={{ padding: "12px 16px", textAlign: "right" }}>₹ {settledTotals.toLocaleString("en-IN")}</td>
                 <td style={{ padding: "12px 16px", textAlign: "right" }}>₹ 0</td>
                 <td style={{ padding: "12px 16px", textAlign: "right" }}>₹ {settledTotals.toLocaleString("en-IN")}</td>
               </tr>
@@ -9862,5 +10221,114 @@ function PaymentInModule({
         </div>
       )}
     </div>
+  );
+}
+
+function IssueCreditNoteModal({ invoice, onClose, onSave, notify }: { invoice: Invoice; onClose: () => void; onSave: (data: any) => Promise<void>; notify: (m: string) => void }) {
+  const [lines, setLines] = useState(invoice.lines?.map((l: any) => ({ ...l, returnQty: 0 })) || []);
+  const [notes, setNotes] = useState("Sales Return for Invoice " + invoice.number);
+  const [saving, setSaving] = useState(false);
+
+  const totalReturnAmount = lines.reduce((acc, l) => {
+    const amount = Number(l.unitPrice || (l as any).product?.sellingPrice || 0) * Number(l.returnQty);
+    const tax = amount * (Number(l.taxRate || (l as any).product?.taxRate || 0) / 100);
+    return acc + amount + tax;
+  }, 0);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const returnLines = lines.filter(l => l.returnQty > 0);
+    if (returnLines.length === 0) return notify("Please select at least one item to return.");
+    if (!invoice.partyId) return notify("Invoice does not have a linked party.");
+    
+    setSaving(true);
+    try {
+      const payload = {
+        partyId: String(invoice.partyId),
+        salesInvoiceId: String(invoice.id),
+        date: new Date(),
+        amount: totalReturnAmount,
+        notes,
+        lines: returnLines.map(l => {
+           const unitPrice = Number(l.unitPrice || (l as any).product?.sellingPrice || 0);
+           const amount = unitPrice * Number(l.returnQty);
+           const taxRate = Number(l.taxRate || (l as any).product?.taxRate || 0);
+           const tax = amount * (taxRate / 100);
+           return {
+             variantId: String((l as any).variantId || (l as any).product?.id || ""),
+             itemName: String(l.itemName || (l as any).product?.name || "Item"),
+             quantity: Number(l.returnQty),
+             unitPrice,
+             taxRate,
+             total: amount + tax
+           };
+        })
+      };
+      await onSave(payload);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Failed to issue credit note");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal title={`Issue Credit Note - ${invoice.number}`} onClose={onClose}>
+      <form onSubmit={handleSubmit} style={{ padding: 20 }}>
+        <p style={{ marginBottom: 16 }}>Select quantities to return from this invoice. Stock will be restored and party outstanding will be reduced.</p>
+        <div className="table-scroll" style={{ marginBottom: 20 }}>
+          <table className="report-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th className="right">Invoiced Qty</th>
+                <th className="right">Return Qty</th>
+                <th className="right">Unit Price (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((l: any, i) => (
+                <tr key={i}>
+                  <td><strong>{l.itemName || l.product?.name || "Item"}</strong></td>
+                  <td className="right">{l.quantity || l.qty}</td>
+                  <td className="right">
+                    <input
+                      type="number"
+                      min={0}
+                      max={Number(l.quantity || l.qty)}
+                      value={l.returnQty}
+                      onChange={e => {
+                        const newLines = [...lines];
+                        newLines[i].returnQty = Number(e.target.value);
+                        setLines(newLines);
+                      }}
+                      style={{ width: 80, padding: 4, textAlign: "right" }}
+                    />
+                  </td>
+                  <td className="right">{Number(l.unitPrice || l.product?.sellingPrice || 0).toLocaleString("en-IN")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
+          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span>Notes / Reason</span>
+            <input type="text" value={notes} onChange={e => setNotes(e.target.value)} style={{ padding: 8, borderRadius: 4, border: "1px solid #cbd5e1" }} />
+          </label>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #e2e8f0", paddingTop: 16 }}>
+          <span style={{ fontSize: 18, fontWeight: 600 }}>Total Credit: ₹ {totalReturnAmount.toLocaleString("en-IN")}</span>
+          <div style={{ display: "flex", gap: 12 }}>
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={saving || totalReturnAmount <= 0}>
+              {saving ? "Processing..." : "Issue Credit Note"}
+            </button>
+          </div>
+        </div>
+      </form>
+    </Modal>
   );
 }

@@ -38,6 +38,7 @@ export interface Invoice {
   number: string;
   date: string;
   party: string;
+  partyId?: string;
   partyPhone?: string;
   partyAddress?: string;
   partyGstin?: string;
@@ -57,6 +58,7 @@ export interface Invoice {
   status: "Paid" | "Partially paid" | "Unpaid" | "Cancelled";
   dueDays?: number;
   lines?: InvoiceLineItem[];
+  payments?: { amount: number; payment: { paidAt: string; mode: string; } }[];
 }
 
 export interface InvoiceSetting {
