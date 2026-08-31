@@ -4809,21 +4809,43 @@ input:checked + .slider:before {
     width: 100% !important;
   }
   .topbar {
-    padding: 0 12px !important;
-    height: 58px !important;
+    padding: 0 10px !important;
+    height: 56px !important;
+    gap: 6px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
+  .topbar > div:first-of-type {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+    flex: 1 !important;
   }
   .topbar > div:first-of-type strong {
     font-size: 13px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    margin: 0 !important;
   }
   .topbar > div:first-of-type span {
-    font-size: 10px !important;
-  }
-  .user-info-text {
     display: none !important;
   }
-  .avatar {
+  .top-actions {
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+  }
+  .top-actions .avatar {
     width: 32px !important;
     height: 32px !important;
+    font-size: 11px !important;
+  }
+  .top-actions > div > strong,
+  .top-actions > div > span,
+  .user-info-text {
+    display: none !important;
   }
   .page {
     padding: 14px 10px 30px !important;
