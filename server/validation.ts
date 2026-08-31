@@ -26,7 +26,19 @@ export const invoiceInput = z.object({
   idempotencyKey: z.string().min(8).max(100), partyId: z.string().optional(), invoiceDate: z.coerce.date(),
   placeOfSupply: z.string().length(2), paidAmount: z.number().nonnegative().default(0), paymentMode: z.enum(["Cash", "UPI", "Card", "Bank"]).default("Cash"),
   notes: z.string().max(1000).optional(), invoiceDiscount: z.number().nonnegative().default(0), additionalCharges: z.number().nonnegative().default(0),
-  lines: z.array(z.object({ variantId: z.string(), quantity: z.number().positive(), unitPrice: z.number().nonnegative(), discount: z.number().nonnegative().default(0) })).min(1),
+  lines: z.array(z.object({ variantId: z.string(), quantity: z.number().positive(), unitPrice: z.number().nonnegative(), discount: z.number().nonnegative().default(0), taxRate: z.number().min(0).max(100).optional() })).min(1),
+});
+
+export const purchaseStockInput = z.object({
+  purchaseDate: z.coerce.date(),
+  purchaseNumber: z.string().trim().min(1).max(80),
+  partyName: z.string().trim().min(1).max(160).optional(),
+  notes: z.string().max(1000).optional(),
+  lines: z.array(z.object({
+    variantId: z.string().min(1),
+    quantity: z.number().positive(),
+    unitCost: z.number().nonnegative().default(0),
+  })).min(1),
 });
 
 export const invoiceSettingInput = z.object({

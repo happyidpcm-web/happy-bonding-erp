@@ -41,16 +41,17 @@ function CornerFiligree() {
 
 export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: Invoice; setting: InvoiceSetting }>(
   ({ invoice, setting }, ref) => {
-    const lines = invoice.lines && invoice.lines.length > 0 ? invoice.lines : [
-      { itemName: "XOXO T SHIRT SURPLUS", sku: "HB-TSH-001", quantity: 1, unitPrice: invoice.amount, discount: 0, taxRate: 5, total: invoice.amount }
-    ];
+    const lines = invoice.lines ?? [];
 
     const totalQty = lines.reduce((s, l) => s + l.quantity, 0);
-    const subtotal = lines.reduce((s, l) => s + l.unitPrice * l.quantity, 0);
-    const discount = lines.reduce((s, l) => s + l.discount, 0);
+    const subtotal = invoice.subtotal ?? lines.reduce((s, l) => s + l.unitPrice * l.quantity, 0);
+    const discount = invoice.discountTotal ?? lines.reduce((s, l) => s + l.discount, 0);
+    const gst = (invoice.cgstTotal ?? 0) + (invoice.sgstTotal ?? 0) + (invoice.igstTotal ?? 0);
+    const additionalCharges = invoice.additionalCharges ?? 0;
     const total = invoice.amount;
     const paid = invoice.paidAmount ?? total;
-    const balance = Math.max(0, total - paid);
+    const balance = Math.max(0, Math.round((total - paid) * 100) / 100);
+    const amountText = (value: number) => value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     return (
       <div ref={ref} className="a4-bill-document gold-frame bill-of-supply-template exact-ref-design">
@@ -98,12 +99,15 @@ export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: 
             <strong>Bill To</strong>
             <p className="party-name font-purple">{invoice.party}</p>
             {invoice.partyPhone && <p>Mobile {invoice.partyPhone}</p>}
+            {invoice.partyGstin && <p>GSTIN {invoice.partyGstin}</p>}
+            {invoice.partyAddress && <p>{invoice.partyAddress}</p>}
             <p>Place of Supply Tamil Nadu</p>
           </div>
           <div className="addr-box">
             <strong>Ship To</strong>
             <p className="party-name font-purple">{invoice.party}</p>
             {invoice.partyPhone && <p>Mobile {invoice.partyPhone}</p>}
+            {invoice.partyAddress && <p>{invoice.partyAddress}</p>}
           </div>
         </div>
 
@@ -127,14 +131,16 @@ export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: 
                   <td style={{ textAlign: "center" }}>{idx + 1}</td>
                   <td>
                     <strong className="item-title">{l.itemName}</strong>
+                    {l.sku && <div className="line-subtext">{l.sku}</div>}
+                    {l.hsnCode && <div className="line-subtext">HSN: {l.hsnCode} · GST {l.taxRate}%</div>}
                   </td>
                   <td style={{ textAlign: "center" }}>{l.quantity} PCS</td>
                   <td style={{ textAlign: "right" }}>
                     {mrp}
                     {l.discount > 0 && <div className="discount-off">({Math.round((l.discount / mrp) * 100)}% OFF)</div>}
                   </td>
-                  <td style={{ textAlign: "right" }}>{l.unitPrice}</td>
-                  <td style={{ textAlign: "right" }}><strong>{l.total}</strong></td>
+                  <td style={{ textAlign: "right" }}>{amountText(l.unitPrice)}</td>
+                  <td style={{ textAlign: "right" }}><strong>{amountText(l.total)}</strong></td>
                 </tr>
               );
             })}
@@ -145,13 +151,22 @@ export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: 
         <div className="purple-subtotal-bar">
           <span className="subtotal-label">SUBTOTAL</span>
           <span className="subtotal-qty">{totalQty}</span>
-          <span className="subtotal-amount">₹ {subtotal}</span>
+          <span className="subtotal-amount">₹ {amountText(subtotal)}</span>
         </div>
 
         {/* Summary Footer */}
         <div className="doc-summary-footer purple-summary-footer">
           <div className="summary-left">
-            {discount > 0 && <p className="discount-line">Discount: - ₹ {discount}</p>}
+            {invoice.notes && <div className="amount-words-box"><span>Notes / Terms</span><strong>{invoice.notes}</strong></div>}
+            {(setting.bankName || setting.accountNumber || setting.upiId) && (
+              <div className="amount-words-box">
+                <span>Bank / UPI</span>
+                <strong>{setting.bankName || "Bank"} {setting.accountNumber ? `· A/c ${setting.accountNumber}` : ""}</strong>
+                {(setting.ifsc || setting.upiId) && <p>{setting.ifsc ? `IFSC ${setting.ifsc}` : ""} {setting.upiId ? `· UPI ${setting.upiId}` : ""}</p>}
+              </div>
+            )}
+            {setting.qrText && <div className="qr-box">{setting.qrText}</div>}
+            {discount > 0 && <p className="discount-line">Discount: - ₹ {amountText(discount)}</p>}
             <div className="amount-words-box">
               <span>Total Amount (in words)</span>
               <strong>{numberToWords(total)}</strong>
@@ -159,10 +174,13 @@ export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: 
           </div>
 
           <div className="summary-right">
-            <p><span>Discount</span><span>- ₹ {discount}</span></p>
-            <h3 className="grand-total-row"><span>Total Amount</span><span>₹ {total}</span></h3>
-            <p><span>Received Amount</span><span>₹ {paid}</span></p>
-            <p className="balance-row"><span>Balance</span><span>₹ {balance}</span></p>
+            <p><span>Sub Total</span><span>₹ {amountText(subtotal)}</span></p>
+            {gst > 0 && <p><span>GST</span><span>₹ {amountText(gst)}</span></p>}
+            {additionalCharges > 0 && <p><span>Additional Charges</span><span>₹ {amountText(additionalCharges)}</span></p>}
+            <p><span>Discount</span><span>- ₹ {amountText(discount)}</span></p>
+            <h3 className="grand-total-row"><span>Total Amount</span><span>₹ {amountText(total)}</span></h3>
+            <p><span>Received Amount</span><span>₹ {amountText(paid)}</span></p>
+            <p className="balance-row"><span>Balance</span><span>₹ {amountText(balance)}</span></p>
 
             <div className="gold-signature-box">
               <div className="sig-img-wrap">

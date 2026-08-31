@@ -1,4 +1,4 @@
-import type { Invoice, InvoiceSetting, Party, Product } from "./types";
+import type { Branch, Invoice, InvoiceSetting, OwnerBranchSummary, Party, Product, StaffUser } from "./types";
 
 const getBaseUrl = () => {
   if (typeof window !== "undefined") {
@@ -14,7 +14,7 @@ const baseUrl = getBaseUrl();
 const TOKEN_KEY = "hb_erp_token";
 const BRANCH_KEY = "hb_erp_branch";
 
-type LoginResult = { token: string; branchIds: string[]; user: { id: string; name: string; email: string } };
+type LoginResult = { token: string; branchIds: string[]; branches?: Branch[]; user: { id: string; name: string; email: string; role?: string } };
 type PartyRow = { id:string; name:string; phone:string|null; type:string; openingBalance:string; openingBalanceType?:string|null; email?:string|null; gstin?:string|null; pan?:string|null; category?:string|null; address?:string|null; shippingAddress?:string|null; sameAsBilling?:boolean|null; creditPeriodDays?:number|null; creditLimit?:string|null; contactPersonName?:string|null; contactPersonDob?:string|null; bankName?:string|null; bankAccountName?:string|null; bankAccountNumber?:string|null; bankIfsc?:string|null; bankBranch?:string|null; customBirthday?:string|null; customKovilThiruvila?:string|null };
 type PartyInput = Partial<Omit<Party, "id" | "balance">> & { name: string; phone?: string; type: Party["type"]; openingBalance?: number };
 type ProductRow = { id:string;sku:string;size:string|null;purchasePrice:string;sellingPrice:string;mrp:string;product:{name:string;category:string;hsnCode:string;taxRate:{rate:string}};balances:Array<{quantity:string}> };
@@ -23,18 +23,61 @@ type SalesRow = {
   invoiceNumber: string;
   invoiceDate: string;
   party: { name: string; phone?: string | null; address?: string | null; gstin?: string | null } | null;
+  subtotal?: string;
+  discountTotal?: string;
+  invoiceDiscount?: string;
+  additionalCharges?: string;
+  taxableTotal?: string;
+  cgstTotal?: string;
+  sgstTotal?: string;
+  igstTotal?: string;
   grandTotal: string;
   paidAmount?: string;
+  notes?: string | null;
   paymentStatus: string;
+  status?: string;
+  payments?: Array<{ payment?: { mode?: string | null } | null }>;
   lines?: Array<{
     itemName: string;
     sku: string;
+    hsnCode?: string | null;
     quantity: number;
     unitPrice: string;
     discount: string;
     taxRate: string;
+    variant?: { purchasePrice?: string | null } | null;
+    taxableAmount?: string;
+    cgst?: string;
+    sgst?: string;
+    igst?: string;
     total: string;
   }>;
+};
+type PaymentInRow = {
+  id: string;
+  mode: string;
+  amount: string;
+  reference?: string | null;
+  paidAt: string;
+  allocations?: Array<{
+    amount: string;
+    salesInvoice?: {
+      invoiceNumber: string;
+      invoiceDate: string;
+      grandTotal: string;
+      paidAmount?: string;
+      party?: { name: string; phone?: string | null } | null;
+    };
+  }>;
+};
+export type PartyLedger = {
+  party: PartyRow;
+  openingBalance: number;
+  invoiceTotal: number;
+  paidTotal: number;
+  balance: number;
+  invoices: Array<{ id: string; invoiceNumber: string; invoiceDate: string; grandTotal: number; paidAmount: number; balance: number; paymentStatus: string }>;
+  payments: Array<{ id: string; mode: string; amount: number; reference?: string | null; paidAt: string; allocations: Array<{ invoiceId: string; invoiceNumber: string; amount: number }> }>;
 };
 
 async function request<T>(path: string, options?: RequestInit, isRetry = false): Promise<T> {
@@ -96,12 +139,34 @@ export const api = {
   async login(email: string, password: string) { const result = await request<LoginResult>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }); localStorage.setItem(TOKEN_KEY, result.token); localStorage.setItem(BRANCH_KEY, result.branchIds[0]); return result; },
   logout() { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(BRANCH_KEY); },
   hasSession() { return Boolean(localStorage.getItem(TOKEN_KEY)); },
+  currentBranchId() { return localStorage.getItem(BRANCH_KEY) || ""; },
+  setCurrentBranch(branchId: string) { localStorage.setItem(BRANCH_KEY, branchId); },
+  async branches(): Promise<Branch[]> { return request<Branch[]>("/branches"); },
+  async createBranch(input: { code: string; name: string; address?: string; phone?: string }): Promise<Branch> {
+    return request<Branch>("/branches", { method: "POST", body: JSON.stringify(input) });
+  },
+  async ownerSummary(): Promise<OwnerBranchSummary[]> { return request<OwnerBranchSummary[]>("/owner/summary"); },
+  async staff(): Promise<StaffUser[]> { return request<StaffUser[]>("/staff"); },
+  async createStaff(input: { name: string; email: string; phone?: string; password: string; branchIds: string[] }): Promise<StaffUser> {
+    return request<StaffUser>("/staff", { method: "POST", body: JSON.stringify(input) });
+  },
+  async syncStatus(): Promise<{ online: boolean; queue: Array<{ status: string; count: number }> }> { return request("/sync/status"); },
+  async pushSync(items: Array<{ branchId?: string; entityType: string; entityId: string; operation: string; payload: unknown }>): Promise<{ ok: boolean; accepted: number }> {
+    return request("/sync/push", { method: "POST", body: JSON.stringify({ items }) });
+  },
   async parties(): Promise<Party[]> {
     try {
       const rows = await request<PartyRow[]>("/parties");
       return rows.map(partyFromApi);
     } catch {
       return [];
+    }
+  },
+  async partyLedger(id: string | number): Promise<PartyLedger | null> {
+    try {
+      return await request<PartyLedger>(`/parties/${id}/ledger`);
+    } catch {
+      return null;
     }
   },
   async createParty(input: PartyInput): Promise<Party> {
@@ -210,6 +275,21 @@ export const api = {
       return [newProd];
     }
   },
+  async createPurchaseStockReceipt(input: { purchaseDate: Date; purchaseNumber: string; partyName?: string; notes?: string; lines: Array<{ variantId: string | number; quantity: number; unitCost: number }> }): Promise<{ ok: boolean; purchaseNumber: string; lines: number }> {
+    return request("/purchases/stock-receipt", {
+      method: "POST",
+      body: JSON.stringify({
+        purchaseDate: input.purchaseDate.toISOString(),
+        purchaseNumber: input.purchaseNumber,
+        partyName: input.partyName,
+        notes: input.notes,
+        lines: input.lines.map(line => ({ variantId: String(line.variantId), quantity: line.quantity, unitCost: line.unitCost })),
+      }),
+    });
+  },
+  async deletePurchaseStockReceipt(purchaseNumber: string): Promise<{ ok: boolean; purchaseNumber: string }> {
+    return request(`/purchases/stock-receipt/${encodeURIComponent(purchaseNumber)}`, { method: "DELETE" });
+  },
   async invoiceSetting(): Promise<InvoiceSetting> {
     try {
       const res = await request<InvoiceSetting>("/settings/invoice");
@@ -244,13 +324,58 @@ export const api = {
       return [];
     }
   },
-  async createSale(input: { partyId?: string; invoiceDate?: Date; paidAmount: number; paymentMode: "Cash" | "UPI" | "Card" | "Bank"; notes?: string; invoiceDiscount?: number; additionalCharges?: number; lines: Array<{ variantId: string; quantity: number; unitPrice: number; discount: number }> }): Promise<Invoice[]> {
+  async sale(id: string | number): Promise<Invoice> {
+    const row = await request<SalesRow>(`/sales/${id}`);
+    return saleFromApi(row);
+  },
+  async createSale(input: { partyId?: string; invoiceDate?: Date; paidAmount: number; paymentMode: "Cash" | "UPI" | "Card" | "Bank"; notes?: string; invoiceDiscount?: number; additionalCharges?: number; lines: Array<{ variantId: string; quantity: number; unitPrice: number; discount: number; taxRate?: number }> }): Promise<Invoice[]> {
     try {
       await request("/sales", { method: "POST", body: JSON.stringify({ idempotencyKey: crypto.randomUUID(), partyId: input.partyId, invoiceDate: (input.invoiceDate ?? new Date()).toISOString(), placeOfSupply: "33", paidAmount: input.paidAmount, paymentMode: input.paymentMode, notes: input.notes, invoiceDiscount: input.invoiceDiscount ?? 0, additionalCharges: input.additionalCharges ?? 0, lines: input.lines }) });
       return await api.sales();
     } catch {
       return [];
     }
+  },
+  async updateSale(id: string | number, input: { partyId?: string; invoiceDate?: Date; paidAmount: number; paymentMode: "Cash" | "UPI" | "Card" | "Bank"; notes?: string; invoiceDiscount?: number; additionalCharges?: number; lines: Array<{ variantId: string; quantity: number; unitPrice: number; discount: number; taxRate?: number }> }): Promise<Invoice[]> {
+    try {
+      const rows = await request<SalesRow[]>(`/sales/${id}`, { method: "PUT", body: JSON.stringify({ idempotencyKey: `edit-${id}-${Date.now()}`, partyId: input.partyId, invoiceDate: (input.invoiceDate ?? new Date()).toISOString(), placeOfSupply: "33", paidAmount: input.paidAmount, paymentMode: input.paymentMode, notes: input.notes, invoiceDiscount: input.invoiceDiscount ?? 0, additionalCharges: input.additionalCharges ?? 0, lines: input.lines }) });
+      return rows.map(saleFromApi);
+    } catch {
+      return [];
+    }
+  },
+  async deleteSale(id: string | number): Promise<Invoice[]> {
+    try {
+      await request(`/sales/${id}`, { method: "DELETE" });
+      return await api.sales();
+    } catch {
+      return [];
+    }
+  },
+  async cancelSale(id: string | number): Promise<Invoice[]> {
+    try {
+      const rows = await request<SalesRow[]>(`/sales/${id}/cancel`, { method: "POST" });
+      return rows.map(saleFromApi);
+    } catch {
+      return [];
+    }
+  },
+  async paymentIns(): Promise<PaymentInRow[]> {
+    try {
+      return await request<PaymentInRow[]>("/payments/in");
+    } catch {
+      return [];
+    }
+  },
+  async nextPaymentInNumber(paidAt = new Date()): Promise<{ prefix: string; number: number; paymentNumber: string; financialYear: string }> {
+    try {
+      return await request(`/payments/in/next-number?paidAt=${encodeURIComponent(paidAt.toISOString())}`);
+    } catch {
+      return { prefix: "HB/PI/26-27/", number: 1, paymentNumber: "HB/PI/26-27/1", financialYear: "26-27" };
+    }
+  },
+  async createPaymentIn(input: { amount: number; mode: string; paidAt: Date; reference?: string; partyName?: string; partyPhone?: string; paymentNumber?: string; prefix?: string; number?: string; discount?: number; allocations?: Array<{ salesInvoiceId: string | number; amount: number }> }): Promise<PaymentInRow | null> {
+    return await request<PaymentInRow>("/payments/in", { method: "POST", body: JSON.stringify({ amount: input.amount, mode: input.mode, paidAt: input.paidAt.toISOString(), reference: input.reference, partyName: input.partyName, partyPhone: input.partyPhone, paymentNumber: input.paymentNumber, prefix: input.prefix, number: input.number, discount: input.discount, allocations: input.allocations }) });
   },
   async sendReportEmail(payload: { reportName: string; userEmail: string; caEmail?: string }): Promise<{ ok: boolean; message: string }> {
     return request("/reports/send-email", {
@@ -339,14 +464,30 @@ function saleFromApi(x: SalesRow): Invoice {
     partyGstin: x.party?.gstin ?? "",
     amount: Number(x.grandTotal),
     paidAmount: Number(x.paidAmount ?? x.grandTotal),
-    status: x.paymentStatus === "PAID" ? "Paid" : x.paymentStatus === "UNPAID" ? "Unpaid" : "Partially paid",
+    paymentMode: x.payments?.[0]?.payment?.mode ?? "",
+    subtotal: Number(x.subtotal ?? 0),
+    discountTotal: Number(x.discountTotal ?? 0),
+    invoiceDiscount: Number(x.invoiceDiscount ?? 0),
+    additionalCharges: Number(x.additionalCharges ?? 0),
+    taxableTotal: Number(x.taxableTotal ?? 0),
+    cgstTotal: Number(x.cgstTotal ?? 0),
+    sgstTotal: Number(x.sgstTotal ?? 0),
+    igstTotal: Number(x.igstTotal ?? 0),
+    notes: x.notes ?? "",
+    status: x.status === "CANCELLED" ? "Cancelled" : x.paymentStatus === "PAID" ? "Paid" : x.paymentStatus === "UNPAID" ? "Unpaid" : "Partially paid",
     lines: (x.lines ?? []).map(l => ({
       itemName: l.itemName,
       sku: l.sku,
+      hsnCode: l.hsnCode ?? "",
       quantity: Number(l.quantity),
       unitPrice: Number(l.unitPrice),
+      purchasePrice: Number(l.variant?.purchasePrice ?? 0),
       discount: Number(l.discount),
       taxRate: Number(l.taxRate),
+      taxableAmount: Number(l.taxableAmount ?? 0),
+      cgst: Number(l.cgst ?? 0),
+      sgst: Number(l.sgst ?? 0),
+      igst: Number(l.igst ?? 0),
       total: Number(l.total),
     })),
   };

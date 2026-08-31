@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { money } from "./data";
 import { api } from "./api";
-import type { Invoice, InvoiceSetting, Page, Party, Product } from "./types";
+import type { Branch, Invoice, InvoiceLineItem, InvoiceSetting, OwnerBranchSummary, Page, Party, Product, StaffUser } from "./types";
 import * as XLSX from "xlsx";
 import happyBondingLogo from "./assets/happy-bonding-logo-white.png";
 import { BillOfSupplyTemplate } from "./components/BillOfSupplyTemplate";
@@ -76,27 +76,45 @@ export default function App() {
   const [partyRows, setPartyRows] = useState<Party[]>([]);
   const [invoiceRows, setInvoiceRows] = useState<Invoice[]>([]);
   const [invoiceSetting, setInvoiceSetting] = useState<InvoiceSetting>(defaultInvoiceSetting);
+  const [branchRows, setBranchRows] = useState<Branch[]>([]);
+  const [currentBranchId, setCurrentBranchId] = useState(api.currentBranchId());
+  const [ownerSummary, setOwnerSummary] = useState<OwnerBranchSummary[]>([]);
+  const [branchModalOpen, setBranchModalOpen] = useState(false);
+  const [staffModalOpen, setStaffModalOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [salesCreateKey, setSalesCreateKey] = useState(0);
 
   const [activeInvoiceModal, setActiveInvoiceModal] = useState<Invoice | null>(null);
 
-  useEffect(() => {
-    if (!apiMode || !authenticated) return;
-    Promise.all([
+  const refreshAppData = async () => {
+    const [nextProducts, nextParties, nextInvoices, nextSetting, nextBranches, nextSummary] = await Promise.all([
       api.products().catch(() => null),
       api.parties().catch(() => null),
       api.sales().catch(() => null),
       api.invoiceSetting().catch(() => null),
-    ])
-      .then(([nextProducts, nextParties, nextInvoices, nextSetting]) => {
-        if (nextProducts) setProductRows(nextProducts);
-        if (nextParties) setPartyRows(nextParties);
-        if (nextInvoices) setInvoiceRows(nextInvoices);
-        if (nextSetting) setInvoiceSetting({ ...defaultInvoiceSetting, ...nextSetting });
-      })
-      .catch(() => {});
-  }, [apiMode, authenticated]);
+      api.branches().catch(() => null),
+      api.ownerSummary().catch(() => null),
+    ]);
+    if (nextProducts) setProductRows(nextProducts);
+    if (nextParties) setPartyRows(nextParties);
+    if (nextInvoices) setInvoiceRows(nextInvoices);
+    if (nextSetting) setInvoiceSetting({ ...defaultInvoiceSetting, ...nextSetting });
+    if (nextBranches) {
+      setBranchRows(nextBranches);
+      if (api.currentBranchId()) {
+        setCurrentBranchId(api.currentBranchId());
+      } else if (nextBranches[0]) {
+        api.setCurrentBranch(nextBranches[0].id);
+        setCurrentBranchId(nextBranches[0].id);
+      }
+    }
+    if (nextSummary) setOwnerSummary(nextSummary);
+  };
+
+  useEffect(() => {
+    if (!apiMode || !authenticated) return;
+    refreshAppData().catch(() => {});
+  }, [apiMode, authenticated, currentBranchId]);
 
   const [expandedNav, setExpandedNav] = useState<"sales" | "purchases" | "parties" | null>(null);
   const [createDropdownOpen, setCreateDropdownOpen] = useState(false);
@@ -130,7 +148,47 @@ export default function App() {
     setSidebar(false);
     setCreateDropdownOpen(false);
   };
+  const currentBranch = branchRows.find(branch => branch.id === currentBranchId) || branchRows[0];
+  const handleBranchChange = (branchId: string) => {
+    api.setCurrentBranch(branchId);
+    setCurrentBranchId(branchId);
+    notify("Branch switched. Data refreshed.");
+  };
+  const handleSyncNow = async () => {
+    try {
+      const queued = JSON.parse(localStorage.getItem("hb_offline_queue") || "[]");
+      if (Array.isArray(queued) && queued.length > 0) {
+        const result = await api.pushSync(queued);
+        localStorage.removeItem("hb_offline_queue");
+        notify(`Online sync complete: ${result.accepted} changes uploaded`);
+        return;
+      }
+      const status = await api.syncStatus();
+      const pending = status.queue.find(row => row.status === "PENDING")?.count || 0;
+      notify(pending ? `${pending} sync changes pending` : "Online sync is up to date");
+    } catch {
+      notify("Offline mode: changes will sync when internet is available");
+    }
+  };
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 2400); };
+  const openInvoiceDetail = async (inv: Invoice) => {
+    setActiveInvoiceModal(inv);
+    try {
+      const fresh = await api.sale(inv.id);
+      setActiveInvoiceModal(fresh);
+    } catch {
+      notify("Showing saved invoice from current list");
+    }
+  };
+  const refreshActiveInvoiceAfterPayment = async (invoiceId: string | number) => {
+    await refreshAppData();
+    try {
+      const fresh = await api.sale(invoiceId);
+      setActiveInvoiceModal(fresh);
+    } catch {
+      setActiveInvoiceModal(null);
+    }
+  };
 
   // Global ERP Keyboard Shortcuts Listener
   useEffect(() => {
@@ -350,13 +408,30 @@ export default function App() {
           </div>
         ))}
       </div>)}</nav>
-      <div className="branch-card"><Building2 size={17}/><div><small>Current branch</small><strong>Pavoorchatram</strong></div><ChevronDown size={16}/></div>
+      <div className="branch-card" style={{ alignItems: "stretch", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Building2 size={17}/>
+          <div style={{ flex: 1 }}>
+            <small>Current branch</small>
+            <strong>{currentBranch?.name || "Select Branch"}</strong>
+          </div>
+          <ChevronDown size={16}/>
+        </div>
+        <select value={currentBranchId} onChange={e => handleBranchChange(e.target.value)} style={{ width: "100%", border: "1px solid #f0d47a", borderRadius: 8, padding: "8px 10px", background: "#fff", fontSize: 12 }}>
+          {branchRows.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+        </select>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+          <button type="button" className="secondary compact" onClick={() => setBranchModalOpen(true)}>Add Branch</button>
+          <button type="button" className="secondary compact" onClick={() => setStaffModalOpen(true)}>Staff</button>
+        </div>
+      </div>
     </aside>
     <main>
       <header className="topbar">
         <button className="icon-button menu-button" onClick={() => setSidebar(true)}><Menu/></button>
-        <div><strong>Happy Bonding ERP</strong><span>{new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"long",year:"numeric",weekday:"long"})} · Pavoorchatram Store</span></div>
+        <div><strong>Happy Bonding ERP</strong><span>{new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"long",year:"numeric",weekday:"long"})} · {currentBranch?.name || "Branch"} Store</span></div>
         <div className="top-actions">
+          <button className="icon-button" title="Sync Offline Changes" onClick={handleSyncNow}><CheckSquare size={19}/></button>
           <button className="icon-button" title="Search ERP"><Search size={19}/></button>
           <div className="user-profile-badge" title="Saravana Kumar (Store Admin)">
             <div className="avatar">SK</div>
@@ -368,18 +443,18 @@ export default function App() {
         </div>
       </header>
       <section className={page === "pos" ? "page pos-page" : "page"}>
-        {page === "dashboard" && <DashboardLive products={productRows} parties={partyRows} invoices={invoiceRows} onNewSale={openSalesInvoice} onSelectInvoice={inv => setActiveInvoiceModal(inv)} onSeeAllTransactions={() => setPage("sales")}/>} 
+        {page === "dashboard" && <DashboardLive products={productRows} parties={partyRows} invoices={invoiceRows} ownerSummary={ownerSummary} onNewSale={openSalesInvoice} onSelectInvoice={openInvoiceDetail} onSeeAllTransactions={() => setPage("sales")}/>} 
         {page === "parties" && <Parties rows={partyRows} setRows={setPartyRows} notify={notify} apiMode={apiMode} onNavigateReport={() => setPage("reports")} autoOpenShareLedger={autoOpenShareLedger} onClearAutoOpenShareLedger={() => setAutoOpenShareLedger(false)} />} 
         {page === "items" && <Items rows={productRows} invoices={invoiceRows} setRows={setProductRows} notify={notify} apiMode={apiMode}/>} 
-        {page === "sales" && <Sales rows={invoiceRows} products={productRows} parties={partyRows} setting={invoiceSetting} setSetting={setInvoiceSetting} setRows={setInvoiceRows} setParties={setPartyRows} setProducts={setProductRows} notify={notify} autoCreateKey={salesCreateKey} onSelectInvoice={inv => setActiveInvoiceModal(inv)} onNavigateReports={handleNavigateReportsFromSales}/>} 
+        {page === "sales" && <Sales rows={invoiceRows} products={productRows} parties={partyRows} setting={invoiceSetting} setSetting={setInvoiceSetting} setRows={setInvoiceRows} setParties={setPartyRows} setProducts={setProductRows} notify={notify} autoCreateKey={salesCreateKey} onSelectInvoice={openInvoiceDetail} onNavigateReports={handleNavigateReportsFromSales}/>} 
         {page === "quotation" && <GenericVoucherPage title="Quotation / Estimate" subtitle="Create and track estimates for customers before final sale." action="+ Create Quotation" icon={FileSpreadsheet} type="Quotation" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
-        {page === "payment_in" && <PaymentInModule parties={partyRows} invoices={invoiceRows} notify={notify} />}
+        {page === "payment_in" && <PaymentInModule parties={partyRows} invoices={invoiceRows} notify={notify} onDataChanged={refreshAppData} />}
         {page === "sales_return" && <GenericVoucherPage title="Sales Return" subtitle="Track customer garment returns & credit balances." action="+ Create Sales Return" icon={ReceiptIndianRupee} type="Sales Return" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
         {page === "credit_note" && <GenericVoucherPage title="Credit Note" subtitle="Issue credit notes against returns & pricing adjustments." action="+ Create Credit Note" icon={ClipboardList} type="Credit Note" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
         {page === "delivery_challan" && <GenericVoucherPage title="Delivery Challan" subtitle="Track dispatch of goods, transport & delivery notes." action="+ Create Delivery Challan" icon={Boxes} type="Delivery Challan" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
         {page === "proforma_invoice" && <GenericVoucherPage title="Proforma Invoice" subtitle="Draft & send proforma invoices prior to supply." action="+ Create Proforma" icon={FileText} type="Proforma Invoice" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
 
-        {page === "purchases" && <GenericVoucherPage title="Purchase Invoices" subtitle="Supplier purchases, stock entries & payable tracking." action="+ Create Purchase" icon={ShoppingBag} type="Purchase Invoice" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
+        {page === "purchases" && <GenericVoucherPage title="Purchase Invoices" subtitle="Supplier purchases, stock entries & payable tracking." action="+ Create Purchase" icon={ShoppingBag} type="Purchase Invoice" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} invoiceSetting={invoiceSetting} onProductsChanged={setProductRows} />}
         {page === "payment_out" && <GenericVoucherPage title="Payment Out" subtitle="Record payments made to suppliers & vendors." action="+ Record Payment Out" icon={CreditCard} type="Payment Out" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
         {page === "purchase_return" && <GenericVoucherPage title="Purchase Return" subtitle="Return damaged/excess goods to suppliers & debit balance." action="+ Create Purchase Return" icon={ShoppingBag} type="Purchase Return" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
         {page === "debit_note" && <GenericVoucherPage title="Debit Note" subtitle="Issue debit notes to suppliers for price differences or returns." action="+ Create Debit Note" icon={ClipboardList} type="Debit Note" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
@@ -395,8 +470,98 @@ export default function App() {
     </main>
     {sidebar && <div className="scrim" onClick={() => setSidebar(false)}/>} 
     {toast && <div className="toast">{toast}</div>}
-    {activeInvoiceModal && <InvoiceDetailModal invoice={activeInvoiceModal} setting={invoiceSetting} onClose={() => setActiveInvoiceModal(null)} />}
+    {activeInvoiceModal && <InvoiceDetailModal invoice={activeInvoiceModal} setting={invoiceSetting} notify={notify} onPaymentSaved={refreshActiveInvoiceAfterPayment} onClose={() => setActiveInvoiceModal(null)} />}
+    {branchModalOpen && <BranchManagementModal branches={branchRows} onClose={() => setBranchModalOpen(false)} onSaved={async () => { await refreshAppData(); setBranchModalOpen(false); notify("Branch saved"); }} notify={notify} />}
+    {staffModalOpen && <StaffManagementModal branches={branchRows} onClose={() => setStaffModalOpen(false)} notify={notify} />}
   </div>;
+}
+
+function BranchManagementModal({ branches, onClose, onSaved, notify }: { branches: Branch[]; onClose: () => void; onSaved: () => void; notify: (msg: string) => void }) {
+  const [saving, setSaving] = useState(false);
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try {
+      setSaving(true);
+      await api.createBranch({
+        code: String(form.get("code") || ""),
+        name: String(form.get("name") || ""),
+        address: String(form.get("address") || ""),
+        phone: String(form.get("phone") || ""),
+      });
+      onSaved();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Branch save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal title="Branch Management" onClose={onClose} wide>
+      <div className="table-scroll" style={{ maxHeight: 220, marginBottom: 16 }}>
+        <table><thead><tr><th>Code</th><th>Branch</th><th>Phone</th><th>Address</th></tr></thead><tbody>
+          {branches.map(branch => <tr key={branch.id}><td>{branch.code}</td><td><strong>{branch.name}</strong></td><td>{branch.phone || "-"}</td><td>{branch.address || "-"}</td></tr>)}
+        </tbody></table>
+      </div>
+      <form className="form-grid" onSubmit={handleSubmit}>
+        <label>Branch Code<input name="code" placeholder="TEN" required /></label>
+        <label>Branch Name<input name="name" placeholder="Tenkasi" required /></label>
+        <label>Phone<input name="phone" placeholder="Branch phone" /></label>
+        <label className="full">Address<textarea name="address" placeholder="Branch address" /></label>
+        <div className="modal-actions full"><button type="button" className="secondary" onClick={onClose} disabled={saving}>Cancel</button><button className="primary" disabled={saving}>{saving ? "Saving..." : "Save Branch"}</button></div>
+      </form>
+    </Modal>
+  );
+}
+
+function StaffManagementModal({ branches, onClose, notify }: { branches: Branch[]; onClose: () => void; notify: (msg: string) => void }) {
+  const [staffRows, setStaffRows] = useState<StaffUser[]>([]);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { api.staff().then(setStaffRows).catch(() => setStaffRows([])); }, []);
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const branchIds = form.getAll("branchIds").map(String);
+    try {
+      setSaving(true);
+      const row = await api.createStaff({
+        name: String(form.get("name") || ""),
+        email: String(form.get("email") || ""),
+        phone: String(form.get("phone") || ""),
+        password: String(form.get("password") || ""),
+        branchIds,
+      });
+      setStaffRows(prev => [row, ...prev]);
+      notify("Staff login created");
+      event.currentTarget.reset();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Staff save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal title="Staff Login Per Branch" onClose={onClose} wide>
+      <div className="table-scroll" style={{ maxHeight: 180, marginBottom: 16 }}>
+        <table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Branches</th></tr></thead><tbody>
+          {staffRows.map(user => <tr key={user.id}><td><strong>{user.name}</strong></td><td>{user.email}</td><td>{user.role}</td><td>{user.branches.map(b => b.name).join(", ")}</td></tr>)}
+        </tbody></table>
+      </div>
+      <form className="form-grid" onSubmit={handleSubmit}>
+        <label>Name<input name="name" required /></label>
+        <label>Email<input name="email" type="email" required /></label>
+        <label>Phone<input name="phone" /></label>
+        <label>Password<input name="password" type="password" minLength={8} required /></label>
+        <div className="full" style={{ display: "grid", gap: 8 }}>
+          <span style={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Branch Access</span>
+          {branches.map(branch => <label key={branch.id} style={{ display: "flex", alignItems: "center", gap: 8 }}><input type="checkbox" name="branchIds" value={branch.id} /> {branch.name}</label>)}
+        </div>
+        <div className="modal-actions full"><button type="button" className="secondary" onClick={onClose} disabled={saving}>Close</button><button className="primary" disabled={saving}>{saving ? "Saving..." : "Create Staff Login"}</button></div>
+      </form>
+    </Modal>
+  );
 }
 
 function LoginScreen({ onLogin }: { onLogin: () => void }) {
@@ -681,6 +846,7 @@ function SalesReportChartCard({ invoices }: { invoices: Invoice[] }) {
 function DashboardLive({
   parties,
   invoices,
+  ownerSummary = [],
   onNewSale,
   onSelectInvoice,
   onSeeAllTransactions,
@@ -688,6 +854,7 @@ function DashboardLive({
   products: Product[];
   parties: Party[];
   invoices: Invoice[];
+  ownerSummary?: OwnerBranchSummary[];
   onNewSale: () => void;
   onSelectInvoice: (inv: Invoice) => void;
   onSeeAllTransactions: () => void;
@@ -707,6 +874,29 @@ function DashboardLive({
         <Metric label="↑ To Pay" value={`₹ ${toPay.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`} icon={CreditCard} tone="red" />
         <Metric label="🏛️ Total Cash + Bank Balance" value={`₹ ${cashBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`} icon={WalletCards} tone="blue" />
       </div>
+
+      {ownerSummary.length > 0 && (
+        <article className="card" style={{ padding: 16, marginBottom: 16 }}>
+          <div className="card-title"><div><h2>Owner Branch Summary</h2><p>All branch sales, stock and payment totals</p></div></div>
+          <div className="table-scroll">
+            <table>
+              <thead><tr><th>Branch</th><th>Sales</th><th>Payment In</th><th>Payment Out</th><th>Stock Qty</th><th>Invoices</th></tr></thead>
+              <tbody>
+                {ownerSummary.map(row => (
+                  <tr key={row.branchId}>
+                    <td><strong>{row.branchName}</strong><small style={{ display: "block", color: "#64748b" }}>{row.code}</small></td>
+                    <td>{money(row.salesTotal)}</td>
+                    <td>{money(row.paymentIn)}</td>
+                    <td>{money(row.paymentOut)}</td>
+                    <td>{row.stockQty.toLocaleString("en-IN")}</td>
+                    <td>{row.invoiceCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      )}
 
       <div className="dashboard-grid" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* 1. Latest Transactions Card FIRST */}
@@ -923,7 +1113,7 @@ function PartySettingsModal({
     setCustomFields(customFields.filter((_, i) => i !== index));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     notify("Party Settings saved successfully");
     onClose();
   };
@@ -1185,7 +1375,7 @@ function BulkAddPartiesModal({
     notify("Cleared all table entries");
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const validRows = rows.filter(r => r.name.trim());
     if (!validRows.length) {
       notify("Please enter at least one Party Name");
@@ -4360,14 +4550,20 @@ function AddItemsToBillModal({
 function InvoiceDetailModal({
   invoice,
   setting,
+  notify,
+  onPaymentSaved,
   onClose,
 }: {
   invoice: Invoice;
   setting: InvoiceSetting;
+  notify: (message: string) => void;
+  onPaymentSaved?: (invoiceId: string | number) => Promise<void> | void;
   onClose: () => void;
 }) {
   const documentRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
+  const [savingPayment, setSavingPayment] = useState(false);
+  const [profitOpen, setProfitOpen] = useState(false);
 
   const handlePrint = () => window.print();
 
@@ -4396,6 +4592,44 @@ function InvoiceDetailModal({
   const total = invoice.amount;
   const paid = invoice.paidAmount ?? total;
   const balance = Math.max(0, total - paid);
+  const profitLines = invoice.lines ?? [];
+  const totalCost = profitLines.reduce((sum, line) => sum + (line.purchasePrice ?? 0) * line.quantity, 0);
+  const taxPayable = (invoice.cgstTotal ?? 0) + (invoice.sgstTotal ?? 0) + (invoice.igstTotal ?? 0);
+  const salesExcludingTaxAndCharges = Math.max(0, (invoice.taxableTotal ?? (total - taxPayable - (invoice.additionalCharges ?? 0))));
+  const profitAmount = Math.round((salesExcludingTaxAndCharges - totalCost) * 100) / 100;
+  const handleReceiveBalance = async () => {
+    if (balance <= 0 || savingPayment) return;
+    const input = window.prompt(`Balance amount ${money(balance)}. Received amount enter pannunga:`, String(balance));
+    if (input === null) return;
+    const amount = Number(input);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      notify("Valid received amount enter pannunga");
+      return;
+    }
+    const safeAmount = Math.min(amount, balance);
+    try {
+      setSavingPayment(true);
+      const saved = await api.createPaymentIn({
+        amount: safeAmount,
+        mode: invoice.paymentMode || "Cash",
+        paidAt: new Date(),
+        reference: `Balance payment for ${invoice.number}`,
+        partyName: invoice.party,
+        partyPhone: invoice.partyPhone || "",
+        allocations: [{ salesInvoiceId: invoice.id, amount: safeAmount }],
+      });
+      if (!saved) {
+        notify("Payment save failed. API/database check pannunga.");
+        return;
+      }
+      await onPaymentSaved?.(invoice.id);
+      notify(safeAmount >= balance ? "Invoice fully paid successfully" : "Partial payment saved successfully");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Payment save failed");
+    } finally {
+      setSavingPayment(false);
+    }
+  };
 
   return (
     <div className="modal-backdrop full-screen-modal-backdrop">
@@ -4406,6 +4640,9 @@ function InvoiceDetailModal({
             <span className={`pill ${invoice.status === "Paid" ? "success" : "danger"}`}>{invoice.status}</span>
           </div>
           <div className="actions-right">
+            <button className="secondary" onClick={() => setProfitOpen(true)}>
+              <TrendingUp size={15} /> Profit Details
+            </button>
             <button className="secondary" onClick={handleDownloadPdf} disabled={downloading}>
               <Download size={15} /> {downloading ? "Downloading..." : "Download PDF"}
             </button>
@@ -4415,6 +4652,11 @@ function InvoiceDetailModal({
             <button className="whatsapp-btn" onClick={handleShare}>
               <MessageCircle size={15} /> Share
             </button>
+            {balance > 0 && (
+              <button className="primary" onClick={handleReceiveBalance} disabled={savingPayment}>
+                <CreditCard size={15} /> {savingPayment ? "Saving..." : `Receive ${money(balance)}`}
+              </button>
+            )}
             <button className="icon-button" onClick={onClose}>
               <X size={20} />
             </button>
@@ -4450,6 +4692,39 @@ function InvoiceDetailModal({
             </div>
           </aside>
         </div>
+        {profitOpen && (
+          <Modal title="Profit Calculation" onClose={() => setProfitOpen(false)}>
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Item Name</th>
+                    <th className="right">Qty</th>
+                    <th className="right">Purchase Price</th>
+                    <th className="right">Total Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {profitLines.map((line, index) => (
+                    <tr key={`${line.sku}-${index}`}>
+                      <td><strong>{line.itemName}</strong><small className="line-subtext">{line.sku}</small></td>
+                      <td className="right">{line.quantity} PCS</td>
+                      <td className="right">{money(line.purchasePrice ?? 0)}</td>
+                      <td className="right">{money((line.purchasePrice ?? 0) * line.quantity)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="bill-summary" style={{ marginTop: 14 }}>
+              <p><span>Sales Amount (Excl. Addn. Charges)</span><strong>{money(salesExcludingTaxAndCharges)}</strong></p>
+              <p><span>Total Cost</span><strong>{money(totalCost)}</strong></p>
+              <p><span>Tax Payable</span><strong>{money(taxPayable)}</strong></p>
+              <div><span>Profit</span><strong className={profitAmount >= 0 ? "positive" : "negative"}>{profitAmount >= 0 ? "+ " : "- "}{money(Math.abs(profitAmount))}</strong></div>
+              <small style={{ color: "#64748b" }}>(Sales Amount - Total Cost)</small>
+            </div>
+          </Modal>
+        )}
       </div>
     </div>
   );
@@ -4477,9 +4752,11 @@ function parseInvoiceDate(dateStr: string): Date {
   return isNaN(d.getTime()) ? new Date() : d;
 }
 
-function isInvoiceInDateRange(r: Invoice, filter: string): boolean {
+type CustomDateRange = { from: string; to: string };
+
+function isInvoiceInDateRange(r: { date: string }, filter: string, customRange?: CustomDateRange): boolean {
   const d = parseInvoiceDate(r.date);
-  const now = new Date(2026, 7, 10); // 10 Aug 2026
+  const now = new Date(2026, 7, 15); // 15 Aug 2026
 
   const isSameDay = (d1: Date, d2: Date) =>
     d1.getFullYear() === d2.getFullYear() &&
@@ -4490,21 +4767,21 @@ function isInvoiceInDateRange(r: Invoice, filter: string): boolean {
     return isSameDay(d, now);
   }
   if (filter === "Yesterday") {
-    const yest = new Date(2026, 7, 9);
+    const yest = new Date(2026, 7, 14);
     return isSameDay(d, yest);
   }
   if (filter === "This Week") {
-    const start = new Date(2026, 7, 4);
-    const end = new Date(2026, 7, 10);
+    const start = new Date(2026, 7, 10);
+    const end = new Date(2026, 7, 15);
     return d >= start && d <= end;
   }
   if (filter === "Last Week") {
-    const start = new Date(2026, 6, 28);
-    const end = new Date(2026, 7, 3);
+    const start = new Date(2026, 7, 3);
+    const end = new Date(2026, 7, 9);
     return d >= start && d <= end;
   }
   if (filter === "Last 7 Days") {
-    const start = new Date(2026, 7, 3);
+    const start = new Date(2026, 7, 9);
     return d >= start && d <= now;
   }
   if (filter === "This Month") {
@@ -4514,7 +4791,7 @@ function isInvoiceInDateRange(r: Invoice, filter: string): boolean {
     return d.getMonth() === 6 && d.getFullYear() === 2026; // Jul 2026
   }
   if (filter === "Last 30 Days") {
-    const start = new Date(2026, 6, 12);
+    const start = new Date(2026, 6, 17);
     return d >= start && d <= now;
   }
   if (filter === "This Quarter") {
@@ -4534,16 +4811,98 @@ function isInvoiceInDateRange(r: Invoice, filter: string): boolean {
     return d >= start && d <= end;
   }
   if (filter === "Last 365 Days") {
-    const start = new Date(2025, 7, 11);
+    const start = new Date(2025, 7, 16);
     return d >= start && d <= now;
   }
+  if (filter === "Custom Range") {
+    if (!customRange?.from || !customRange?.to) return true;
+    const start = new Date(customRange.from);
+    const end = new Date(customRange.to);
+    end.setHours(23, 59, 59, 999);
+    return d >= start && d <= end;
+  }
   return true;
+}
+
+const REPORT_DATE_OPTIONS = [
+  { label: "Today", sub: "" },
+  { label: "Yesterday", sub: "" },
+  { label: "This Week", sub: "10 Aug 2026 - 15 Aug 2026" },
+  { label: "Last Week", sub: "03 Aug 2026 - 09 Aug 2026" },
+  { label: "Last 7 Days", sub: "09 Aug 2026 - 15 Aug 2026" },
+  { label: "This Month", sub: "01 Aug 2026 - 31 Aug 2026" },
+  { label: "Previous Month", sub: "01 Jul 2026 - 31 Jul 2026" },
+  { label: "Last 30 Days", sub: "17 Jul 2026 - 15 Aug 2026" },
+  { label: "This Quarter", sub: "01 Jul 2026 - 30 Sep 2026" },
+  { label: "Previous Quarter", sub: "01 Apr 2026 - 30 Jun 2026" },
+  { label: "Current Fiscal Year", sub: "01 Apr 2026 - 31 Mar 2027" },
+  { label: "Previous Fiscal Year", sub: "01 Apr 2025 - 31 Mar 2026" },
+  { label: "Last 365 Days", sub: "16 Aug 2025 - 15 Aug 2026" },
+  { label: "Custom Range", sub: "" },
+];
+
+function CustomDateRangePopover({
+  range,
+  onApply,
+  onCancel,
+}: {
+  range: CustomDateRange;
+  onApply: (range: CustomDateRange) => void;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState<CustomDateRange>(range);
+  return (
+    <div style={{ position: "absolute", top: "calc(100% + 8px)", left: 0, width: 344, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 6, boxShadow: "0 12px 28px rgba(15,23,42,.16)", zIndex: 1000, padding: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 18px minmax(0, 1fr)", alignItems: "end", gap: 10, marginBottom: 14, color: "#64748b", fontSize: 14 }}>
+        <label style={{ display: "grid", gap: 8 }}>
+          <span>Select Start Date</span>
+          <input
+            type="date"
+            value={draft.from}
+            onChange={e => setDraft(prev => ({ ...prev, from: e.target.value }))}
+            style={{ width: "100%", minWidth: 0, height: 36, border: "1px solid #dbe3ef", borderRadius: 6, padding: "0 8px", color: "#334155", boxSizing: "border-box" }}
+          />
+        </label>
+        <span style={{ textAlign: "center", height: 36, lineHeight: "36px", color: "#94a3b8" }}>-</span>
+        <label style={{ display: "grid", gap: 8 }}>
+          <span>End Date</span>
+          <input
+            type="date"
+            value={draft.to}
+            onChange={e => setDraft(prev => ({ ...prev, to: e.target.value }))}
+            style={{ width: "100%", minWidth: 0, height: 36, border: "1px solid #dbe3ef", borderRadius: 6, padding: "0 8px", color: "#334155", boxSizing: "border-box" }}
+          />
+        </label>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 14, fontSize: 12, fontWeight: 700 }}>
+        <button type="button" onClick={onCancel} style={{ border: 0, background: "transparent", color: "#475569", padding: "8px 0" }}>CANCEL</button>
+        <button
+          type="button"
+          onClick={() => onApply(draft)}
+          disabled={!draft.from || !draft.to}
+          style={{ border: 0, background: "transparent", color: draft.from && draft.to ? "#4f46e5" : "#a8b1c2", padding: "8px 0", fontWeight: 800 }}
+        >
+          OK
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function customRangeLabel(range: CustomDateRange) {
+  if (!range.from || !range.to) return "Custom Date Range";
+  const fmt = (value: string) => new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  return `${fmt(range.from)} - ${fmt(range.to)}`;
 }
 
 function SalesInvoicesListView({
   rows,
   onCreateNew,
   onSelectInvoice,
+  onEditInvoice,
+  onDeleteInvoice,
+  onCancelInvoice,
+  onDuplicateInvoice,
   onOpenReportView,
   onOpenQuickSettings,
   notify,
@@ -4551,6 +4910,10 @@ function SalesInvoicesListView({
   rows: Invoice[];
   onCreateNew: () => void;
   onSelectInvoice: (inv: Invoice) => void;
+  onEditInvoice: (inv: Invoice) => void;
+  onDeleteInvoice: (inv: Invoice) => void;
+  onCancelInvoice: (inv: Invoice) => void;
+  onDuplicateInvoice: (inv: Invoice) => void;
   onOpenReportView: (reportName: string) => void;
   onOpenQuickSettings: () => void;
   notify: (msg: string) => void;
@@ -4566,17 +4929,17 @@ function SalesInvoicesListView({
   const dateOptions = [
     { label: "Today", sub: "" },
     { label: "Yesterday", sub: "" },
-    { label: "This Week", sub: "04 Aug 2026 - 10 Aug 2026" },
-    { label: "Last Week", sub: "28 Jul 2026 - 03 Aug 2026" },
-    { label: "Last 7 Days", sub: "03 Aug 2026 - 10 Aug 2026" },
+    { label: "This Week", sub: "10 Aug 2026 - 15 Aug 2026" },
+    { label: "Last Week", sub: "03 Aug 2026 - 09 Aug 2026" },
+    { label: "Last 7 Days", sub: "09 Aug 2026 - 15 Aug 2026" },
     { label: "This Month", sub: "01 Aug 2026 - 31 Aug 2026" },
     { label: "Previous Month", sub: "01 Jul 2026 - 31 Jul 2026" },
-    { label: "Last 30 Days", sub: "12 Jul 2026 - 10 Aug 2026" },
+    { label: "Last 30 Days", sub: "17 Jul 2026 - 15 Aug 2026" },
     { label: "This Quarter", sub: "01 Jul 2026 - 30 Sep 2026" },
     { label: "Previous Quarter", sub: "01 Apr 2026 - 30 Jun 2026" },
     { label: "Current Fiscal Year", sub: "01 Apr 2026 - 31 Mar 2027" },
     { label: "Previous Fiscal Year", sub: "01 Apr 2025 - 31 Mar 2026" },
-    { label: "Last 365 Days", sub: "11 Aug 2025 - 10 Aug 2026" },
+    { label: "Last 365 Days", sub: "16 Aug 2025 - 15 Aug 2026" },
     { label: "Custom Range", sub: "" },
   ];
 
@@ -4641,16 +5004,17 @@ function SalesInvoicesListView({
 
   // Dynamic metrics calculation strictly from backend PostgreSQL filtered invoices
   const totalSalesVal = useMemo(() => {
-    return filtered.reduce((sum, r) => sum + r.amount, 0);
+    return filtered.filter(r => r.status !== "Cancelled").reduce((sum, r) => sum + r.amount, 0);
   }, [filtered]);
 
   const paidSalesVal = useMemo(() => {
-    return filtered.filter(r => r.status === "Paid" || r.status === "Partially paid").reduce((sum, r) => sum + (r.paidAmount ?? r.amount), 0);
+    return filtered.filter(r => r.status !== "Cancelled" && (r.status === "Paid" || r.status === "Partially paid")).reduce((sum, r) => sum + (r.paidAmount ?? r.amount), 0);
   }, [filtered]);
 
   const unpaidSalesVal = useMemo(() => {
-    return filtered.reduce((sum, r) => sum + Math.max(0, r.amount - (r.paidAmount ?? r.amount)), 0);
+    return filtered.filter(r => r.status !== "Cancelled").reduce((sum, r) => sum + Math.max(0, r.amount - (r.paidAmount ?? r.amount)), 0);
   }, [filtered]);
+  const cancelledSalesVal = useMemo(() => filtered.filter(r => r.status === "Cancelled").reduce((sum, r) => sum + r.amount, 0), [filtered]);
 
   const toggleSelectAll = () => {
     if (selectedIds.size === filtered.length) setSelectedIds(new Set());
@@ -4790,7 +5154,7 @@ function SalesInvoicesListView({
             <span>Cancelled</span>
           </div>
           <h2 className="sales-summary-card-val" style={{ color: "#64748b" }}>
-            -
+            {cancelledSalesVal > 0 ? `₹ ${cancelledSalesVal.toLocaleString("en-IN")}` : "-"}
           </h2>
         </div>
       </div>
@@ -4911,7 +5275,7 @@ function SalesInvoicesListView({
                     <strong>₹ {inv.amount.toLocaleString("en-IN")}</strong>
                   </td>
                   <td>
-                    <span className={inv.status === "Paid" ? "status-pill-green" : "status-pill-red"}>
+                    <span className={inv.status === "Paid" ? "status-pill-green" : inv.status === "Cancelled" ? "status-pill-gray" : "status-pill-red"}>
                       {inv.status}
                     </span>
                   </td>
@@ -4945,6 +5309,38 @@ function SalesInvoicesListView({
                             type="button"
                             onClick={() => {
                               setOpenMenuId(null);
+                              onEditInvoice(inv);
+                            }}
+                          >
+                            <Pencil size={14} /> Edit
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              onDuplicateInvoice(inv);
+                            }}
+                          >
+                            <ClipboardList size={14} /> Duplicate
+                          </button>
+
+                          {inv.status !== "Paid" && inv.status !== "Cancelled" && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                onSelectInvoice(inv);
+                              }}
+                            >
+                              <CreditCard size={14} /> Receive Payment
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenMenuId(null);
                               onSelectInvoice(inv);
                               window.setTimeout(() => window.print(), 300);
                             }}
@@ -4966,6 +5362,29 @@ function SalesInvoicesListView({
                             }}
                           >
                             <MessageCircle size={14} /> Share WhatsApp
+                          </button>
+
+                          {inv.status !== "Cancelled" && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                onCancelInvoice(inv);
+                              }}
+                            >
+                              <XCircle size={14} /> Cancel Invoice
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              onDeleteInvoice(inv);
+                            }}
+                            style={{ color: "#dc2626" }}
+                          >
+                            <Trash2 size={14} /> Delete Invoice
                           </button>
                         </div>
                       )}
@@ -5555,6 +5974,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false);
   const [query,setQuery]=useState("");
   const [creating,setCreating]=useState(false);
+  const [editingInvoice,setEditingInvoice]=useState<Invoice|null>(null);
 
   if (activeReportView === "sales_summary") {
     return (
@@ -5762,8 +6182,14 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   const itemMatches=itemSearch?products.filter(p=>`${p.name} ${p.sku}`.toLowerCase().includes(itemSearch.toLowerCase())).slice(0,5):[];
   const subtotal=lines.reduce((sum,line)=>sum+line.product.sellingPrice*line.qty,0);
   const discount=lines.reduce((sum,line)=>sum+line.discount,0);
-  const tax=lines.reduce((sum,line)=>sum+((line.product.sellingPrice*line.qty-line.discount)*(line.taxRate??line.product.taxRate??5)/100),0);
   const taxable=Math.max(0,subtotal-discount-invoiceDiscount);
+  const taxBaseBeforeInvoiceDiscount=Math.max(0,subtotal-discount);
+  const tax=taxBaseBeforeInvoiceDiscount<=0?0:lines.reduce((sum,line)=>{
+    const lineBase=Math.max(0,line.product.sellingPrice*line.qty-line.discount);
+    const invoiceDiscountShare=invoiceDiscount*(lineBase/taxBaseBeforeInvoiceDiscount);
+    const lineTaxable=Math.max(0,lineBase-invoiceDiscountShare);
+    return sum+(lineTaxable*(line.taxRate??line.product.taxRate??0)/100);
+  },0);
   const total=Math.max(0,Math.round((subtotal-discount-invoiceDiscount+tax+additionalCharges)*100)/100);
   const dueDate=new Date(invoiceDate); dueDate.setDate(dueDate.getDate()+Number(paymentTerms||0));
   useEffect(()=>{if(autoCreateKey)setCreating(true);},[autoCreateKey]);
@@ -5771,7 +6197,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   useEffect(()=>{setTerms(setting.terms);},[setting.terms]);
   useEffect(()=>{if(creating) api.nextSaleNumber(new Date(invoiceDate)).then(x=>setNextNumber(x.invoiceNumber)).catch(()=>setNextNumber(""));},[creating,rows.length,invoiceDate]);
   
-  const addLine=(product:Product, taxRate?:number)=>{setLines(current=>{const found=current.find(x=>x.product.id===product.id);return found?current.map(x=>x.product.id===product.id?{...x,qty:x.qty+1}:x):[...current,{product,qty:1,discount:0,taxRate:taxRate??product.taxRate??5}]});setItemSearch("");};
+  const addLine=(product:Product, taxRate?:number)=>{setLines(current=>{const found=current.find(x=>x.product.id===product.id);return found?current.map(x=>x.product.id===product.id?{...x,qty:x.qty+1}:x):[...current,{product,qty:1,discount:0,taxRate:taxRate??product.taxRate??0}]});setItemSearch("");};
   const addBatchLines=(items: Array<{ product: Product; qty: number; taxRate: number }>) => {
     setLines(current => {
       let next = [...current];
@@ -5823,9 +6249,72 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
       setSaving(true);
       let partyId=selectedParty?.id ? String(selectedParty.id) : undefined;
       const received=markPaid?total:paid;
-      const next=await api.createSale({partyId,invoiceDate:new Date(invoiceDate),paidAmount:Math.min(received,total),paymentMode,notes:[notes,showTerms?terms:""].filter(Boolean).join("\n"),invoiceDiscount,additionalCharges,lines:lines.map(x=>({variantId:String(x.product.id),quantity:x.qty,unitPrice:x.product.sellingPrice,discount:x.discount}))});
-      setRows(next); setProducts(await api.products()); resetInvoiceForm(); setCreating(keepOpen); notify(keepOpen?"Sales invoice saved. Ready for next invoice.":"Sales invoice saved");
+      const payload={partyId,invoiceDate:new Date(invoiceDate),paidAmount:Math.min(received,total),paymentMode,notes:[notes,showTerms?terms:""].filter(Boolean).join("\n"),invoiceDiscount,additionalCharges,lines:lines.map(x=>({variantId:String(x.product.id),quantity:x.qty,unitPrice:x.product.sellingPrice,discount:x.discount,taxRate:x.taxRate??x.product.taxRate??0}))};
+      const next=editingInvoice?await api.updateSale(editingInvoice.id,payload):await api.createSale(payload);
+      setRows(next); setProducts(await api.products()); setEditingInvoice(null); resetInvoiceForm(); setCreating(keepOpen && !editingInvoice); notify(editingInvoice?`Sales invoice ${editingInvoice.number} updated`:keepOpen?"Sales invoice saved. Ready for next invoice.":"Sales invoice saved");
     }catch(error){notify(error instanceof Error?error.message:"Invoice save failed");}finally{setSaving(false);}
+  };
+  const deleteInvoice = async (inv: Invoice) => {
+    if (!window.confirm(`Delete sales invoice ${inv.number}? Stock will be added back.`)) return;
+    try {
+      const next = await api.deleteSale(inv.id);
+      setRows(next.length ? next : rows.filter(row => row.id !== inv.id));
+      setProducts(await api.products());
+      notify(`Sales invoice ${inv.number} deleted`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Sales invoice delete failed");
+    }
+  };
+  const cancelInvoice = async (inv: Invoice) => {
+    if (!window.confirm(`Cancel sales invoice ${inv.number}? Stock will be added back and invoice will stay in records as Cancelled.`)) return;
+    try {
+      const next = await api.cancelSale(inv.id);
+      setRows(next.length ? next : rows.map(row => row.id === inv.id ? { ...row, status: "Cancelled" as const } : row));
+      setProducts(await api.products());
+      notify(`Sales invoice ${inv.number} cancelled`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Sales invoice cancel failed");
+    }
+  };
+  const duplicateInvoice = (inv: Invoice) => {
+    const copiedLines = (inv.lines ?? []).map(line => {
+      const product = products.find(p => String(p.id) === String((line as InvoiceLineItem & { productId?: string }).productId) || p.sku === line.sku);
+      return product ? { product, qty: line.quantity, discount: line.discount, taxRate: line.taxRate } : null;
+    }).filter(Boolean) as InvoiceLineDraft[];
+    setLines(copiedLines);
+    const party = parties.find(p => p.name === inv.party || p.phone === inv.partyPhone);
+    setSelectedParty(party);
+    setPartySearch(party ? `${party.name} ${party.phone}` : inv.party);
+    setPaid(0);
+    setInvoiceDiscount(inv.invoiceDiscount ?? 0);
+    setAdditionalCharges(inv.additionalCharges ?? 0);
+    setNotes(inv.notes ?? "");
+    setCreating(true);
+    notify(`Invoice ${inv.number} duplicated. Check and save as new invoice.`);
+  };
+  const editInvoice = (inv: Invoice) => {
+    const editLines = (inv.lines ?? []).map(line => {
+      const product = products.find(p => p.sku === line.sku);
+      return product ? { product, qty: line.quantity, discount: line.discount, taxRate: line.taxRate } : null;
+    }).filter(Boolean) as InvoiceLineDraft[];
+    if (!editLines.length) {
+      notify("This invoice items are not available in product master, cannot edit safely.");
+      return;
+    }
+    const party = parties.find(p => p.name === inv.party || p.phone === inv.partyPhone);
+    setEditingInvoice(inv);
+    setLines(editLines);
+    setSelectedParty(party);
+    setPartySearch(party ? `${party.name} ${party.phone}` : inv.party);
+    setPaid(inv.paidAmount ?? 0);
+    setPaymentMode((inv.paymentMode as "Cash"|"UPI"|"Card"|"Bank") || "Cash");
+    setInvoiceDiscount(inv.invoiceDiscount ?? 0);
+    setAdditionalCharges(inv.additionalCharges ?? 0);
+    setNotes(inv.notes ?? "");
+    setInvoiceDate(new Date(inv.date).toISOString().slice(0,10));
+    setMarkPaid((inv.paidAmount ?? 0) >= inv.amount);
+    setCreating(true);
+    notify(`Editing ${inv.number}`);
   };
   if(!creating) return (
     <>
@@ -5833,6 +6322,10 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
         rows={rows}
         onCreateNew={()=>setCreating(true)}
         onSelectInvoice={onSelectInvoice}
+        onEditInvoice={editInvoice}
+        onDeleteInvoice={deleteInvoice}
+        onCancelInvoice={cancelInvoice}
+        onDuplicateInvoice={duplicateInvoice}
         onOpenReportView={(reportName: string) => {
           if (onNavigateReports) {
             onNavigateReports(reportName);
@@ -6002,9 +6495,9 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
             </thead>
             <tbody>
               {lines.map((line, index) => {
-                const taxable = line.product.sellingPrice * line.qty - line.discount;
-                const currentTaxRate = line.taxRate ?? line.product.taxRate ?? 5;
-                const lineTax = (taxable * currentTaxRate) / 100;
+                const taxable = Math.max(0, line.product.sellingPrice * line.qty - line.discount);
+                const currentTaxRate = line.taxRate ?? line.product.taxRate ?? 0;
+                const lineTax = Math.round((taxable * currentTaxRate) / 100 * 100) / 100;
                 return (
                   <tr key={line.product.id}>
                     <td className="center-cell">{index + 1}</td>
@@ -6072,7 +6565,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
                 <div className="search-results">
                   {itemMatches.map(p => (
                     <button key={p.id} type="button" onClick={() => addLine(p)}>
-                      <div><strong>{p.name}</strong><small>{p.sku} · Stock {p.stock} · GST {p.taxRate ?? 5}%</small></div>
+                      <div><strong>{p.name}</strong><small>{p.sku} · Stock {p.stock} · GST {p.taxRate ?? 0}%</small></div>
                       <span>{money(p.sellingPrice)}</span>
                     </button>
                   ))}
@@ -6243,7 +6736,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
 
             <div className="ref-calc-row ref-balance-row">
               <strong className="ref-green-lbl">Balance Amount</strong>
-              <strong className="ref-green-val">{money(Math.max(0, total - paid))}</strong>
+              <strong className="ref-green-val">{money(Math.max(0, total - (markPaid ? total : paid)))}</strong>
             </div>
 
             <div className="ref-signature-area">
@@ -6958,6 +7451,7 @@ interface VoucherRecord {
   amount: number;
   status: string;
   notes?: string;
+  items?: Array<{ name: string; hsn: string; qty: number; price: number; amount: number }>;
 }
 
 function CreateQuotationScreen({
@@ -6969,6 +7463,7 @@ function CreateQuotationScreen({
   vouchers = [],
   onBack,
   onSave,
+  onProductsChanged,
   notify,
 }: {
   title: string;
@@ -6979,6 +7474,7 @@ function CreateQuotationScreen({
   vouchers?: VoucherRecord[];
   onBack: () => void;
   onSave: (rec: VoucherRecord) => void;
+  onProductsChanged?: (rows: Product[]) => void;
   notify: (msg: string) => void;
 }) {
   const [selectedParty, setSelectedParty] = useState<Party | undefined>(undefined);
@@ -6993,7 +7489,7 @@ function CreateQuotationScreen({
   const [validityDate, setValidityDate] = useState("09 Sep 2026");
   const [linkedInvoice, setLinkedInvoice] = useState("");
 
-  const [lines, setLines] = useState<Array<{ id: string; name: string; hsn: string; mrp: number; qty: number; price: number; discount: number; tax: number; amount: number }>>([]);
+  const [lines, setLines] = useState<Array<{ id: string; variantId: string | number; name: string; hsn: string; mrp: number; qty: number; price: number; discount: number; tax: number; amount: number }>>([]);
   const [itemSearchOpen, setItemSearchOpen] = useState(false);
   const [itemQuery, setItemQuery] = useState("");
 
@@ -7038,25 +7534,45 @@ function CreateQuotationScreen({
   const netAmount = Math.max(0, taxableAmount + Number(additionalCharges) - Number(overallDiscount));
   const finalTotal = autoRoundOff ? Math.round(netAmount) : netAmount;
 
-  const handleSaveQuotation = (keepNew = false) => {
+  const handleSaveQuotation = async (keepNew = false) => {
     const partyName = selectedParty ? selectedParty.name : customPartyName.trim();
     if (!partyName) {
       notify("Please select or add a Party");
       return;
     }
+    if (type === "Purchase Invoice" && lines.length === 0) {
+      notify("Please add at least one item to update stock");
+      return;
+    }
     const fullNumber = type === "Quotation" ? number : `${prefix}${number}`;
+    if (type === "Purchase Invoice") {
+      try {
+        await api.createPurchaseStockReceipt({
+          purchaseDate: new Date(date),
+          purchaseNumber: fullNumber,
+          partyName,
+          notes,
+          lines: lines.map(line => ({ variantId: line.variantId, quantity: line.qty, unitCost: line.price })),
+        });
+        if (onProductsChanged) onProductsChanged(await api.products());
+      } catch (error) {
+        notify(error instanceof Error ? error.message : "Purchase stock update failed");
+        return;
+      }
+    }
     const newRecord: VoucherRecord = {
       id: String(Date.now()),
-      date: "11 Aug 2026",
+      date: new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
       number: fullNumber,
       party: partyName,
       dueIn: `${validDays} Days`,
       amount: finalTotal || 1500,
       status: "Open",
       notes: notes || `${type} created in ERP`,
+      items: lines.map(line => ({ name: line.name, hsn: line.hsn, qty: line.qty, price: line.price, amount: line.amount })),
     };
     onSave(newRecord);
-    notify(`${type} ${fullNumber} created successfully`);
+    notify(type === "Purchase Invoice" ? `${type} ${fullNumber} saved and stock added` : `${type} ${fullNumber} created successfully`);
     if (keepNew) {
       setLines([]);
       setSelectedParty(undefined);
@@ -7068,14 +7584,16 @@ function CreateQuotationScreen({
   };
 
   const addItemToQuotation = (prod: Product) => {
-    const amount = prod.sellingPrice * 1;
+    const price = type === "Purchase Invoice" ? prod.purchasePrice : prod.sellingPrice;
+    const amount = price * 1;
     const newRow = {
       id: String(Date.now()) + Math.random(),
+      variantId: prod.id,
       name: prod.name,
       hsn: prod.hsnCode || "6205",
-      mrp: prod.mrp || prod.sellingPrice,
+      mrp: prod.mrp || price,
       qty: 1,
-      price: prod.sellingPrice,
+      price,
       discount: 0,
       tax: 5,
       amount,
@@ -7771,6 +8289,8 @@ function GenericVoucherPage({
   products = [],
   invoices = [],
   notify,
+  invoiceSetting = defaultInvoiceSetting,
+  onProductsChanged,
 }: {
   title: string;
   subtitle: string;
@@ -7781,9 +8301,14 @@ function GenericVoucherPage({
   products?: Product[];
   invoices?: Invoice[];
   notify: (msg: string) => void;
+  invoiceSetting?: InvoiceSetting;
+  onProductsChanged?: (rows: Product[]) => void;
 }) {
   const [creatingFullVoucher, setCreatingFullVoucher] = useState(false);
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false);
+  const [selectedVoucher, setSelectedVoucher] = useState<VoucherRecord | null>(null);
+  const purchaseDocumentRef = useRef<HTMLDivElement>(null);
+  const [purchasePdfDownloading, setPurchasePdfDownloading] = useState(false);
   const [records, setRecords] = useState<VoucherRecord[]>(() => {
     // 1. Check LocalStorage for user saved vouchers
     const stored = localStorage.getItem(`hb_vouchers_${type}`);
@@ -7848,6 +8373,63 @@ function GenericVoucherPage({
     localStorage.setItem(`hb_vouchers_${type}`, JSON.stringify(nextRecords));
   };
 
+  const getPurchaseInvoicePreview = (voucher: VoucherRecord): Invoice => {
+    const matchedParty = parties.find(p => p.name === voucher.party || voucher.party.startsWith(`${p.name} (`));
+    return {
+      id: voucher.id,
+      number: voucher.number,
+      date: voucher.date,
+      party: voucher.party,
+      partyPhone: matchedParty?.phone,
+      partyAddress: matchedParty?.address,
+      partyGstin: matchedParty?.gstin,
+      amount: voucher.amount,
+      paidAmount: voucher.status === "Open" ? 0 : voucher.amount,
+      paymentMode: "Cash",
+      status: voucher.status === "Open" ? "Unpaid" : "Paid",
+      lines: (voucher.items || []).map(item => ({
+        itemName: item.name,
+        sku: item.hsn || "",
+        quantity: item.qty,
+        unitPrice: item.price,
+        discount: 0,
+        taxRate: 0,
+        total: item.amount,
+      })),
+    };
+  };
+
+  const handlePurchaseDownloadPdf = async () => {
+    if (!purchaseDocumentRef.current || !selectedVoucher) return;
+    try {
+      setPurchasePdfDownloading(true);
+      await downloadInvoicePdf(purchaseDocumentRef.current, `Purchase_${selectedVoucher.number.replace(/[/\\?%*:|"<>]/g, "_")}`);
+    } catch (err) {
+      console.error(err);
+      notify("Purchase PDF download failed");
+    } finally {
+      setPurchasePdfDownloading(false);
+    }
+  };
+
+  const handleDeleteVoucher = async (voucher: VoucherRecord) => {
+    if (!window.confirm(`Delete ${type} ${voucher.number}?${type === "Purchase Invoice" ? " Stock will be reduced." : ""}`)) return;
+    try {
+      if (type === "Purchase Invoice" && !String(voucher.id).startsWith("db-") && !String(voucher.id).startsWith("party-")) {
+        await api.deletePurchaseStockReceipt(voucher.number);
+        if (onProductsChanged) onProductsChanged(await api.products());
+      }
+    } catch (error) {
+      notify(error instanceof Error ? error.message : `${type} delete failed`);
+      return;
+    }
+    const nextRecords = records.filter(row => row.id !== voucher.id);
+    setRecords(nextRecords);
+    localStorage.setItem(`hb_vouchers_${type}`, JSON.stringify(nextRecords));
+    if (selectedVoucher?.id === voucher.id) setSelectedVoucher(null);
+    notify(`${type} ${voucher.number} deleted`);
+  };
+
   if (creatingFullVoucher) {
     return (
       <CreateQuotationScreen
@@ -7859,8 +8441,134 @@ function GenericVoucherPage({
         vouchers={records}
         onBack={() => setCreatingFullVoucher(false)}
         onSave={handleSaveNewRecord}
+        onProductsChanged={onProductsChanged}
         notify={notify}
       />
+    );
+  }
+
+  if (selectedVoucher && type === "Purchase Invoice") {
+    const previewInvoice = getPurchaseInvoicePreview(selectedVoucher);
+    const paid = previewInvoice.paidAmount ?? 0;
+    const balance = Math.max(0, previewInvoice.amount - paid);
+    return (
+      <div className="modal-backdrop full-screen-modal-backdrop">
+        <div className="full-invoice-view-container card">
+          <div className="full-invoice-top-bar">
+            <div className="title-left">
+              <button className="secondary compact" onClick={() => setSelectedVoucher(null)}>← {type} {selectedVoucher.number}</button>
+              <span className={`pill ${selectedVoucher.status === "Converted" || selectedVoucher.status === "Completed" ? "success" : "danger"}`}>{selectedVoucher.status}</span>
+            </div>
+            <div className="actions-right">
+              <button className="secondary" onClick={handlePurchaseDownloadPdf} disabled={purchasePdfDownloading}>
+                <Download size={15} /> {purchasePdfDownloading ? "Downloading..." : "Download PDF"}
+              </button>
+              <button className="secondary" onClick={() => window.print()}>
+                <Printer size={15} /> Print PDF
+              </button>
+              <button className="whatsapp-btn" onClick={() => shareWhatsAppInvoice({ partyName: selectedVoucher.party, number: selectedVoucher.number, amount: selectedVoucher.amount, paidAmount: paid })}>
+                <MessageCircle size={15} /> Share
+              </button>
+              <button className="icon-button" onClick={() => handleDeleteVoucher(selectedVoucher)} style={{ color: "#dc2626" }} title="Delete">
+                <Trash2 size={18} />
+              </button>
+              <button className="icon-button" onClick={() => setSelectedVoucher(null)}>
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+
+          <div className="full-invoice-content-grid">
+            <div className="bill-document-preview-wrapper">
+              <BillOfSupplyTemplate ref={purchaseDocumentRef} invoice={previewInvoice} setting={invoiceSetting} />
+            </div>
+
+            <aside className="payment-history-drawer card">
+              <div className="drawer-head">
+                <h3>Purchase Summary</h3>
+              </div>
+              <div className="history-list">
+                <div className="history-item">
+                  <span>Purchase Amount</span>
+                  <strong>{money(previewInvoice.amount)}</strong>
+                </div>
+                <div className="history-item green">
+                  <span>Amount Paid</span>
+                  <strong>{money(paid)}</strong>
+                </div>
+                <div className="history-item">
+                  <span>Total Items</span>
+                  <strong>{previewInvoice.lines?.reduce((sum, line) => sum + line.quantity, 0) || 0}</strong>
+                </div>
+                <div className="history-item highlight">
+                  <span>Balance Amount</span>
+                  <strong className={balance > 0 ? "negative" : "positive"}>{money(balance)}</strong>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (selectedVoucher) {
+    return (
+      <div className="printable-report" style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 20, minHeight: "85vh" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, borderBottom: "1px solid #f1f5f9", paddingBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button type="button" className="icon-button" onClick={() => setSelectedVoucher(null)} title="Back">
+              <ArrowLeft size={18} />
+            </button>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a", margin: 0 }}>{type} #{selectedVoucher.number}</h1>
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button type="button" className="secondary" onClick={() => notify(`${type} ${selectedVoucher.number} print ready`)}>
+              <Printer size={15} /> Print PDF
+            </button>
+          </div>
+        </div>
+
+        <section style={{ border: "1px solid #dbe3ef", borderRadius: 8, overflow: "hidden", marginBottom: 16 }}>
+          <div style={{ background: "#f8fafc", borderBottom: "1px solid #dbe3ef", padding: "10px 16px", fontSize: 13, fontWeight: 700, color: "#334155" }}>{type} Details</div>
+          <div style={{ padding: 16, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 24, fontSize: 13 }}>
+            <div><span style={{ display: "block", color: "#64748b", marginBottom: 8 }}>Party Name</span><strong>{selectedVoucher.party}</strong></div>
+            <div><span style={{ display: "block", color: "#64748b", marginBottom: 8 }}>Date</span><strong>{selectedVoucher.date}</strong></div>
+            <div><span style={{ display: "block", color: "#64748b", marginBottom: 8 }}>Amount</span><strong>₹ {selectedVoucher.amount.toLocaleString("en-IN")}</strong></div>
+            <div><span style={{ display: "block", color: "#64748b", marginBottom: 8 }}>Status</span><strong>{selectedVoucher.status}</strong></div>
+            <div style={{ gridColumn: "1 / -1" }}><span style={{ display: "block", color: "#64748b", marginBottom: 8 }}>Notes</span><strong>{selectedVoucher.notes || "--"}</strong></div>
+          </div>
+        </section>
+
+        <section style={{ border: "1px solid #dbe3ef", borderRadius: 8, overflow: "hidden" }}>
+          <div style={{ background: "#fff", borderBottom: "1px solid #dbe3ef", padding: "12px 16px", fontSize: 13, fontWeight: 700, color: "#334155" }}>Items</div>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#f1f5f9", color: "#0f172a" }}>
+                <th style={{ padding: "12px 14px", textAlign: "left" }}>Item</th>
+                <th style={{ padding: "12px 14px", textAlign: "left" }}>HSN</th>
+                <th style={{ padding: "12px 14px", textAlign: "right" }}>Qty</th>
+                <th style={{ padding: "12px 14px", textAlign: "right" }}>Price</th>
+                <th style={{ padding: "12px 14px", textAlign: "right" }}>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(!selectedVoucher.items || selectedVoucher.items.length === 0) && (
+                <tr><td colSpan={5} style={{ padding: "24px 14px", textAlign: "center", color: "#64748b" }}>No item details available for this voucher</td></tr>
+              )}
+              {(selectedVoucher.items || []).map((item, idx) => (
+                <tr key={`${item.name}-${idx}`}>
+                  <td style={{ padding: "12px 14px", borderBottom: "1px solid #e2e8f0" }}>{item.name}</td>
+                  <td style={{ padding: "12px 14px", borderBottom: "1px solid #e2e8f0" }}>{item.hsn}</td>
+                  <td style={{ padding: "12px 14px", borderBottom: "1px solid #e2e8f0", textAlign: "right" }}>{item.qty}</td>
+                  <td style={{ padding: "12px 14px", borderBottom: "1px solid #e2e8f0", textAlign: "right" }}>₹ {item.price.toLocaleString("en-IN")}</td>
+                  <td style={{ padding: "12px 14px", borderBottom: "1px solid #e2e8f0", textAlign: "right" }}>₹ {item.amount.toLocaleString("en-IN")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      </div>
     );
   }
 
@@ -7980,11 +8688,14 @@ function GenericVoucherPage({
                     </span>
                   </td>
                   <td style={{ padding: "14px 16px", textAlign: "center" }}>
-                    <button type="button" className="secondary compact" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => notify(`${type} ${row.number} details viewed`)}>
+                    <button type="button" className="secondary compact" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => setSelectedVoucher(row)}>
                       View
                     </button>
-                    <button type="button" className="icon-pencil-btn" style={{ marginLeft: 6, padding: "4px 6px" }} onClick={() => notify(`${type} ${row.number} sent to print`)} title="Print">
+                    <button type="button" className="icon-pencil-btn" style={{ marginLeft: 6, padding: "4px 6px" }} onClick={() => type === "Purchase Invoice" ? setSelectedVoucher(row) : notify(`${type} ${row.number} sent to print`)} title="Print">
                       <Printer size={14} />
+                    </button>
+                    <button type="button" className="icon-pencil-btn" style={{ marginLeft: 6, padding: "4px 6px", color: "#dc2626" }} onClick={() => handleDeleteVoucher(row)} title="Delete">
+                      <Trash2 size={14} />
                     </button>
                   </td>
                 </tr>
@@ -8182,19 +8893,156 @@ interface PaymentInRecord {
   mode: string;
   notes?: string;
   invoiceRef?: string;
+  allocations?: Array<{ date: string; invoiceNumber: string; invoiceAmount: number; amountReceived: number; balanceAmount: number; discount: number; tds: number }>;
+}
+
+type PaymentInApiRow = Awaited<ReturnType<typeof api.paymentIns>>[number];
+
+function paymentInRecordFromApi(row: PaymentInApiRow, fallbackIndex: number): PaymentInRecord {
+  let meta: { paymentNumber?: string; prefix?: string; number?: string; partyName?: string; partyPhone?: string; discount?: number; notes?: string } = {};
+  try {
+    meta = row.reference ? JSON.parse(row.reference) : {};
+  } catch {
+    meta = { notes: row.reference || "" };
+  }
+  const allocation = row.allocations?.[0];
+  const invoice = allocation?.salesInvoice;
+  const party = invoice?.party;
+  const amount = Number(row.amount || 0);
+  const paidAt = new Date(row.paidAt);
+  const date = paidAt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  const number = meta.paymentNumber || `HB/PI/26-27/${fallbackIndex}`;
+  const numOnly = meta.number || number.split("/").pop() || String(fallbackIndex);
+  const prefix = meta.prefix || number.replace(numOnly, "");
+  const partyName = meta.partyName || party?.name || "Cash Sale";
+  const discount = Number(meta.discount || 0);
+  return {
+    id: row.id,
+    date,
+    number,
+    prefix,
+    numOnly,
+    partyName,
+    partyPhone: meta.partyPhone || party?.phone || "",
+    totalSettled: (row.allocations || []).reduce((sum, item) => sum + Number(item.amount || 0), 0),
+    amountReceived: amount,
+    discount,
+    mode: row.mode || "Cash",
+    notes: meta.notes || "",
+    invoiceRef: invoice?.invoiceNumber,
+    allocations: (row.allocations || []).map(item => {
+      const inv = item.salesInvoice;
+      const invoiceAmount = Number(inv?.grandTotal || 0);
+      const received = Number(item.amount || 0);
+      const paid = Number(inv?.paidAmount || 0);
+      return {
+        date: inv?.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "-",
+        invoiceNumber: inv?.invoiceNumber || "-",
+        invoiceAmount,
+        amountReceived: received,
+        balanceAmount: Math.max(0, invoiceAmount - paid),
+        discount: 0,
+        tds: 0,
+      };
+    }),
+  };
+}
+
+function amountPlain(value: number) {
+  return value.toLocaleString("en-IN", { minimumFractionDigits: value % 1 ? 2 : 0, maximumFractionDigits: 2 });
+}
+
+function sharePaymentInWhatsApp(record: PaymentInRecord) {
+  const lines = [
+    "Happy Bonding Men's Wear - Payment Receipt",
+    `Payment In: ${record.number}`,
+    `Party: ${record.partyName}`,
+    `Date: ${record.date}`,
+    `Amount Received: ${amountPlain(record.amountReceived)}`,
+    `Discount: ${amountPlain(record.discount)}`,
+    `Mode: ${record.mode}`,
+    record.notes ? `Notes: ${record.notes}` : "",
+  ].filter(Boolean);
+  const digits = (record.partyPhone || "").replace(/\D/g, "");
+  const targetPhone = digits.length === 10 ? `91${digits}` : digits.length > 10 ? digits : "";
+  const url = targetPhone
+    ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(lines.join("\n"))}`
+    : `https://wa.me/?text=${encodeURIComponent(lines.join("\n"))}`;
+  window.open(url, "_blank");
+}
+
+function PaymentInReceiptTemplate({ record }: { record: PaymentInRecord }) {
+  return (
+    <div style={{ width: 794, minHeight: 1123, background: "#fff", color: "#0f172a", fontFamily: "Arial, sans-serif", padding: 44, boxSizing: "border-box" }}>
+      <div style={{ borderBottom: "2px solid #111827", paddingBottom: 16, marginBottom: 22, display: "flex", justifyContent: "space-between", gap: 24 }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 24 }}>Happy Bonding Men's Wear</h1>
+          <p style={{ margin: "8px 0 0", fontSize: 12, color: "#475569" }}>Pavoorchatram</p>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <h2 style={{ margin: 0, fontSize: 20 }}>Payment In</h2>
+          <p style={{ margin: "8px 0 0", fontSize: 13, fontWeight: 700 }}>{record.number}</p>
+        </div>
+      </div>
+
+      <section style={{ border: "1px solid #dbe3ef", borderRadius: 6, overflow: "hidden", marginBottom: 20 }}>
+        <div style={{ background: "#f8fafc", padding: "10px 14px", fontSize: 13, fontWeight: 700 }}>Payment Details</div>
+        <div style={{ padding: 14, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", rowGap: 18, columnGap: 24, fontSize: 13 }}>
+          <div><span style={{ display: "block", color: "#64748b", marginBottom: 6 }}>Party Name</span><strong>{record.partyName}</strong></div>
+          <div><span style={{ display: "block", color: "#64748b", marginBottom: 6 }}>Payment Date</span><strong>{record.date}</strong></div>
+          <div><span style={{ display: "block", color: "#64748b", marginBottom: 6 }}>Payment Mode</span><strong>{record.mode}</strong></div>
+          <div><span style={{ display: "block", color: "#64748b", marginBottom: 6 }}>Amount Received</span><strong>{amountPlain(record.amountReceived)}</strong></div>
+          <div><span style={{ display: "block", color: "#64748b", marginBottom: 6 }}>Payment In Discount</span><strong>{amountPlain(record.discount)}</strong></div>
+          <div><span style={{ display: "block", color: "#64748b", marginBottom: 6 }}>Notes</span><strong>{record.notes || "--"}</strong></div>
+        </div>
+      </section>
+
+      <section style={{ border: "1px solid #dbe3ef", borderRadius: 6, overflow: "hidden" }}>
+        <div style={{ padding: "10px 14px", fontSize: 13, fontWeight: 700 }}>Invoices settled with this payment</div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <thead>
+            <tr style={{ background: "#f1f5f9" }}>
+              {["Date", "Invoice Number", "Invoice Amount", "TDS", "Discount", "Amount Received", "Balance Amount"].map(head => (
+                <th key={head} style={{ padding: "10px 8px", textAlign: head.includes("Amount") || head === "TDS" || head === "Discount" ? "right" : "left", borderTop: "1px solid #dbe3ef", borderBottom: "1px solid #dbe3ef" }}>{head}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {(!record.allocations || record.allocations.length === 0) && (
+              <tr><td colSpan={7} style={{ padding: 20, textAlign: "center", color: "#64748b" }}>No invoices have been settled with this payment</td></tr>
+            )}
+            {(record.allocations || []).map((item, idx) => (
+              <tr key={`${item.invoiceNumber}-${idx}`}>
+                <td style={{ padding: "10px 8px", borderBottom: "1px solid #e2e8f0" }}>{item.date}</td>
+                <td style={{ padding: "10px 8px", borderBottom: "1px solid #e2e8f0" }}>{item.invoiceNumber}</td>
+                <td style={{ padding: "10px 8px", borderBottom: "1px solid #e2e8f0", textAlign: "right" }}>{amountPlain(item.invoiceAmount)}</td>
+                <td style={{ padding: "10px 8px", borderBottom: "1px solid #e2e8f0", textAlign: "right" }}>{amountPlain(item.tds)}</td>
+                <td style={{ padding: "10px 8px", borderBottom: "1px solid #e2e8f0", textAlign: "right" }}>{amountPlain(item.discount)}</td>
+                <td style={{ padding: "10px 8px", borderBottom: "1px solid #e2e8f0", textAlign: "right" }}>{amountPlain(item.amountReceived)}</td>
+                <td style={{ padding: "10px 8px", borderBottom: "1px solid #e2e8f0", textAlign: "right" }}>{amountPlain(item.balanceAmount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    </div>
+  );
 }
 
 function PaymentInModule({
   parties,
   invoices = [],
   notify,
+  onDataChanged,
 }: {
   parties: Party[];
   invoices?: Invoice[];
   notify: (msg: string) => void;
+  onDataChanged?: () => Promise<void> | void;
 }) {
-  const [viewMode, setViewMode] = useState<"list" | "create" | "edit">("list");
+  const [viewMode, setViewMode] = useState<"list" | "create" | "edit" | "detail">("list");
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<PaymentInRecord | null>(null);
 
   useEffect(() => {
     if (!activeMenuId) return;
@@ -8207,53 +9055,21 @@ function PaymentInModule({
     };
   }, [activeMenuId]);
 
-  const [records, setRecords] = useState<PaymentInRecord[]>(() => {
-    const stored = localStorage.getItem("hb_payment_in_records");
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch {}
-    }
-
-    return [
-      {
-        id: "pi-1",
-        date: "21 Feb 2026",
-        number: "HB/PI/25-26/1",
-        prefix: "HB/PI/25-26/",
-        numOnly: "1",
-        partyName: "MY23 CHANDRU NATTARPATTI",
-        totalSettled: 849,
-        amountReceived: 849,
-        discount: 0,
-        mode: "Cash",
-        notes: "Payment received for invoice HB/SL/25-26/6990",
-        invoiceRef: "HB/SL/25-26/6990",
-      },
-      ...invoices.slice(0, 4).map((inv, idx) => ({
-        id: `pi-db-${inv.id}`,
-        date: inv.date,
-        number: `HB/PI/26-27/${idx + 2}`,
-        prefix: "HB/PI/26-27/",
-        numOnly: String(idx + 2),
-        partyName: inv.party,
-        partyPhone: inv.partyPhone,
-        totalSettled: inv.amount,
-        amountReceived: inv.amount,
-        discount: 0,
-        mode: idx % 2 === 0 ? "Cash" : "UPI",
-        notes: `Payment for invoice ${inv.number}`,
-        invoiceRef: inv.number,
-      })),
-    ];
-  });
+  const [records, setRecords] = useState<PaymentInRecord[]>([]);
 
   const [query, setQuery] = useState("");
   const [dateFilter, setDateFilter] = useState("Last 365 Days");
+  const [dateMenuOpen, setDateMenuOpen] = useState(false);
+  const [customDateRange, setCustomDateRange] = useState<CustomDateRange>({ from: "2025-08-16", to: "2026-08-15" });
+  const [invoiceQuery, setInvoiceQuery] = useState("");
+  const [invoiceDateFilter, setInvoiceDateFilter] = useState("Last 365 Days");
+  const [invoiceDateMenuOpen, setInvoiceDateMenuOpen] = useState(false);
+  const [invoiceCustomDateRange, setInvoiceCustomDateRange] = useState<CustomDateRange>({ from: "2025-08-16", to: "2026-08-15" });
 
   const [editingRecord, setEditingRecord] = useState<PaymentInRecord | null>(null);
   const [partyInput, setPartyInput] = useState("");
+  const [partySearch, setPartySearch] = useState("");
+  const [partyDropdownOpen, setPartyDropdownOpen] = useState(false);
   const [amountInput, setAmountInput] = useState("");
   const [discountInput, setDiscountInput] = useState("0");
   const [dateInput, setDateInput] = useState("2026-08-10");
@@ -8261,6 +9077,21 @@ function PaymentInModule({
   const [prefixInput, setPrefixInput] = useState("HB/PI/26-27/");
   const [numberInput, setNumberInput] = useState("1");
   const [notesInput, setNotesInput] = useState("");
+  const [numberLoading, setNumberLoading] = useState(false);
+  const paymentReceiptRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let alive = true;
+    api.paymentIns().then(rows => {
+      if (!alive) return;
+      const mapped = rows.map((row, idx) => paymentInRecordFromApi(row, rows.length - idx));
+      setRecords(mapped);
+      localStorage.setItem("hb_payment_in_records", JSON.stringify(mapped));
+    }).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const filtered = useMemo(() => {
     return records.filter(r => {
@@ -8268,26 +9099,78 @@ function PaymentInModule({
         const q = query.toLowerCase();
         if (!`${r.number} ${r.partyName} ${r.mode} ${r.notes}`.toLowerCase().includes(q)) return false;
       }
+      if (!isInvoiceInDateRange(r, dateFilter, customDateRange)) return false;
       return true;
     });
-  }, [records, query]);
+  }, [records, query, dateFilter, customDateRange]);
+
+  const partyInvoices = useMemo(() => {
+    if (!partyInput) return [];
+    const q = invoiceQuery.trim().toLowerCase();
+    return invoices.filter(inv => {
+      if (inv.party !== partyInput) return false;
+      if (q && !`${inv.number} ${inv.party} ${inv.status}`.toLowerCase().includes(q)) return false;
+      return isInvoiceInDateRange(inv, invoiceDateFilter, invoiceCustomDateRange);
+    });
+  }, [invoices, partyInput, invoiceQuery, invoiceDateFilter, invoiceCustomDateRange]);
+
+  const settledInvoiceRows = partyInvoices.filter(inv => Math.max(0, inv.amount - (inv.paidAmount ?? 0)) > 0);
+
+  const settledTotals = settledInvoiceRows.reduce((acc, inv) => acc + Math.max(0, inv.amount - (inv.paidAmount ?? 0)), 0);
+  const selectedPartyBalance = invoices
+    .filter(inv => inv.party === partyInput)
+    .reduce((sum, inv) => sum + Math.max(0, inv.amount - (inv.paidAmount ?? 0)), 0);
+  const partyMatches = useMemo(() => {
+    const q = partySearch.trim().toLowerCase();
+    return parties
+      .filter(p => !q || `${p.name} ${p.phone}`.toLowerCase().includes(q))
+      .slice(0, 20);
+  }, [parties, partySearch]);
+
+  useEffect(() => {
+    if (viewMode === "list" || !partyInput || editingRecord) return;
+    setAmountInput(String(settledTotals || ""));
+  }, [settledTotals, partyInput, viewMode, editingRecord]);
+
+  useEffect(() => {
+    if (viewMode !== "create") return;
+    let alive = true;
+    setNumberLoading(true);
+    api.nextPaymentInNumber(new Date(dateInput)).then(next => {
+      if (!alive) return;
+      setPrefixInput(next.prefix);
+      setNumberInput(String(next.number));
+    }).finally(() => {
+      if (alive) setNumberLoading(false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [dateInput, viewMode]);
 
   const handleOpenCreate = () => {
     setEditingRecord(null);
     setPartyInput("");
+    setPartySearch("");
+    setPartyDropdownOpen(false);
     setAmountInput("");
     setDiscountInput("0");
-    setDateInput("2026-08-10");
+    setDateInput("2026-08-15");
     setModeInput("Cash");
-    setPrefixInput("HB/PI/26-27/");
-    setNumberInput(String(records.length + 1));
     setNotesInput("");
     setViewMode("create");
+    setNumberLoading(true);
+    api.nextPaymentInNumber(new Date("2026-08-15")).then(next => {
+      setPrefixInput(next.prefix);
+      setNumberInput(String(next.number));
+    }).finally(() => setNumberLoading(false));
   };
 
   const handleOpenEdit = (rec: PaymentInRecord) => {
     setEditingRecord(rec);
     setPartyInput(rec.partyName);
+    setPartySearch(rec.partyName);
+    setPartyDropdownOpen(false);
     setAmountInput(String(rec.amountReceived));
     setDiscountInput(String(rec.discount || 0));
     setDateInput(rec.date.includes("2026") ? "2026-02-21" : "2026-08-10");
@@ -8307,12 +9190,16 @@ function PaymentInModule({
     notify("Payment In entry deleted successfully");
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!partyInput.trim()) {
       notify("Please select or enter a Party Name");
       return;
     }
     const amt = Number(amountInput) || 0;
+    if (amt <= 0) {
+      notify("Amount Received must be greater than zero");
+      return;
+    }
     const fullNum = `${prefixInput}${numberInput}`;
 
     if (viewMode === "edit" && editingRecord) {
@@ -8327,28 +9214,48 @@ function PaymentInModule({
         numOnly: numberInput,
         number: fullNum,
         notes: notesInput.trim(),
+        date: new Date(dateInput).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
       };
       const next = records.map(r => r.id === editingRecord.id ? updated : r);
       setRecords(next);
       localStorage.setItem("hb_payment_in_records", JSON.stringify(next));
       notify(`Payment In #${fullNum} updated successfully`);
     } else {
-      const newRec: PaymentInRecord = {
-        id: String(Date.now()),
-        date: "10 Aug 2026",
-        number: fullNum,
-        prefix: prefixInput,
-        numOnly: numberInput,
-        partyName: partyInput.trim(),
-        totalSettled: amt,
-        amountReceived: amt,
-        discount: Number(discountInput) || 0,
+      const selectedParty = parties.find(p => p.name === partyInput);
+      let remainingAllocation = Math.min(amt, settledTotals);
+      const allocationsPayload = settledInvoiceRows.flatMap(inv => {
+        if (remainingAllocation <= 0) return [];
+        const invoiceBalance = Math.max(0, inv.amount - (inv.paidAmount ?? 0));
+        const allocated = Math.min(invoiceBalance, remainingAllocation);
+        remainingAllocation -= allocated;
+        return [{ salesInvoiceId: inv.id, amount: allocated }];
+      });
+      const saved = await api.createPaymentIn({
+        amount: amt,
         mode: modeInput,
-        notes: notesInput.trim(),
-      };
-      const next = [newRec, ...records];
+        paidAt: new Date(dateInput),
+        reference: notesInput.trim(),
+        partyName: partyInput.trim(),
+        partyPhone: selectedParty?.phone || "",
+        paymentNumber: fullNum,
+        prefix: prefixInput,
+        number: numberInput,
+        discount: Number(discountInput) || 0,
+        allocations: allocationsPayload,
+      });
+      if (!saved) {
+        notify("Payment In save failed. Please check API/database connection.");
+        return;
+      }
+      const newRec = paymentInRecordFromApi(saved, Number(numberInput) || records.length + 1);
+      const next = [newRec, ...records.filter(r => r.id !== newRec.id)];
       setRecords(next);
       localStorage.setItem("hb_payment_in_records", JSON.stringify(next));
+      setQuery("");
+      setDateFilter("Last 365 Days");
+      setDateMenuOpen(false);
+      setCustomDateRange({ from: "2025-08-16", to: "2026-08-15" });
+      await onDataChanged?.();
       notify(`Payment In #${fullNum} saved successfully`);
     }
     setViewMode("list");
@@ -8390,17 +9297,48 @@ function PaymentInModule({
                   style={{ width: "100%", paddingLeft: 34, paddingRight: 10, height: 38, border: "1px solid #cbd5e1", borderRadius: 8, fontSize: 13, background: "#fff" }}
                 />
               </div>
-              <select
-                value={dateFilter}
-                onChange={e => setDateFilter(e.target.value)}
-                style={{ height: 38, padding: "0 12px", border: "1px solid #cbd5e1", borderRadius: 8, fontSize: 13, background: "#fff", color: "#334155" }}
-              >
-                <option value="Last 365 Days">📅 Last 365 Days ▾</option>
-                <option value="Today">Today</option>
-                <option value="Yesterday">Yesterday</option>
-                <option value="This Month">This Month</option>
-                <option value="All">All Time</option>
-              </select>
+              <div style={{ position: "relative", width: 220 }}>
+                <button
+                  type="button"
+                  onClick={() => setDateMenuOpen(open => !open)}
+                  style={{ width: "100%", height: 38, padding: "0 12px", border: "1px solid #cbd5e1", borderRadius: 8, fontSize: 13, background: "#fff", color: "#334155", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}
+                >
+                  <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Calendar size={15} color="#64748b" />
+                    {dateFilter === "Custom Range" ? customRangeLabel(customDateRange) : dateFilter}
+                  </span>
+                  <ChevronDown size={14} color="#64748b" />
+                </button>
+                {dateMenuOpen && dateFilter !== "Custom Range" && (
+                  <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, width: 260, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, boxShadow: "0 12px 28px rgba(15,23,42,.14)", zIndex: 999, padding: 6 }}>
+                    {REPORT_DATE_OPTIONS.map(opt => (
+                      <button
+                        key={opt.label}
+                        type="button"
+                        onClick={() => {
+                          setDateFilter(opt.label);
+                          if (opt.label === "Custom Range") return;
+                          setDateMenuOpen(false);
+                        }}
+                        style={{ width: "100%", border: 0, background: dateFilter === opt.label ? "#eef2ff" : "transparent", color: dateFilter === opt.label ? "#4f46e5" : "#334155", padding: "8px 10px", borderRadius: 6, textAlign: "left", fontSize: 12, display: "grid", gap: 2 }}
+                      >
+                        <span>{opt.label}</span>
+                        {opt.sub && <small style={{ color: "#94a3b8" }}>{opt.sub}</small>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {dateMenuOpen && dateFilter === "Custom Range" && (
+                  <CustomDateRangePopover
+                    range={customDateRange}
+                    onCancel={() => setDateMenuOpen(false)}
+                    onApply={range => {
+                      setCustomDateRange(range);
+                      setDateMenuOpen(false);
+                    }}
+                  />
+                )}
+              </div>
             </div>
 
             <button
@@ -8433,7 +9371,14 @@ function PaymentInModule({
                 {filtered.map((row, idx) => {
                   const isUpward = idx >= filtered.length - 2 || filtered.length <= 3;
                   return (
-                    <tr key={row.id} style={{ borderBottom: "1px solid #f1f5f9", fontSize: 13, color: "#1e293b", position: "relative" }}>
+                    <tr
+                      key={row.id}
+                      onClick={() => {
+                        setSelectedRecord(row);
+                        setViewMode("detail");
+                      }}
+                      style={{ borderBottom: "1px solid #f1f5f9", fontSize: 13, color: "#1e293b", position: "relative", cursor: "pointer" }}
+                    >
                       <td style={{ padding: "14px 16px", color: "#64748b" }}>{row.date}</td>
                       <td style={{ padding: "14px 16px" }} className="mono"><strong>{row.number}</strong></td>
                       <td style={{ padding: "14px 16px" }}><strong>{row.partyName}</strong></td>
@@ -8523,6 +9468,100 @@ function PaymentInModule({
     );
   }
 
+  if (viewMode === "detail" && selectedRecord) {
+    const receiptFileName = `${selectedRecord.number.replace(/[/\\?%*:|"<>]/g, "-")}_payment_in_${selectedRecord.partyName.replace(/[^a-z0-9]+/gi, "_")}`;
+    const handlePaymentDownload = async () => {
+      if (!paymentReceiptRef.current) return;
+      await downloadInvoicePdf(paymentReceiptRef.current, receiptFileName);
+    };
+    const handlePaymentPrint = async () => {
+      if (!paymentReceiptRef.current) return;
+      const printable = paymentReceiptRef.current.innerHTML;
+      const win = window.open("", "_blank", "width=900,height=700");
+      if (!win) return;
+      win.document.write(`<html><head><title>${selectedRecord.number}</title></head><body style="margin:0">${printable}</body></html>`);
+      win.document.close();
+      win.focus();
+      win.print();
+    };
+    return (
+      <div style={{ background: "#fff", minHeight: "85vh", padding: "0 4px" }}>
+        <div style={{ position: "fixed", left: -10000, top: 0 }}>
+          <div ref={paymentReceiptRef}>
+            <PaymentInReceiptTemplate record={selectedRecord} />
+          </div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button type="button" className="icon-button" onClick={() => setViewMode("list")} title="Back">
+              <ArrowLeft size={20} />
+            </button>
+            <h1 style={{ fontSize: 20, fontWeight: 600, color: "#0f172a", margin: 0 }}>Payment In #{selectedRecord.number}</h1>
+          </div>
+          <div style={{ display: "flex", gap: 12 }}>
+            <button type="button" className="secondary" onClick={() => handleOpenEdit(selectedRecord)}><Pencil size={15} /> Edit</button>
+            <button type="button" className="icon-button" style={{ border: "1px solid #cbd5e1", color: "#ef4444" }} onClick={() => handleDelete(selectedRecord.id)}><Trash2 size={15} /></button>
+            <button type="button" className="icon-button" style={{ border: "1px solid #cbd5e1" }}><Keyboard size={15} /></button>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 14, marginBottom: 16 }}>
+          <button type="button" className="secondary" onClick={handlePaymentDownload}><Download size={15} /> Download PDF</button>
+          <button type="button" className="secondary" onClick={handlePaymentPrint}><Printer size={15} /> Print PDF</button>
+          <button type="button" className="secondary"><CircleIndianRupee size={15} /></button>
+          <button type="button" className="secondary" onClick={() => sharePaymentInWhatsApp(selectedRecord)}><Share2 size={15} /> Share <ChevronDown size={14} /></button>
+        </div>
+
+        <section style={{ border: "1px solid #dbe3ef", borderRadius: 8, overflow: "hidden", marginBottom: 16 }}>
+          <div style={{ background: "#f8fafc", borderBottom: "1px solid #dbe3ef", padding: "10px 16px", fontSize: 13, fontWeight: 700, color: "#334155" }}>Payment Details</div>
+          <div style={{ padding: 16, display: "grid", gridTemplateColumns: "1.2fr 1.2fr 1.2fr 1.2fr 1.2fr", gap: 24, fontSize: 13 }}>
+            <div><span style={{ display: "block", color: "#64748b", marginBottom: 8 }}>Party Name</span><strong>{selectedRecord.partyName}</strong></div>
+            <div><span style={{ display: "block", color: "#64748b", marginBottom: 8 }}>Payment Date</span><strong>{selectedRecord.date}</strong></div>
+            <div><span style={{ display: "block", color: "#64748b", marginBottom: 8 }}>Amount Received</span><strong>{amountPlain(selectedRecord.amountReceived)}</strong></div>
+            <div><span style={{ display: "block", color: "#64748b", marginBottom: 8 }}>Payment In Discount</span><strong>{amountPlain(selectedRecord.discount)}</strong></div>
+            <div><span style={{ display: "block", color: "#64748b", marginBottom: 8 }}>Payment Mode</span><strong>{selectedRecord.mode}</strong></div>
+            <div style={{ gridColumn: "1 / -1" }}><span style={{ display: "block", color: "#64748b", marginBottom: 8 }}>Notes</span><strong>{selectedRecord.notes || "--"}</strong></div>
+          </div>
+        </section>
+
+        <section style={{ border: "1px solid #dbe3ef", borderRadius: 8, overflow: "hidden" }}>
+          <div style={{ background: "#fff", borderBottom: "1px solid #dbe3ef", padding: "12px 16px", fontSize: 13, fontWeight: 700, color: "#334155" }}>Invoices settled with this payment</div>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#f1f5f9", color: "#0f172a" }}>
+                <th style={{ padding: "12px 14px", textAlign: "left" }}>Date</th>
+                <th style={{ padding: "12px 14px", textAlign: "left" }}>Invoice Number</th>
+                <th style={{ padding: "12px 14px", textAlign: "right" }}>Invoice Amount</th>
+                <th style={{ padding: "12px 14px", textAlign: "right" }}>TDS</th>
+                <th style={{ padding: "12px 14px", textAlign: "right" }}>Discount</th>
+                <th style={{ padding: "12px 14px", textAlign: "right" }}>Amount Received</th>
+                <th style={{ padding: "12px 14px", textAlign: "right" }}>Balance Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(!selectedRecord.allocations || selectedRecord.allocations.length === 0) && (
+                <tr>
+                  <td colSpan={7} style={{ padding: "24px 14px", textAlign: "center", color: "#64748b" }}>No invoices have been settled with this payment</td>
+                </tr>
+              )}
+              {(selectedRecord.allocations || []).map((item, idx) => (
+                <tr key={`${item.invoiceNumber}-${idx}`}>
+                  <td style={{ padding: "12px 14px" }}>{item.date}</td>
+                  <td style={{ padding: "12px 14px" }}>{item.invoiceNumber}</td>
+                  <td style={{ padding: "12px 14px", textAlign: "right" }}>{amountPlain(item.invoiceAmount)}</td>
+                  <td style={{ padding: "12px 14px", textAlign: "right" }}>{amountPlain(item.tds)}</td>
+                  <td style={{ padding: "12px 14px", textAlign: "right" }}>{amountPlain(item.discount)}</td>
+                  <td style={{ padding: "12px 14px", textAlign: "right" }}>{amountPlain(item.amountReceived)}</td>
+                  <td style={{ padding: "12px 14px", textAlign: "right" }}>{amountPlain(item.balanceAmount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="printable-report" style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 20, minHeight: "85vh" }}>
       {/* Top Header Bar matching Image 2 & Image 4 */}
@@ -8558,15 +9597,49 @@ function PaymentInModule({
       </div>
 
       {/* Top 2 Cards Block matching Image 2 & Image 4 */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(420px, .9fr) minmax(560px, 1.2fr)", gap: 20, marginBottom: 24 }}>
         {/* Left Card */}
-        <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 16, background: "#fafafa", display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 16, background: "#fff", display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
             <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b", display: "block", marginBottom: 4 }}>Party Name</label>
+            <div style={{ position: "relative" }}>
+              <input
+                value={partySearch}
+                onFocus={() => setPartyDropdownOpen(true)}
+                onChange={e => {
+                  setPartySearch(e.target.value);
+                  setPartyInput("");
+                  setPartyDropdownOpen(true);
+                }}
+                placeholder="Search party by name or number"
+                style={{ width: "100%", height: 38, padding: "0 34px 0 12px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 13, background: "#fff" }}
+              />
+              <ChevronDown size={15} color="#64748b" style={{ position: "absolute", right: 10, top: 12 }} />
+              {partyDropdownOpen && (
+                <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, maxHeight: 260, overflow: "auto", background: "#fff", border: "1px solid #cbd5e1", borderRadius: 8, boxShadow: "0 12px 28px rgba(15,23,42,.14)", zIndex: 1000 }}>
+                  {partyMatches.map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setPartyInput(p.name);
+                        setPartySearch(`${p.name}${p.phone ? ` ${p.phone}` : ""}`);
+                        setPartyDropdownOpen(false);
+                      }}
+                      style={{ width: "100%", border: 0, borderBottom: "1px solid #eef2f7", background: "#fff", padding: "10px 12px", textAlign: "left", display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13, color: "#1e293b" }}
+                    >
+                      <span><strong>{p.name}</strong><small style={{ display: "block", color: "#64748b", marginTop: 2 }}>{p.phone || "No mobile number"}</small></span>
+                      <span style={{ color: "#475569", fontWeight: 700 }}>₹{p.balance.toLocaleString("en-IN")}</span>
+                    </button>
+                  ))}
+                  {!partyMatches.length && <div style={{ padding: 14, textAlign: "center", color: "#64748b", fontSize: 12 }}>No party found in database</div>}
+                </div>
+              )}
+            </div>
             <select
               value={partyInput}
               onChange={e => setPartyInput(e.target.value)}
-              style={{ width: "100%", height: 38, padding: "0 10px", border: "1px solid #cbd5e1", borderRadius: 8, fontSize: 13, background: "#fff" }}
+              style={{ display: "none" }}
             >
               <option value="">Search party by name or number ▾</option>
               {parties.map(p => (
@@ -8575,7 +9648,7 @@ function PaymentInModule({
                 </option>
               ))}
             </select>
-            {partyInput && <span style={{ fontSize: 11, color: "#64748b", marginTop: 4, display: "block" }}>Current Balance: ₹849</span>}
+            {partyInput && <span style={{ fontSize: 11, color: "#64748b", marginTop: 4, display: "block" }}>Current Balance: ₹{selectedPartyBalance.toLocaleString("en-IN")}</span>}
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -8631,16 +9704,17 @@ function PaymentInModule({
               <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b", display: "block", marginBottom: 4 }}>Payment In Prefix</label>
               <input
                 value={prefixInput}
-                onChange={e => setPrefixInput(e.target.value)}
-                style={{ width: "100%", height: 38, padding: "0 8px", border: "1px solid #cbd5e1", borderRadius: 8, fontSize: 12, background: "#fff" }}
+                readOnly
+                style={{ width: "100%", height: 38, padding: "0 8px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 12, background: "#f8fafc" }}
               />
             </div>
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b", display: "block", marginBottom: 4 }}>Payment In Number</label>
               <input
                 value={numberInput}
-                onChange={e => setNumberInput(e.target.value)}
-                style={{ width: "100%", height: 38, padding: "0 8px", border: "1px solid #cbd5e1", borderRadius: 8, fontSize: 12, background: "#fff" }}
+                readOnly
+                placeholder={numberLoading ? "..." : "1"}
+                style={{ width: "100%", height: 38, padding: "0 8px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 12, background: "#f8fafc" }}
               />
             </div>
           </div>
@@ -8691,11 +9765,54 @@ function PaymentInModule({
               </span>
               <div style={{ position: "relative", width: 160 }}>
                 <Search size={14} color="#94a3b8" style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)" }} />
-                <input placeholder="Search..." style={{ width: "100%", paddingLeft: 28, height: 32, border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 12 }} />
+                <input
+                  value={invoiceQuery}
+                  onChange={e => setInvoiceQuery(e.target.value)}
+                  placeholder="Search..."
+                  style={{ width: "100%", paddingLeft: 28, height: 32, border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 12 }}
+                />
               </div>
-              <select style={{ height: 32, padding: "0 8px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 12, color: "#334155" }}>
-                <option>📅 Select Date Range ▾</option>
-              </select>
+              <div style={{ position: "relative", width: 190 }}>
+                <button
+                  type="button"
+                  onClick={() => setInvoiceDateMenuOpen(open => !open)}
+                  style={{ width: "100%", height: 32, padding: "0 8px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 12, color: "#334155", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}
+                >
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {invoiceDateFilter === "Custom Range" ? customRangeLabel(invoiceCustomDateRange) : invoiceDateFilter}
+                  </span>
+                  <ChevronDown size={13} color="#64748b" />
+                </button>
+                {invoiceDateMenuOpen && invoiceDateFilter !== "Custom Range" && (
+                  <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, width: 260, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, boxShadow: "0 12px 28px rgba(15,23,42,.14)", zIndex: 999, padding: 6 }}>
+                    {REPORT_DATE_OPTIONS.map(opt => (
+                      <button
+                        key={opt.label}
+                        type="button"
+                        onClick={() => {
+                          setInvoiceDateFilter(opt.label);
+                          if (opt.label === "Custom Range") return;
+                          setInvoiceDateMenuOpen(false);
+                        }}
+                        style={{ width: "100%", border: 0, background: invoiceDateFilter === opt.label ? "#eef2ff" : "transparent", color: invoiceDateFilter === opt.label ? "#4f46e5" : "#334155", padding: "8px 10px", borderRadius: 6, textAlign: "left", fontSize: 12, display: "grid", gap: 2 }}
+                      >
+                        <span>{opt.label}</span>
+                        {opt.sub && <small style={{ color: "#94a3b8" }}>{opt.sub}</small>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {invoiceDateMenuOpen && invoiceDateFilter === "Custom Range" && (
+                  <CustomDateRangePopover
+                    range={invoiceCustomDateRange}
+                    onCancel={() => setInvoiceDateMenuOpen(false)}
+                    onApply={range => {
+                      setInvoiceCustomDateRange(range);
+                      setInvoiceDateMenuOpen(false);
+                    }}
+                  />
+                )}
+              </div>
             </div>
           </div>
 
@@ -8714,22 +9831,31 @@ function PaymentInModule({
               </tr>
             </thead>
             <tbody>
-              <tr style={{ borderBottom: "1px solid #f1f5f9", fontSize: 13, color: "#1e293b" }}>
-                <td style={{ padding: "14px 16px", textAlign: "center" }}>
-                  <input type="checkbox" defaultChecked />
-                </td>
-                <td style={{ padding: "14px 16px", color: "#64748b" }}>21 Feb 2026</td>
-                <td style={{ padding: "14px 16px", color: "#64748b" }}>23 Mar 2026</td>
-                <td style={{ padding: "14px 16px" }} className="mono"><strong>HB/SL/25-26/6990</strong></td>
-                <td style={{ padding: "14px 16px", textAlign: "right" }}>₹ 849</td>
-                <td style={{ padding: "14px 16px", textAlign: "right", color: "#2563eb", cursor: "pointer", fontWeight: 600 }}>Apply Discount</td>
-                <td style={{ padding: "14px 16px", textAlign: "right", fontWeight: 700 }}>₹ 849</td>
-              </tr>
+              {settledInvoiceRows.length === 0 && (
+                <tr>
+                  <td colSpan={7} style={{ padding: "24px 16px", textAlign: "center", color: "#64748b", fontSize: 13 }}>
+                    No backend invoices found for this party and date range
+                  </td>
+                </tr>
+              )}
+              {settledInvoiceRows.map(inv => (
+                <tr key={inv.id} style={{ borderBottom: "1px solid #f1f5f9", fontSize: 13, color: "#1e293b" }}>
+                  <td style={{ padding: "14px 16px", textAlign: "center" }}>
+                    <input type="checkbox" defaultChecked />
+                  </td>
+                  <td style={{ padding: "14px 16px", color: "#64748b" }}>{inv.date}</td>
+                  <td style={{ padding: "14px 16px", color: "#64748b" }}>-</td>
+                  <td style={{ padding: "14px 16px" }} className="mono"><strong>{inv.number}</strong></td>
+                  <td style={{ padding: "14px 16px", textAlign: "right" }}>₹ {inv.amount.toLocaleString("en-IN")}</td>
+                  <td style={{ padding: "14px 16px", textAlign: "right", color: "#2563eb", cursor: "pointer", fontWeight: 600 }}>Apply Discount</td>
+                  <td style={{ padding: "14px 16px", textAlign: "right", fontWeight: 700 }}>₹ {inv.amount.toLocaleString("en-IN")}</td>
+                </tr>
+              ))}
               <tr style={{ background: "#f8fafc", fontWeight: 700, fontSize: 13, color: "#0f172a" }}>
                 <td colSpan={4} style={{ padding: "12px 16px" }}>Total</td>
-                <td style={{ padding: "12px 16px", textAlign: "right" }}>₹ 849</td>
+                <td style={{ padding: "12px 16px", textAlign: "right" }}>₹ {settledTotals.toLocaleString("en-IN")}</td>
                 <td style={{ padding: "12px 16px", textAlign: "right" }}>₹ 0</td>
-                <td style={{ padding: "12px 16px", textAlign: "right" }}>₹ 849</td>
+                <td style={{ padding: "12px 16px", textAlign: "right" }}>₹ {settledTotals.toLocaleString("en-IN")}</td>
               </tr>
             </tbody>
           </table>

@@ -61,6 +61,7 @@ model Organization {
   sequences   DocumentSequence[]
   invoiceSetting InvoiceSetting?
   auditEvents AuditEvent[]
+  syncQueue   OfflineSyncQueue[]
 }
 
 model Branch {
@@ -359,4 +360,22 @@ model AuditEvent {
   actor          User?        @relation(fields: [actorId], references: [id])
 
   @@index([organizationId, occurredAt])
+}
+
+model OfflineSyncQueue {
+  id             String       @id @default(cuid())
+  organizationId String
+  branchId       String?
+  entityType     String
+  entityId       String
+  operation      String
+  payload        Json
+  status         String       @default("PENDING")
+  attempts       Int          @default(0)
+  lastError      String?
+  createdAt      DateTime     @default(now())
+  syncedAt       DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, branchId, status, createdAt])
 }

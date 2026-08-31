@@ -20,10 +20,16 @@ export interface Party {
 export interface InvoiceLineItem {
   itemName: string;
   sku: string;
+  hsnCode?: string;
   quantity: number;
   unitPrice: number;
+  purchasePrice?: number;
   discount: number;
   taxRate: number;
+  taxableAmount?: number;
+  cgst?: number;
+  sgst?: number;
+  igst?: number;
   total: number;
 }
 
@@ -38,7 +44,17 @@ export interface Invoice {
   amount: number;
   paidAmount?: number;
   paymentMode?: string;
-  status: "Paid" | "Partially paid" | "Unpaid";
+  subtotal?: number;
+  discountTotal?: number;
+  invoiceDiscount?: number;
+  additionalCharges?: number;
+  taxableTotal?: number;
+  cgstTotal?: number;
+  sgstTotal?: number;
+  igstTotal?: number;
+  notes?: string;
+  dueDate?: string;
+  status: "Paid" | "Partially paid" | "Unpaid" | "Cancelled";
   dueDays?: number;
   lines?: InvoiceLineItem[];
 }
@@ -48,4 +64,32 @@ export interface InvoiceSetting {
   bankName?: string; accountName?: string; accountNumber?: string; ifsc?: string;
   upiId?: string; qrText?: string; signatureText?: string; signatureUrl?: string;
   sequenceNumber?: string; showPurchasePrice?: boolean; showItemImage?: boolean; priceHistory?: boolean; theme?: string;
+}
+
+export interface Branch {
+  id: string;
+  code: string;
+  name: string;
+  address?: string | null;
+  phone?: string | null;
+}
+
+export interface OwnerBranchSummary {
+  branchId: string;
+  branchName: string;
+  code: string;
+  salesTotal: number;
+  paymentIn: number;
+  paymentOut: number;
+  stockQty: number;
+  invoiceCount: number;
+}
+
+export interface StaffUser {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  role: string;
+  branches: Branch[];
 }
