@@ -15,7 +15,7 @@ export interface Expense {
 
 export interface Product {
   id: string | number; name: string; sku: string; category: string; size: string;
-  stock: number; purchasePrice: number; sellingPrice: number; mrp: number; hsnCode?: string; taxRate?: number;
+  stock: number; purchasePrice: number; sellingPrice: number; mrp: number; hsnCode?: string; taxRate?: number; unit?: string;
 }
 
 export interface Party {

@@ -97,7 +97,7 @@ export function ThermalReceiptTemplate({
         <div
           style={{
             display: "flex",
-            justify: "space-between",
+            justifyContent: "space-between",
             fontWeight: "bold",
             fontSize: is58 ? "13px" : "14px",
             marginTop: 4,

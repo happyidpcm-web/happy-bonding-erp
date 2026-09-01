@@ -61,7 +61,7 @@ export function BarcodeGeneratorModal({
             padding: "16px 20px",
             borderBottom: "1px solid #e2e8f0",
             display: "flex",
-            justify: "space-between",
+            justifyContent: "space-between",
             alignItems: "center",
           }}
         >
@@ -145,7 +145,7 @@ export function BarcodeGeneratorModal({
                         cursor: "pointer",
                         background: selectedProduct?.id === prod.id ? "#eef2ff" : "#fff",
                         display: "flex",
-                        justify: "space-between",
+                        justifyContent: "space-between",
                         alignItems: "center",
                       }}
                     >

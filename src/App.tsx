@@ -557,7 +557,7 @@ export default function App() {
 
         {page === "reports" && <Reports products={productRows} invoices={invoiceRows} notify={notify} initialReport={activeReportSubScreen}/>} 
         {page === "cash" && <CashBank notify={notify}/>} 
-        {page === "pos" && <POS products={productRows} invoices={invoiceRows} setInvoices={setInvoiceRows} setProducts={setProductRows} notify={notify} apiMode={apiMode}/>} 
+        {page === "pos" && <Sales rows={invoiceRows} products={productRows} parties={partyRows} setting={invoiceSetting} setSetting={setInvoiceSetting} setRows={setInvoiceRows} setParties={setPartyRows} setProducts={setProductRows} notify={notify} autoCreateKey={Date.now()} onSelectInvoice={openInvoiceDetail} onNavigateReports={handleNavigateReportsFromSales}/>} 
         {page === "staff" && <Staff/>} 
         {page === "settings" && <SettingsPage notify={notify}/>} 
       </section>
@@ -8274,6 +8274,7 @@ interface VoucherRecord {
   date: string;
   number: string;
   party: string;
+  amount: number;
   invoiceRef?: string;
   dueIn?: string;
   status: string;
