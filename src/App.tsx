@@ -175,6 +175,7 @@ export default function App() {
   const [ownerSummary, setOwnerSummary] = useState<OwnerBranchSummary[]>([]);
   const [branchModalOpen, setBranchModalOpen] = useState(false);
   const [staffModalOpen, setStaffModalOpen] = useState(false);
+  const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [salesCreateKey, setSalesCreateKey] = useState(0);
 
@@ -526,7 +527,10 @@ export default function App() {
         <div className="top-actions">
           <button className="icon-button" title="Sync Offline Changes" onClick={handleSyncNow}><CheckSquare size={19}/></button>
           <button className="icon-button" title="Search ERP"><Search size={19}/></button>
-          <div className="user-profile-badge" title="Saravana Kumar (Store Admin)">
+          <button className="secondary compact" style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 10px", fontSize: 12, cursor: "pointer" }} onClick={() => setChangePasswordModalOpen(true)} title="Change Password">
+            🔑 Change Password
+          </button>
+          <div className="user-profile-badge" title="Saravana Kumar (Store Admin) - Click to change password" onClick={() => setChangePasswordModalOpen(true)} style={{ cursor: "pointer" }}>
             <div className="avatar">SK</div>
             <div className="user-info-text">
               <strong>Saravana Kumar</strong>
@@ -567,7 +571,63 @@ export default function App() {
     {activeInvoiceModal && <InvoiceDetailModal invoice={activeInvoiceModal} setting={invoiceSetting} notify={notify} onPaymentSaved={refreshActiveInvoiceAfterPayment} onClose={() => setActiveInvoiceModal(null)} />}
     {branchModalOpen && <BranchManagementModal branches={branchRows} onClose={() => setBranchModalOpen(false)} onSaved={async () => { await refreshAppData(); setBranchModalOpen(false); notify("Branch saved"); }} notify={notify} />}
     {staffModalOpen && <StaffManagementModal branches={branchRows} onClose={() => setStaffModalOpen(false)} notify={notify} />}
+    {changePasswordModalOpen && <ChangePasswordModal onClose={() => setChangePasswordModalOpen(false)} notify={notify} />}
   </div>;
+}
+
+function ChangePasswordModal({ onClose, notify }: { onClose: () => void; notify: (msg: string) => void }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [showPass, setShowPass] = useState(false);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (newPassword.length < 6) {
+      notify("New password must be at least 6 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      notify("New passwords do not match!");
+      return;
+    }
+    try {
+      setSaving(true);
+      await api.changePassword(currentPassword, newPassword);
+      notify("✅ Password changed successfully!");
+      onClose();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Password change failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal title="🔑 Change My Password" onClose={onClose}>
+      <form className="form-grid" onSubmit={handleSubmit} style={{ gap: 12 }}>
+        <label className="full">Current Password
+          <div style={{ position: "relative", width: "100%" }}>
+            <input type={showPass ? "text" : "password"} value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required placeholder="Enter current password" style={{ width: "100%", paddingRight: 40 }} />
+            <button type="button" onClick={() => setShowPass(!showPass)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", border: "none", background: "transparent", cursor: "pointer", color: "#64748b" }}>
+              {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+        </label>
+        <label className="full">New Password
+          <input type={showPass ? "text" : "password"} value={newPassword} onChange={e => setNewPassword(e.target.value)} minLength={6} required placeholder="Enter new password (min 6 chars)" />
+        </label>
+        <label className="full">Confirm New Password
+          <input type={showPass ? "text" : "password"} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} minLength={6} required placeholder="Re-enter new password" />
+        </label>
+        <div className="modal-actions full">
+          <button type="button" className="secondary" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="primary" disabled={saving}>{saving ? "Updating..." : "Update Password"}</button>
+        </div>
+      </form>
+    </Modal>
+  );
 }
 
 function BranchManagementModal({ branches, onClose, onSaved, notify }: { branches: Branch[]; onClose: () => void; onSaved: () => void; notify: (msg: string) => void }) {
@@ -612,7 +672,29 @@ function BranchManagementModal({ branches, onClose, onSaved, notify }: { branche
 function StaffManagementModal({ branches, onClose, notify }: { branches: Branch[]; onClose: () => void; notify: (msg: string) => void }) {
   const [staffRows, setStaffRows] = useState<StaffUser[]>([]);
   const [saving, setSaving] = useState(false);
+  const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
+  const [newStaffPassword, setNewStaffPassword] = useState("");
+
   useEffect(() => { api.staff().then(setStaffRows).catch(() => setStaffRows([])); }, []);
+
+  const handleResetPassword = async (staffId: string) => {
+    if (!newStaffPassword || newStaffPassword.length < 6) {
+      notify("Password must be at least 6 characters");
+      return;
+    }
+    try {
+      setSaving(true);
+      await api.updateStaffPassword(staffId, newStaffPassword);
+      notify("✅ Staff password updated successfully!");
+      setEditingStaffId(null);
+      setNewStaffPassword("");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Failed to update staff password");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -627,7 +709,7 @@ function StaffManagementModal({ branches, onClose, notify }: { branches: Branch[
         branchIds,
       });
       setStaffRows(prev => [row, ...prev]);
-      notify("Staff login created");
+      notify("Staff login created with custom password");
       event.currentTarget.reset();
     } catch (error) {
       notify(error instanceof Error ? error.message : "Staff save failed");
@@ -637,22 +719,68 @@ function StaffManagementModal({ branches, onClose, notify }: { branches: Branch[
   };
 
   return (
-    <Modal title="Staff Login Per Branch" onClose={onClose} wide>
-      <div className="table-scroll" style={{ maxHeight: 180, marginBottom: 16 }}>
-        <table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Branches</th></tr></thead><tbody>
-          {staffRows.map(user => <tr key={user.id}><td><strong>{user.name}</strong></td><td>{user.email}</td><td>{user.role}</td><td>{user.branches.map(b => b.name).join(", ")}</td></tr>)}
-        </tbody></table>
+    <Modal title="Staff Login & Password Control" onClose={onClose} wide>
+      <div className="table-scroll" style={{ maxHeight: 220, marginBottom: 16 }}>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Branches</th>
+              <th style={{ textAlign: "right" }}>Password Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {staffRows.map(user => (
+              <tr key={user.id}>
+                <td><strong>{user.name}</strong></td>
+                <td>{user.email}</td>
+                <td><span className="pill neutral">{user.role}</span></td>
+                <td>{user.branches.map(b => b.name).join(", ")}</td>
+                <td style={{ textAlign: "right" }}>
+                  {editingStaffId === user.id ? (
+                    <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                      <input
+                        type="password"
+                        placeholder="New Password"
+                        value={newStaffPassword}
+                        onChange={e => setNewStaffPassword(e.target.value)}
+                        style={{ width: 120, padding: "4px 8px", fontSize: 12, borderRadius: 6, border: "1px solid #cbd5e1" }}
+                      />
+                      <button className="primary compact" type="button" onClick={() => handleResetPassword(user.id)} disabled={saving}>Save</button>
+                      <button className="secondary compact" type="button" onClick={() => setEditingStaffId(null)}>Cancel</button>
+                    </div>
+                  ) : (
+                    <button className="secondary compact" type="button" onClick={() => { setEditingStaffId(user.id); setNewStaffPassword(""); }}>
+                      🔑 Reset Password
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
       <form className="form-grid" onSubmit={handleSubmit}>
-        <label>Name<input name="name" required /></label>
-        <label>Email<input name="email" type="email" required /></label>
-        <label>Phone<input name="phone" /></label>
-        <label>Password<input name="password" type="password" minLength={8} required /></label>
+        <label>Name<input name="name" required placeholder="Staff name" /></label>
+        <label>Email<input name="email" type="email" required placeholder="staff@happybonding.in" /></label>
+        <label>Phone<input name="phone" placeholder="Phone number" /></label>
+        <label>Initial Password<input name="password" type="password" minLength={6} required placeholder="Set password (min 6 chars)" /></label>
         <div className="full" style={{ display: "grid", gap: 8 }}>
           <span style={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Branch Access</span>
-          {branches.map(branch => <label key={branch.id} style={{ display: "flex", alignItems: "center", gap: 8 }}><input type="checkbox" name="branchIds" value={branch.id} /> {branch.name}</label>)}
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            {branches.map(branch => (
+              <label key={branch.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input type="checkbox" name="branchIds" value={branch.id} defaultChecked={branches.length === 1} /> {branch.name}
+              </label>
+            ))}
+          </div>
         </div>
-        <div className="modal-actions full"><button type="button" className="secondary" onClick={onClose} disabled={saving}>Close</button><button className="primary" disabled={saving}>{saving ? "Saving..." : "Create Staff Login"}</button></div>
+        <div className="modal-actions full">
+          <button type="button" className="secondary" onClick={onClose} disabled={saving}>Close</button>
+          <button className="primary" disabled={saving}>{saving ? "Saving..." : "Create Staff Account"}</button>
+        </div>
       </form>
     </Modal>
   );

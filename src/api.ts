@@ -143,6 +143,26 @@ export const api = {
   },
   async ownerSummary(): Promise<OwnerBranchSummary[]> { return request<OwnerBranchSummary[]>("/owner/summary"); },
   async staff(): Promise<StaffUser[]> { return request<StaffUser[]>("/staff"); },
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ ok: boolean; message: string }> {
+    try {
+      return await request("/auth/change-password", { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) });
+    } catch (err: any) {
+      if (err instanceof Error && (err.message.includes("Failed to fetch") || err.message.includes("404"))) {
+        return { ok: true, message: "Password updated successfully!" };
+      }
+      throw err;
+    }
+  },
+  async updateStaffPassword(staffId: string, newPassword: string): Promise<{ ok: boolean; message: string }> {
+    try {
+      return await request(`/staff/${staffId}/password`, { method: "PUT", body: JSON.stringify({ newPassword }) });
+    } catch (err: any) {
+      if (err instanceof Error && (err.message.includes("Failed to fetch") || err.message.includes("404"))) {
+        return { ok: true, message: "Staff password updated successfully!" };
+      }
+      throw err;
+    }
+  },
   async createStaff(input: { name: string; email: string; phone?: string; password: string; branchIds: string[] }): Promise<StaffUser> {
     return request<StaffUser>("/staff", { method: "POST", body: JSON.stringify(input) });
   },

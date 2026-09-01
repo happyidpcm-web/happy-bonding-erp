@@ -149,6 +149,44 @@ app.post("/api/staff", requirePermission("settings.write"), async (req, res) => 
   res.status(201).json({ id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role.name, branches: user.branches.map(x => x.branch) });
 });
 
+app.post("/api/auth/change-password", async (req, res) => {
+  const userId = req.session!.userId;
+  const currentPassword = String(req.body?.currentPassword ?? "");
+  const newPassword = String(req.body?.newPassword ?? "");
+  if (!currentPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: "Current password and new password (minimum 6 characters) are required" });
+  }
+  const user = await db.user.findUnique({ where: { id: userId } });
+  if (!user || !(await compare(currentPassword, user.passwordHash))) {
+    return res.status(401).json({ error: "Current password is incorrect" });
+  }
+  const newHash = await hash(newPassword, 12);
+  await db.user.update({
+    where: { id: userId },
+    data: { passwordHash: newHash, tokenVersion: { increment: 1 } },
+  });
+  await audit(req, "auth.password_changed", "User", userId);
+  res.json({ ok: true, message: "Password updated successfully" });
+});
+
+app.put("/api/staff/:id/password", requirePermission("settings.write"), async (req, res) => {
+  const organizationId = req.session!.organizationId;
+  const staffId = String(req.params.id || "");
+  const newPassword = String(req.body?.newPassword ?? "");
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: "New password must be at least 6 characters" });
+  }
+  const staffUser = await db.user.findFirst({ where: { id: staffId, organizationId, active: true } });
+  if (!staffUser) return res.status(404).json({ error: "Staff user not found" });
+  const newHash = await hash(newPassword, 12);
+  await db.user.update({
+    where: { id: staffUser.id },
+    data: { passwordHash: newHash, tokenVersion: { increment: 1 } },
+  });
+  await audit(req, "staff.password_reset", "User", staffUser.id, { staffEmail: staffUser.email });
+  res.json({ ok: true, message: "Staff password reset successfully" });
+});
+
 app.get("/api/sync/status", async (req, res) => {
   const rows = await db.offlineSyncQueue.groupBy({
     by: ["status"],
