@@ -253,21 +253,11 @@ export default function App() {
   };
   const [pendingSwitchBranch, setPendingSwitchBranch] = useState<{ id: string; name: string } | null>(null);
   const currentBranch = branchRows.find(branch => branch.id === currentBranchId) || branchRows[0];
-  const handleBranchChange = async (branchId: string) => {
+  const handleBranchChange = (branchId: string) => {
     if (branchId === currentBranchId) return;
     const targetBranch = branchRows.find(b => b.id === branchId);
     if (!targetBranch) return;
-    try {
-      const res = await api.switchBranch(branchId);
-      if (res.ok) {
-        api.setCurrentBranch(branchId);
-        setCurrentBranchId(branchId);
-        notify(`Switched to branch: ${targetBranch.name}`);
-        await refreshAppData();
-      }
-    } catch (err: any) {
-      setPendingSwitchBranch({ id: branchId, name: targetBranch.name });
-    }
+    setPendingSwitchBranch({ id: branchId, name: targetBranch.name });
   };
 
 
@@ -1005,7 +995,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
         <form onSubmit={submit}>
           <label>
             Email address
-            <input name="email" type="email" defaultValue="admin@happybonding.in" required />
+            <input name="email" type="email" placeholder="e.g. admin@happybonding.in" required />
           </label>
           <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             Password
@@ -1013,7 +1003,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
               <input
                 name="password"
                 type={showPassword ? "text" : "password"}
-                defaultValue="HappyBonding@2026"
+                placeholder="Enter password"
                 required
                 style={{ width: "100%", paddingRight: 40 }}
               />
