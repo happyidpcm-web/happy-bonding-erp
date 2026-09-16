@@ -1237,7 +1237,7 @@ app.post("/api/admin/reset-transactions", requirePermission("settings.write"), a
   const organizationId = req.session!.organizationId;
   const { doubleConfirmation, clearProducts, clearParties } = req.body;
 
-  if (doubleConfirmation !== "RESET_LIVE") {
+  if (String(doubleConfirmation ?? "").trim().toUpperCase() !== "RESET_LIVE") {
     return res.status(400).json({ error: "Safety check failed. Type 'RESET_LIVE' to confirm." });
   }
 

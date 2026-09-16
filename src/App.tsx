@@ -12004,15 +12004,24 @@ function SettingsPage({
             </div>
 
             <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 6 }}>
-                To confirm, type <code style={{ color: "#dc2626", fontWeight: 700 }}>RESET_LIVE</code> below:
-              </label>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>
+                  To confirm, type <code style={{ color: "#dc2626", fontWeight: 700 }}>RESET_LIVE</code> below:
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setResetConfirmInput("RESET_LIVE")}
+                  style={{ background: "#eff6ff", border: "1px solid #bfdbfe", color: "#1d4ed8", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: "pointer" }}
+                >
+                  ⚡ Click to Auto-Fill RESET_LIVE
+                </button>
+              </div>
               <input
                 type="text"
                 placeholder="Type RESET_LIVE"
                 value={resetConfirmInput}
                 onChange={e => setResetConfirmInput(e.target.value)}
-                style={{ width: "100%", padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: 6 }}
+                style={{ width: "100%", padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: 6, fontWeight: 600 }}
               />
             </div>
 
@@ -12021,8 +12030,8 @@ function SettingsPage({
               <button
                 type="submit"
                 className="primary"
-                style={{ background: "#dc2626", color: "#fff", borderColor: "#dc2626" }}
-                disabled={resetConfirmInput !== "RESET_LIVE" || resetting}
+                style={{ background: resetConfirmInput.trim().toUpperCase() === "RESET_LIVE" ? "#dc2626" : "#cbd5e1", color: "#fff", borderColor: resetConfirmInput.trim().toUpperCase() === "RESET_LIVE" ? "#dc2626" : "#cbd5e1", cursor: resetConfirmInput.trim().toUpperCase() === "RESET_LIVE" ? "pointer" : "not-allowed" }}
+                disabled={resetConfirmInput.trim().toUpperCase() !== "RESET_LIVE" || resetting}
               >
                 {resetting ? "Clearing..." : "Yes, Clear Database for Live Launch"}
               </button>
