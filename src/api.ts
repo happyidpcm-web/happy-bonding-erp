@@ -90,9 +90,11 @@ async function request<T>(path: string, options?: RequestInit, isRetry = false):
       const loginBody = await loginRes.json();
       if (loginRes.ok && loginBody.token) {
         token = loginBody.token as string;
-        branch = (loginBody.branchIds?.[0] as string) || null;
         localStorage.setItem(TOKEN_KEY, token);
-        if (branch) localStorage.setItem(BRANCH_KEY, branch);
+        if (!branch && loginBody.branchIds?.[0]) {
+          branch = loginBody.branchIds[0];
+          if (branch) localStorage.setItem(BRANCH_KEY, branch);
+        }
       }
     } catch {}
   }
@@ -118,7 +120,9 @@ async function request<T>(path: string, options?: RequestInit, isRetry = false):
       const loginBody = await loginRes.json();
       if (loginRes.ok && loginBody.token) {
         localStorage.setItem(TOKEN_KEY, loginBody.token);
-        if (loginBody.branchIds?.[0]) localStorage.setItem(BRANCH_KEY, loginBody.branchIds[0]);
+        if (!localStorage.getItem(BRANCH_KEY) && loginBody.branchIds?.[0]) {
+          localStorage.setItem(BRANCH_KEY, loginBody.branchIds[0]);
+        }
         return request<T>(path, options, true);
       }
     } catch {
@@ -138,9 +142,23 @@ export const api = {
   currentBranchId() { return localStorage.getItem(BRANCH_KEY) || ""; },
   setCurrentBranch(branchId: string) { localStorage.setItem(BRANCH_KEY, branchId); },
   async branches(): Promise<Branch[]> { return request<Branch[]>("/branches"); },
-  async createBranch(input: { code: string; name: string; address?: string; phone?: string }): Promise<Branch> {
+  async createBranch(input: { code: string; name: string; address?: string; phone?: string; email?: string; password?: string }): Promise<Branch> {
     return request<Branch>("/branches", { method: "POST", body: JSON.stringify(input) });
   },
+  async updateBranch(id: string, input: { code: string; name: string; address?: string; phone?: string; email?: string; password?: string }): Promise<Branch> {
+    return request<Branch>(`/branches/${id}`, { method: "PUT", body: JSON.stringify(input) });
+  },
+
+  async switchBranch(branchId: string, email?: string, password?: string): Promise<{ ok: boolean; token: string; branchId: string; branchName: string }> {
+    const res = await request<{ ok: boolean; token: string; branchId: string; branchName: string }>("/branches/switch", {
+      method: "POST",
+      body: JSON.stringify({ branchId, email, password }),
+    });
+    if (res.token) localStorage.setItem(TOKEN_KEY, res.token);
+    if (res.branchId) localStorage.setItem(BRANCH_KEY, res.branchId);
+    return res;
+  },
+
   async ownerSummary(): Promise<OwnerBranchSummary[]> { return request<OwnerBranchSummary[]>("/owner/summary"); },
   async staff(): Promise<StaffUser[]> { return request<StaffUser[]>("/staff"); },
   async changePassword(currentPassword: string, newPassword: string): Promise<{ ok: boolean; message: string }> {
@@ -493,6 +511,12 @@ export const api = {
     return request<{ ok: boolean; message: string }>("/backup/restore", {
       method: "POST",
       body: JSON.stringify({ backupData, doubleConfirmation: true, understandingText }),
+    });
+  },
+  async resetTransactions(payload: { doubleConfirmation: string; clearProducts?: boolean; clearParties?: boolean }) {
+    return request<{ ok: boolean; message: string }>("/admin/reset-transactions", {
+      method: "POST",
+      body: JSON.stringify(payload),
     });
   },
 };

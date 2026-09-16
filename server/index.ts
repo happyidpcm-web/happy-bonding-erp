@@ -38,7 +38,14 @@ async function ensureAdminUser() {
       where: { email: "admin@happybonding.in" }, update: { passwordHash, roleId: role.id },
       create: { organizationId: organization.id, roleId: role.id, name: "Saravana", email: "admin@happybonding.in", phone: "7708030903", passwordHash },
     });
-    await db.userBranch.upsert({ where: { userId_branchId: { userId: user.id, branchId: branch.id } }, update: {}, create: { userId: user.id, branchId: branch.id } });
+    const allBranches = await db.branch.findMany({ where: { organizationId: organization.id } });
+    for (const b of allBranches) {
+      await db.userBranch.upsert({
+        where: { userId_branchId: { userId: user.id, branchId: b.id } },
+        update: {},
+        create: { userId: user.id, branchId: b.id },
+      });
+    }
   } catch (err) {
     console.error("Auto admin user creation error:", err);
   }
@@ -53,10 +60,40 @@ app.post("/api/auth/login", async (req, res) => {
     user = await db.user.findUnique({ where: { email: input.email.toLowerCase() }, include: { role: true, branches: true } });
   }
   if (!user || !user.active || !(await compare(input.password, user.passwordHash))) return res.status(401).json({ error: "Invalid email or password" });
-  const session = { userId: user.id, organizationId: user.organizationId, branchIds: user.branches.map(x => x.branchId), permissions: user.role.permissions, tokenVersion: user.tokenVersion };
-  const branches = await db.branch.findMany({ where: { id: { in: session.branchIds } }, orderBy: { name: "asc" } });
-  res.json({ token: await createToken(session), user: { id: user.id, name: user.name, email: user.email, role: user.role.name }, branchIds: session.branchIds, branches });
+
+  const isOwner = user.role.permissions.includes("*");
+  const allBranches = await db.branch.findMany({
+    where: { organizationId: user.organizationId },
+    include: {
+      memberships: {
+        include: {
+          user: { select: { id: true, name: true, email: true, role: { select: { name: true } } } },
+        },
+      },
+    },
+    orderBy: { name: "asc" },
+  });
+
+  const sessionBranchIds = isOwner ? allBranches.map(b => b.id) : user.branches.map(x => x.branchId);
+
+  const session = {
+    userId: user.id,
+    organizationId: user.organizationId,
+    branchIds: sessionBranchIds,
+    permissions: user.role.permissions,
+    tokenVersion: user.tokenVersion,
+  };
+
+  const returnedBranches = isOwner ? allBranches : allBranches.filter(b => sessionBranchIds.includes(b.id));
+
+  res.json({
+    token: await createToken(session),
+    user: { id: user.id, name: user.name, email: user.email, role: user.role.name },
+    branchIds: sessionBranchIds,
+    branches: returnedBranches,
+  });
 });
+
 
 app.use("/api", requireAuth);
 
@@ -67,6 +104,13 @@ app.get("/api/branches", async (req, res) => {
       organizationId: req.session!.organizationId,
       ...(isOwner ? {} : { id: { in: req.session!.branchIds } }),
     },
+    include: {
+      memberships: {
+        include: {
+          user: { select: { id: true, name: true, email: true, role: { select: { name: true } } } },
+        },
+      },
+    },
     orderBy: { name: "asc" },
   });
   res.json(rows);
@@ -76,14 +120,215 @@ app.post("/api/branches", requirePermission("settings.write"), async (req, res) 
   const organizationId = req.session!.organizationId;
   const code = String(req.body?.code ?? "").trim().toUpperCase().slice(0, 12);
   const name = String(req.body?.name ?? "").trim();
+  const email = String(req.body?.email ?? "").trim().toLowerCase();
+  const password = String(req.body?.password ?? "");
+
   if (!code || !name) return res.status(400).json({ error: "Branch code and name are required" });
+
+  const existing = await db.branch.findFirst({ where: { organizationId, code } });
+  if (existing) return res.status(400).json({ error: `Branch code '${code}' already exists` });
+
   const row = await db.branch.create({
     data: { organizationId, code, name, address: String(req.body?.address ?? ""), phone: String(req.body?.phone ?? "") },
   });
   await db.userBranch.upsert({ where: { userId_branchId: { userId: req.session!.userId, branchId: row.id } }, update: {}, create: { userId: req.session!.userId, branchId: row.id } });
-  await audit(req, "branch.created", "Branch", row.id, { code, name });
-  res.status(201).json(row);
+
+  if (email && password.length >= 6) {
+    const existingUser = await db.user.findUnique({ where: { email } });
+    if (!existingUser) {
+      const role = await db.role.upsert({
+        where: { organizationId_name: { organizationId, name: "Staff" } },
+        update: {},
+        create: { organizationId, name: "Staff", permissions: ["parties.write", "products.write", "sales.write", "reports.read"] },
+      });
+      await db.user.create({
+        data: {
+          organizationId,
+          roleId: role.id,
+          name: `${name} Staff`,
+          email,
+          phone: String(req.body?.phone ?? ""),
+          passwordHash: await hash(password, 12),
+          branches: { create: [{ branchId: row.id }] },
+        },
+      });
+    } else {
+      await db.userBranch.upsert({ where: { userId_branchId: { userId: existingUser.id, branchId: row.id } }, update: {}, create: { userId: existingUser.id, branchId: row.id } });
+    }
+  }
+
+  await audit(req, "branch.created", "Branch", row.id, { code, name, email });
+  const freshRow = await db.branch.findUnique({
+    where: { id: row.id },
+    include: {
+      memberships: {
+        include: {
+          user: { select: { id: true, name: true, email: true, role: { select: { name: true } } } },
+        },
+      },
+    },
+  });
+  res.status(201).json(freshRow || row);
 });
+
+app.put("/api/branches/:id", requirePermission("settings.write"), async (req, res) => {
+  const organizationId = req.session!.organizationId;
+  const branchId = String(req.params.id || "");
+  const code = String(req.body?.code ?? "").trim().toUpperCase().slice(0, 12);
+  const name = String(req.body?.name ?? "").trim();
+  const phone = String(req.body?.phone ?? "").trim();
+  const address = String(req.body?.address ?? "").trim();
+  const email = String(req.body?.email ?? "").trim().toLowerCase();
+  const password = String(req.body?.password ?? "");
+
+  if (!code || !name) return res.status(400).json({ error: "Branch code and name are required" });
+
+  const existingBranch = await db.branch.findFirst({ where: { id: branchId, organizationId } });
+  if (!existingBranch) return res.status(404).json({ error: "Branch not found" });
+
+  const duplicateCode = await db.branch.findFirst({ where: { organizationId, code, NOT: { id: branchId } } });
+  if (duplicateCode) return res.status(400).json({ error: `Branch code '${code}' already in use` });
+
+  await db.branch.update({
+    where: { id: branchId },
+    data: { code, name, phone, address },
+  });
+
+  if (email) {
+    const memberships = await db.userBranch.findMany({
+      where: { branchId },
+      include: { user: { include: { role: true } } },
+    });
+
+    const existingStaffMembership = memberships.find(m => m.user.role.name !== "Owner" && m.user.email.toLowerCase() !== "admin@happybonding.in") || memberships.find(m => m.user.role.name !== "Owner");
+
+
+    if (existingStaffMembership) {
+      const staffUser = existingStaffMembership.user;
+      const existingOtherUser = await db.user.findFirst({
+        where: { email, NOT: { id: staffUser.id } },
+      });
+      if (existingOtherUser) {
+        return res.status(400).json({ error: `Username/Email '${email}' is already used by another user` });
+      }
+
+      const updateData: any = {
+        email,
+        name: `${name} Staff`,
+        phone: phone || staffUser.phone,
+      };
+      if (password.length >= 6) {
+        updateData.passwordHash = await hash(password, 12);
+      }
+
+      await db.user.update({
+        where: { id: staffUser.id },
+        data: updateData,
+      });
+    } else {
+      let targetUser = await db.user.findUnique({ where: { email } });
+      if (!targetUser) {
+        const role = await db.role.upsert({
+          where: { organizationId_name: { organizationId, name: "Staff" } },
+          update: {},
+          create: { organizationId, name: "Staff", permissions: ["parties.write", "products.write", "sales.write", "reports.read"] },
+        });
+        targetUser = await db.user.create({
+          data: {
+            organizationId,
+            roleId: role.id,
+            name: `${name} Staff`,
+            email,
+            phone,
+            passwordHash: await hash(password.length >= 6 ? password : "HappyBonding@2026", 12),
+            branches: { create: [{ branchId }] },
+          },
+        });
+      } else {
+        await db.userBranch.upsert({
+          where: { userId_branchId: { userId: targetUser.id, branchId } },
+          update: {},
+          create: { userId: targetUser.id, branchId },
+        });
+        if (password.length >= 6) {
+          await db.user.update({
+            where: { id: targetUser.id },
+            data: { passwordHash: await hash(password, 12) },
+          });
+        }
+      }
+    }
+  }
+
+  await audit(req, "branch.updated", "Branch", branchId, { code, name, email });
+
+  const freshBranch = await db.branch.findUnique({
+    where: { id: branchId },
+    include: {
+      memberships: {
+        include: {
+          user: { select: { id: true, name: true, email: true, role: { select: { name: true } } } },
+        },
+      },
+    },
+  });
+
+  res.json(freshBranch);
+});
+
+
+
+app.post("/api/branches/switch", async (req, res) => {
+  const organizationId = req.session!.organizationId;
+  const branchId = String(req.body?.branchId ?? "");
+  const email = String(req.body?.email ?? "").trim().toLowerCase();
+  const password = String(req.body?.password ?? "");
+
+  if (!branchId) return res.status(400).json({ error: "Branch ID is required" });
+
+  const branch = await db.branch.findFirst({ where: { id: branchId, organizationId } });
+  if (!branch) return res.status(404).json({ error: "Branch not found" });
+
+  const isOwner = req.session!.permissions.includes("*");
+
+  if (email && password) {
+    const user = await db.user.findUnique({
+      where: { email },
+      include: { role: true, branches: true },
+    });
+
+    if (!user || !user.active || !(await compare(password, user.passwordHash))) {
+      return res.status(401).json({ error: "Invalid branch username or password" });
+    }
+
+    const hasAccess = user.role.permissions.includes("*") || user.branches.some(b => b.branchId === branchId);
+    if (!hasAccess) {
+      return res.status(403).json({ error: "User does not have access to this branch" });
+    }
+
+    const session = {
+      userId: user.id,
+      organizationId: user.organizationId,
+      branchIds: Array.from(new Set([...user.branches.map(x => x.branchId), branchId])),
+      permissions: user.role.permissions,
+      tokenVersion: user.tokenVersion,
+    };
+    const newToken = await createToken(session);
+    return res.json({ ok: true, token: newToken, branchId, branchName: branch.name });
+  }
+
+  if (isOwner || req.session!.branchIds.includes(branchId)) {
+    const session = {
+      ...req.session!,
+      branchIds: Array.from(new Set([...req.session!.branchIds, branchId])),
+    };
+    const newToken = await createToken(session);
+    return res.json({ ok: true, token: newToken, branchId, branchName: branch.name });
+  }
+
+  return res.status(401).json({ error: "Branch password verification required", requiresAuth: true });
+});
+
 
 app.get("/api/owner/summary", requirePermission("reports.read"), async (req, res) => {
   const organizationId = req.session!.organizationId;
@@ -988,6 +1233,57 @@ app.post("/api/backup/restore", requirePermission("settings.write"), async (req,
   }
 });
 
+app.post("/api/admin/reset-transactions", requirePermission("settings.write"), async (req, res) => {
+  const organizationId = req.session!.organizationId;
+  const { doubleConfirmation, clearProducts, clearParties } = req.body;
+
+  if (doubleConfirmation !== "RESET_LIVE") {
+    return res.status(400).json({ error: "Safety check failed. Type 'RESET_LIVE' to confirm." });
+  }
+
+  try {
+    await db.salesInvoiceLine.deleteMany({ where: { invoice: { organizationId } } });
+    await db.paymentAllocation.deleteMany({ where: { salesInvoice: { organizationId } } });
+    await db.payment.deleteMany({ where: { organizationId } });
+    await db.creditNoteLine.deleteMany({ where: { creditNote: { organizationId } } });
+    await db.creditNote.deleteMany({ where: { organizationId } });
+    await db.salesInvoice.deleteMany({ where: { organizationId } });
+
+    await db.expense.deleteMany({ where: { organizationId } });
+
+    await db.stockMovement.deleteMany({ where: { branch: { organizationId } } });
+    await db.stockBalance.updateMany({
+      where: { branch: { organizationId } },
+      data: { quantity: 0 },
+    });
+
+    await db.documentSequence.updateMany({
+      where: { organizationId },
+      data: { nextNumber: 1 },
+    });
+
+    await db.auditEvent.deleteMany({ where: { organizationId } });
+    await db.offlineSyncQueue.deleteMany({ where: { organizationId } });
+
+    if (clearProducts) {
+      await db.stockBalance.deleteMany({ where: { branch: { organizationId } } });
+      await db.productVariant.deleteMany({ where: { product: { organizationId } } });
+      await db.product.deleteMany({ where: { organizationId } });
+    }
+
+    if (clearParties) {
+      await db.party.deleteMany({ where: { organizationId } });
+    }
+
+    await audit(req, "database.reset_for_live", "Organization", organizationId, { clearProducts, clearParties });
+
+    res.json({ ok: true, message: "Database test data cleared successfully! Ready for Live sales." });
+  } catch (err: any) {
+    console.error("Database reset error:", err);
+    res.status(500).json({ error: "Failed to reset database: " + err.message });
+  }
+});
+
 // Daily Automated Local Backup Service
 function setupDailyBackupScheduler() {
   const backupsDir = path.join(process.cwd(), "backups");
@@ -1000,6 +1296,10 @@ function setupDailyBackupScheduler() {
       const backup = await generateFullBackupData(org.id);
       const dateStr = new Date().toISOString().split("T")[0];
       const filePath = path.join(backupsDir, `backup-${dateStr}.json`);
+      if ((backup.data?.parties?.length || 0) === 0 && fs.existsSync(filePath)) {
+        console.log(`[Automated Daily Backup] Skipped overwriting backup with empty database data.`);
+        return;
+      }
       fs.writeFileSync(filePath, JSON.stringify(backup, null, 2));
       console.log(`[Automated Daily Backup] Backup saved: ${filePath}`);
     } catch (err: any) {

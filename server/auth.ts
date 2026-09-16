@@ -41,9 +41,16 @@ export function requirePermission(permission: string) {
 
 export function requireBranch(req: Request, res: Response) {
   const branchId = String(req.headers["x-branch-id"] ?? "");
-  if (!branchId || !req.session?.branchIds.includes(branchId)) {
+  if (!branchId) {
+    res.status(400).json({ error: "Branch ID header (x-branch-id) is required" });
+    return null;
+  }
+  const isOwner = req.session?.permissions?.includes("*");
+  const hasBranchAccess = isOwner || req.session?.branchIds?.includes(branchId);
+  if (!hasBranchAccess) {
     res.status(403).json({ error: "Branch access denied" });
     return null;
   }
   return branchId;
 }
+

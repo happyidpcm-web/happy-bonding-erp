@@ -181,6 +181,13 @@ export default function App() {
 
   const [activeInvoiceModal, setActiveInvoiceModal] = useState<Invoice | null>(null);
 
+  const handleLogout = () => {
+    api.logout();
+    setAuthenticated(false);
+    notify("Logged out successfully");
+  };
+
+
   const refreshAppData = async () => {
     const [nextProducts, nextParties, nextInvoices, nextSetting, nextBranches, nextSummary] = await Promise.all([
       api.products().catch(() => null),
@@ -207,8 +214,10 @@ export default function App() {
   };
 
   useEffect(() => {
-    refreshAppData().catch(() => {});
-  }, [currentBranchId]);
+    if (authenticated) {
+      refreshAppData().catch(() => {});
+    }
+  }, [authenticated, currentBranchId]);
 
   const [expandedNav, setExpandedNav] = useState<"sales" | "purchases" | "parties" | null>(null);
   const [createDropdownOpen, setCreateDropdownOpen] = useState(false);
@@ -242,12 +251,27 @@ export default function App() {
     setSidebar(false);
     setCreateDropdownOpen(false);
   };
+  const [pendingSwitchBranch, setPendingSwitchBranch] = useState<{ id: string; name: string } | null>(null);
   const currentBranch = branchRows.find(branch => branch.id === currentBranchId) || branchRows[0];
-  const handleBranchChange = (branchId: string) => {
-    api.setCurrentBranch(branchId);
-    setCurrentBranchId(branchId);
-    notify("Branch switched. Data refreshed.");
+  const handleBranchChange = async (branchId: string) => {
+    if (branchId === currentBranchId) return;
+    const targetBranch = branchRows.find(b => b.id === branchId);
+    if (!targetBranch) return;
+    try {
+      const res = await api.switchBranch(branchId);
+      if (res.ok) {
+        api.setCurrentBranch(branchId);
+        setCurrentBranchId(branchId);
+        notify(`Switched to branch: ${targetBranch.name}`);
+        await refreshAppData();
+      }
+    } catch (err: any) {
+      setPendingSwitchBranch({ id: branchId, name: targetBranch.name });
+    }
   };
+
+
+
   const handleSyncNow = async () => {
     try {
       const queued = JSON.parse(localStorage.getItem("hb_offline_queue") || "[]");
@@ -350,7 +374,7 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleGlobalShortcuts);
   }, []);
 
-  if (!authenticated) return <LoginScreen onLogin={() => setAuthenticated(true)}/>;
+  if (!authenticated) return <LoginScreen onLogin={async () => { setAuthenticated(true); await refreshAppData(); }}/>;
 
   return <div className="app-shell">
     <aside className={`sidebar ${sidebar ? "open" : ""}`}>
@@ -530,6 +554,9 @@ export default function App() {
           <button className="secondary compact" style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 10px", fontSize: 12, cursor: "pointer" }} onClick={() => setChangePasswordModalOpen(true)} title="Change Password">
             🔑 Change Password
           </button>
+          <button className="secondary compact" style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 10px", fontSize: 12, cursor: "pointer", background: "#fef2f2", color: "#dc2626", borderColor: "#fca5a5" }} onClick={handleLogout} title="Logout">
+            🚪 Logout
+          </button>
           <div className="user-profile-badge" title="Saravana Kumar (Store Admin) - Click to change password" onClick={() => setChangePasswordModalOpen(true)} style={{ cursor: "pointer" }}>
             <div className="avatar">SK</div>
             <div className="user-info-text">
@@ -545,7 +572,7 @@ export default function App() {
         {page === "items" && <Items rows={productRows} invoices={invoiceRows} setRows={setProductRows} notify={notify} apiMode={apiMode}/>} 
         {page === "sales" && <Sales rows={invoiceRows} products={productRows} parties={partyRows} setting={invoiceSetting} setSetting={setInvoiceSetting} setRows={setInvoiceRows} setParties={setPartyRows} setProducts={setProductRows} notify={notify} autoCreateKey={salesCreateKey} onSelectInvoice={openInvoiceDetail} onNavigateReports={handleNavigateReportsFromSales}/>} 
         {page === "quotation" && <GenericVoucherPage title="Quotation / Estimate" subtitle="Create and track estimates for customers before final sale." action="+ Create Quotation" icon={FileSpreadsheet} type="Quotation" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
-        {page === "payment_in" && <PaymentInModule parties={partyRows} invoices={invoiceRows} notify={notify} onDataChanged={refreshAppData} />}
+        {page === "payment_in" && <PaymentInModule parties={partyRows} invoices={invoiceRows} notify={notify} onDataChanged={refreshAppData} currentBranchId={currentBranchId} />}
         {page === "sales_return" && <GenericVoucherPage title="Sales Return" subtitle="Track customer garment returns & credit balances." action="+ Create Sales Return" icon={ReceiptIndianRupee} type="Sales Return" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
         {page === "credit_note" && <GenericVoucherPage title="Credit Note" subtitle="Issue credit notes against returns & pricing adjustments." action="+ Create Credit Note" icon={ClipboardList} type="Credit Note" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
         {page === "delivery_challan" && <GenericVoucherPage title="Delivery Challan" subtitle="Track dispatch of goods, transport & delivery notes." action="+ Create Delivery Challan" icon={Boxes} type="Delivery Challan" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
@@ -556,14 +583,16 @@ export default function App() {
         {page === "purchase_return" && <GenericVoucherPage title="Purchase Return" subtitle="Return damaged/excess goods to suppliers & debit balance." action="+ Create Purchase Return" icon={ShoppingBag} type="Purchase Return" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
         {page === "debit_note" && <GenericVoucherPage title="Debit Note" subtitle="Issue debit notes to suppliers for price differences or returns." action="+ Create Debit Note" icon={ClipboardList} type="Debit Note" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
         {page === "purchase_orders" && <GenericVoucherPage title="Purchase Orders" subtitle="Send POs to vendors & manage upcoming stock shipments." action="+ Create PO" icon={Boxes} type="Purchase Order" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
-        {page === "expenses" && <ExpensesModule notify={notify} />}
+        {page === "expenses" && <ExpensesModule notify={notify} currentBranchId={currentBranchId} />}
+
         {page === "reminders" && <RemindersModule parties={partyRows} invoices={invoiceRows} notify={notify} />}
 
         {page === "reports" && <Reports products={productRows} invoices={invoiceRows} notify={notify} initialReport={activeReportSubScreen}/>} 
         {page === "cash" && <CashBank notify={notify}/>} 
         {page === "pos" && <Sales rows={invoiceRows} products={productRows} parties={partyRows} setting={invoiceSetting} setSetting={setInvoiceSetting} setRows={setInvoiceRows} setParties={setPartyRows} setProducts={setProductRows} notify={notify} autoCreateKey={Date.now()} onSelectInvoice={openInvoiceDetail} onNavigateReports={handleNavigateReportsFromSales}/>} 
         {page === "staff" && <Staff/>} 
-        {page === "settings" && <SettingsPage notify={notify}/>} 
+        {page === "settings" && <SettingsPage notify={notify} branches={branchRows} currentBranchId={currentBranchId} onSwitchBranch={handleBranchChange} onRefreshData={refreshAppData} />} 
+
       </section>
     </main>
     {sidebar && <div className="scrim" onClick={() => setSidebar(false)}/>} 
@@ -572,7 +601,9 @@ export default function App() {
     {branchModalOpen && <BranchManagementModal branches={branchRows} onClose={() => setBranchModalOpen(false)} onSaved={async () => { await refreshAppData(); setBranchModalOpen(false); notify("Branch saved"); }} notify={notify} />}
     {staffModalOpen && <StaffManagementModal branches={branchRows} onClose={() => setStaffModalOpen(false)} notify={notify} />}
     {changePasswordModalOpen && <ChangePasswordModal onClose={() => setChangePasswordModalOpen(false)} notify={notify} />}
+    {pendingSwitchBranch && <BranchSwitchAuthModal branch={pendingSwitchBranch} onClose={() => setPendingSwitchBranch(null)} onSuccess={async (bId) => { api.setCurrentBranch(bId); setCurrentBranchId(bId); await refreshAppData(); }} notify={notify} />}
   </div>;
+
 }
 
 function ChangePasswordModal({ onClose, notify }: { onClose: () => void; notify: (msg: string) => void }) {
@@ -630,7 +661,135 @@ function ChangePasswordModal({ onClose, notify }: { onClose: () => void; notify:
   );
 }
 
+function BranchSwitchAuthModal({ branch, onClose, onSuccess, notify }: { branch: { id: string; name: string }; onClose: () => void; onSuccess: (branchId: string) => void; notify: (msg: string) => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [verifying, setVerifying] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) return notify("Please enter branch username and password");
+    setVerifying(true);
+    try {
+      const res = await api.switchBranch(branch.id, email, password);
+      if (res.ok) {
+        notify(`Authenticated & switched to ${branch.name}`);
+        onSuccess(branch.id);
+        onClose();
+      }
+    } catch (err: any) {
+      notify(err.message || "Invalid branch credentials");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  return (
+    <Modal title={`Branch Access Authentication - ${branch.name}`} onClose={onClose}>
+      <p style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>
+        Please enter staff/branch credentials to access <strong>{branch.name}</strong> data.
+      </p>
+      <form className="form-grid" onSubmit={handleSubmit}>
+        <label className="full">Branch Username / Email
+          <input type="email" placeholder="branch@happybonding.in" value={email} onChange={e => setEmail(e.target.value)} required autoFocus />
+        </label>
+        <label className="full">Branch Password
+          <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
+        </label>
+        <div className="modal-actions full" style={{ marginTop: 12 }}>
+          <button type="button" className="secondary" onClick={onClose} disabled={verifying}>Cancel</button>
+          <button className="primary" disabled={verifying}>{verifying ? "Verifying..." : "Verify & Switch Branch"}</button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function EditBranchModal({ branch, onClose, onSaved, notify }: { branch: Branch; onClose: () => void; onSaved: () => void; notify: (msg: string) => void }) {
+  const [saving, setSaving] = useState(false);
+  const [code, setCode] = useState(branch.code || "");
+  const [name, setName] = useState(branch.name || "");
+  const [phone, setPhone] = useState(branch.phone || "");
+  const [address, setAddress] = useState(branch.address || "");
+  const initialEmail = branch.memberships?.find(m => m.user?.email && m.user.email.toLowerCase() !== "admin@happybonding.in")?.user?.email || branch.memberships?.[0]?.user?.email || "";
+  const [email, setEmail] = useState(initialEmail);
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!code || !name) return notify("Branch code and name are required.");
+    try {
+      setSaving(true);
+      await api.updateBranch(branch.id, {
+        code,
+        name,
+        phone,
+        address,
+        email: email.trim(),
+        password,
+      });
+      notify(`✅ Branch '${name}' details & credentials updated!`);
+      onSaved();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Branch update failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal title={`✏️ Edit Branch & Credentials - ${branch.name}`} onClose={onClose}>
+      <form className="form-grid" onSubmit={handleSubmit}>
+        <label>Branch Code
+          <input value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="PAV" required />
+        </label>
+        <label>Branch Name
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="Pavoorchatram Store" required />
+        </label>
+        <label>Phone Number
+          <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="7708030903" />
+        </label>
+        <label>Branch Username / Email
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="branch@happybonding.in" />
+        </label>
+        <label className="full">
+          Branch Password (for login & branch switch authentication)
+          <div style={{ position: "relative", width: "100%" }}>
+            <input
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="Leave blank to keep existing password"
+              minLength={6}
+              style={{ width: "100%", paddingRight: 40 }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", border: "none", background: "transparent", cursor: "pointer", color: "#64748b" }}
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+          <small style={{ color: "#64748b", marginTop: 4, display: "block" }}>
+            Enter new password (min 6 chars) to reset password for this branch login.
+          </small>
+        </label>
+        <label className="full">Branch Address
+          <textarea value={address} onChange={e => setAddress(e.target.value)} placeholder="Full store address" />
+        </label>
+        <div className="modal-actions full">
+          <button type="button" className="secondary" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="primary" disabled={saving}>{saving ? "Saving Changes..." : "Save Branch & Credentials"}</button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 function BranchManagementModal({ branches, onClose, onSaved, notify }: { branches: Branch[]; onClose: () => void; onSaved: () => void; notify: (msg: string) => void }) {
+
   const [saving, setSaving] = useState(false);
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -642,6 +801,8 @@ function BranchManagementModal({ branches, onClose, onSaved, notify }: { branche
         name: String(form.get("name") || ""),
         address: String(form.get("address") || ""),
         phone: String(form.get("phone") || ""),
+        email: String(form.get("email") || "").trim(),
+        password: String(form.get("password") || ""),
       });
       onSaved();
     } catch (error) {
@@ -652,22 +813,36 @@ function BranchManagementModal({ branches, onClose, onSaved, notify }: { branche
   };
 
   return (
-    <Modal title="Branch Management" onClose={onClose} wide>
+    <Modal title="Branch Management & Credentials" onClose={onClose} wide>
       <div className="table-scroll" style={{ maxHeight: 220, marginBottom: 16 }}>
-        <table><thead><tr><th>Code</th><th>Branch</th><th>Phone</th><th>Address</th></tr></thead><tbody>
-          {branches.map(branch => <tr key={branch.id}><td>{branch.code}</td><td><strong>{branch.name}</strong></td><td>{branch.phone || "-"}</td><td>{branch.address || "-"}</td></tr>)}
+        <table><thead><tr><th>Code</th><th>Branch</th><th>Branch Username/Email</th><th>Phone</th><th>Address</th></tr></thead><tbody>
+          {branches.map(branch => {
+            const staffEmail = branch.memberships?.find(m => m.user?.email && m.user.email.toLowerCase() !== "admin@happybonding.in")?.user?.email || branch.memberships?.[0]?.user?.email || "-";
+            return (
+              <tr key={branch.id}>
+                <td>{branch.code}</td>
+                <td><strong>{branch.name}</strong></td>
+                <td><code style={{ fontSize: 11, background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>{staffEmail}</code></td>
+                <td>{branch.phone || "-"}</td>
+                <td>{branch.address || "-"}</td>
+              </tr>
+            );
+          })}
         </tbody></table>
       </div>
       <form className="form-grid" onSubmit={handleSubmit}>
         <label>Branch Code<input name="code" placeholder="TEN" required /></label>
         <label>Branch Name<input name="name" placeholder="Tenkasi" required /></label>
         <label>Phone<input name="phone" placeholder="Branch phone" /></label>
+        <label>Branch Username / Email<input name="email" type="email" placeholder="tenkasi@happybonding.in" /></label>
+        <label className="full">Branch Password (for login & branch switch access)<input name="password" type="password" placeholder="Set password (min 6 characters)" minLength={6} /></label>
         <label className="full">Address<textarea name="address" placeholder="Branch address" /></label>
         <div className="modal-actions full"><button type="button" className="secondary" onClick={onClose} disabled={saving}>Cancel</button><button className="primary" disabled={saving}>{saving ? "Saving..." : "Save Branch"}</button></div>
       </form>
     </Modal>
   );
 }
+
 
 function StaffManagementModal({ branches, onClose, notify }: { branches: Branch[]; onClose: () => void; notify: (msg: string) => void }) {
   const [staffRows, setStaffRows] = useState<StaffUser[]>([]);
@@ -800,15 +975,17 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
     const passVal = String(form.get("password")).trim();
 
     try {
-      await api.login(emailVal, passVal);
+      const loginRes = await api.login(emailVal, passVal);
+      if (loginRes?.branchIds?.[0]) {
+        api.setCurrentBranch(loginRes.branchIds[0]);
+      }
       onLogin();
-    } catch {
-      // Offline/Local fallback login when password is HappyBonding@2026 or admin
+    } catch (err: any) {
       if (passVal === "HappyBonding@2026" || passVal === "admin" || passVal === "123456") {
         localStorage.setItem("hb_erp_token", "mock_local_token_2026");
         onLogin();
       } else {
-        setError("Invalid credentials. Enter password: HappyBonding@2026");
+        setError(err?.message || "Invalid email or password");
       }
     } finally {
       setBusy(false);
@@ -10004,11 +10181,13 @@ function PaymentInModule({
   invoices = [],
   notify,
   onDataChanged,
+  currentBranchId,
 }: {
   parties: Party[];
   invoices?: Invoice[];
   notify: (msg: string) => void;
   onDataChanged?: () => Promise<void> | void;
+  currentBranchId?: string;
 }) {
   const [viewMode, setViewMode] = useState<"list" | "create" | "edit" | "detail">("list");
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -10061,7 +10240,8 @@ function PaymentInModule({
     return () => {
       alive = false;
     };
-  }, []);
+  }, [currentBranchId]);
+
 
   const filtered = useMemo(() => {
     return records.filter(r => {
@@ -10945,7 +11125,7 @@ function IssueCreditNoteModal({ invoice, onClose, onSave, notify }: { invoice: I
   );
 }
 
-function ExpensesModule({ notify }: { notify: (msg: string) => void }) {
+function ExpensesModule({ notify, currentBranchId }: { notify: (msg: string) => void; currentBranchId?: string }) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState("All");
@@ -10968,7 +11148,8 @@ function ExpensesModule({ notify }: { notify: (msg: string) => void }) {
     }
   };
 
-  useEffect(() => { fetchExpenses(); }, []);
+  useEffect(() => { fetchExpenses(); }, [currentBranchId]);
+
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -11291,8 +11472,23 @@ Visit us for special festival offers & new shirt/pant arrivals!
 
 type SettingsTab = "profile" | "gst" | "numbering" | "print" | "users" | "branches" | "backup";
 
-function SettingsPage({ notify }: { notify: (msg: string) => void }) {
+function SettingsPage({
+  notify,
+  branches,
+  currentBranchId,
+  onSwitchBranch,
+  onRefreshData,
+}: {
+  notify: (msg: string) => void;
+  branches?: Branch[];
+  currentBranchId?: string;
+  onSwitchBranch?: (branchId: string) => void;
+  onRefreshData?: () => Promise<void> | void;
+}) {
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
+  const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
+  const [branchModalOpen, setBranchModalOpen] = useState(false);
+
 
   // Restore states
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
@@ -11300,6 +11496,34 @@ function SettingsPage({ notify }: { notify: (msg: string) => void }) {
   const [checkOverwrite, setCheckOverwrite] = useState(false);
   const [confirmInput, setConfirmInput] = useState("");
   const [restoring, setRestoring] = useState(false);
+
+  // Live Reset states
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetConfirmInput, setResetConfirmInput] = useState("");
+  const [clearProductsCheck, setClearProductsCheck] = useState(false);
+  const [clearPartiesCheck, setClearPartiesCheck] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  const handleResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (resetConfirmInput !== "RESET_LIVE") return;
+    setResetting(true);
+    try {
+      const res = await api.resetTransactions({
+        doubleConfirmation: "RESET_LIVE",
+        clearProducts: clearProductsCheck,
+        clearParties: clearPartiesCheck,
+      });
+      notify(res.message || "Database test data cleared successfully!");
+      setResetModalOpen(false);
+      setResetConfirmInput("");
+      if (onRefreshData) await onRefreshData();
+    } catch (err: any) {
+      notify("Reset failed: " + (err.message || "Unknown error"));
+    } finally {
+      setResetting(false);
+    }
+  };
 
   // Business Profile Form States
   const [businessName, setBusinessName] = useState("Happy Bonding Men's Wear");
@@ -11567,32 +11791,114 @@ function SettingsPage({ notify }: { notify: (msg: string) => void }) {
 
         {/* Tab 6: Branches */}
         {activeTab === "branches" && (
-          <article className="card settings-form">
-            <h2>Store Branches</h2>
-            <p>Manage multi-branch isolation and store locations.</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div style={{ padding: 14, border: "1px solid #e2e8f0", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc" }}>
-                <div>
-                  <strong style={{ fontSize: 14, display: "block", color: "#0f172a" }}>📍 Pavoorchatram Store (Main Branch)</strong>
-                  <small style={{ color: "#64748b" }}>West Bus Stand, Pavoorchatram - 627808</small>
-                </div>
-                <span className="pill green">Active Branch</span>
-              </div>
-              <div style={{ padding: 14, border: "1px solid #e2e8f0", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <strong style={{ fontSize: 14, display: "block", color: "#0f172a" }}>📍 Ambasamudram Store (Branch 2)</strong>
-                  <small style={{ color: "#64748b" }}>Ambasamudram Main Branch</small>
-                </div>
-                <span className="pill neutral">Configured Branch</span>
-              </div>
+          <article className="card settings-form" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div>
+              <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: "#0f172a" }}>Store Branches & Access Credentials</h2>
+              <p style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>
+                Manage multi-branch store locations, view linked staff usernames, edit store details and set branch login passwords.
+              </p>
             </div>
-            <div className="save-line">
-              <button className="primary" onClick={() => notify("Create New Branch modal opened")}>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {(branches && branches.length > 0 ? branches : []).map(b => {
+                const isActive = b.id === currentBranchId;
+                const staffEmail = b.memberships?.find(m => m.user?.email && m.user.email.toLowerCase() !== "admin@happybonding.in")?.user?.email || b.memberships?.[0]?.user?.email || "No credentials set";
+                return (
+                  <div
+                    key={b.id}
+                    style={{
+                      padding: 16,
+                      border: isActive ? "2px solid #8b5cf6" : "1px solid #e2e8f0",
+                      borderRadius: 12,
+                      background: isActive ? "#faf5ff" : "#ffffff",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 16,
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                    }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontSize: 18 }}>📍</span>
+                        <strong style={{ fontSize: 15, color: "#0f172a" }}>{b.name}</strong>
+                        <code style={{ fontSize: 11, background: "#e2e8f0", padding: "2px 6px", borderRadius: 4, fontWeight: 700, color: "#334155" }}>{b.code}</code>
+                        {isActive ? (
+                          <span className="pill green" style={{ fontSize: 11 }}>Active Store Branch</span>
+                        ) : (
+                          <span className="pill neutral" style={{ fontSize: 11 }}>Configured Branch</span>
+                        )}
+                      </div>
+
+                      <div style={{ fontSize: 12, color: "#64748b", display: "flex", gap: 16, flexWrap: "wrap", marginTop: 2 }}>
+                        <span>📍 {b.address || "No address specified"}</span>
+                        {b.phone && <span>📞 Phone: {b.phone}</span>}
+                      </div>
+
+                      <div style={{ fontSize: 12, color: "#475569", marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                        🔑 <strong>Branch Staff Username:</strong>
+                        <code style={{ background: "#f1f5f9", padding: "2px 8px", borderRadius: 4, fontSize: 11, color: "#4f46e5", fontWeight: 600 }}>{staffEmail}</code>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      {!isActive && onSwitchBranch && (
+                        <button
+                          type="button"
+                          className="secondary compact"
+                          onClick={() => onSwitchBranch(b.id)}
+                          style={{ background: "#e0e7ff", color: "#4338ca", border: "1px solid #c7d2fe", fontWeight: 600, padding: "6px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer" }}
+                        >
+                          🔄 Switch Branch
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="secondary compact"
+                        onClick={() => setEditingBranch(b)}
+                        style={{ background: "#fff", color: "#334155", border: "1px solid #cbd5e1", fontWeight: 600, padding: "6px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer" }}
+                      >
+                        ✏️ Edit Details & Password
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="save-line" style={{ marginTop: 8 }}>
+              <button className="primary" onClick={() => setBranchModalOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                 + Add New Branch
               </button>
             </div>
+
+            {editingBranch && (
+              <EditBranchModal
+                branch={editingBranch}
+                onClose={() => setEditingBranch(null)}
+                onSaved={async () => {
+                  setEditingBranch(null);
+                  if (onRefreshData) await onRefreshData();
+                }}
+                notify={notify}
+              />
+            )}
+
+            {branchModalOpen && (
+              <BranchManagementModal
+                branches={branches || []}
+                onClose={() => setBranchModalOpen(false)}
+                onSaved={async () => {
+                  setBranchModalOpen(false);
+                  if (onRefreshData) await onRefreshData();
+                  notify("✅ Branch created successfully!");
+                }}
+                notify={notify}
+              />
+            )}
           </article>
         )}
+
 
         {/* Tab 7: Backup & Audit */}
         {activeTab === "backup" && (
@@ -11623,6 +11929,27 @@ function SettingsPage({ notify }: { notify: (msg: string) => void }) {
                   <Upload size={15}/> Select Backup JSON File...
                   <input type="file" accept=".json" onChange={handleFileSelect} style={{ display: "none" }} />
                 </label>
+              </div>
+
+              {/* Card 3: Clear Test Data for Live */}
+              <div style={{ background: "#fff", border: "1px solid #fecaca", borderRadius: 12, padding: 16, display: "flex", flexDirection: "column", gap: 12, gridColumn: "span 2" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: "#dc2626", margin: 0 }}>🧹 Clear Test Data (Prepare for Live Launch)</h3>
+                  <span className="pill warning" style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fca5a5" }}>Live Launch Reset</span>
+                </div>
+                <p style={{ fontSize: 12, color: "#64748b", margin: 0 }}>
+                  Wipe out test sales invoices, payments, expenses, stock balances (set to 0), and reset invoice numbering back to <code>HB/SL/00001</code>.
+                </p>
+                <div style={{ background: "#fef2f2", padding: 10, borderRadius: 8, fontSize: 11, color: "#991b1b", border: "1px solid #fecaca" }}>
+                  ⚠️ <strong>Production Reset:</strong> Use this when you are ready to start real billing for your stores.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setResetModalOpen(true)}
+                  style={{ background: "#dc2626", color: "#fff", border: 0, borderRadius: 8, padding: "8px 16px", fontWeight: 600, width: "max-content", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}
+                >
+                  <Trash2 size={15}/> Clear Test Data & Reset for Live
+                </button>
               </div>
             </div>
           </article>
@@ -11657,6 +11984,60 @@ function SettingsPage({ notify }: { notify: (msg: string) => void }) {
               </button>
             </div>
           </div>
+        </Modal>
+      )}
+
+      {/* Clear Test Data Modal */}
+      {resetModalOpen && (
+        <Modal title="🧹 Clear Test Data & Prepare for Live" onClose={() => setResetModalOpen(false)}>
+          <form onSubmit={handleResetSubmit} style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", padding: 14, borderRadius: 8, color: "#991b1b", fontSize: 13 }}>
+              <strong>CRITICAL WARNING:</strong> This action will permanently delete:
+              <ul style={{ margin: "6px 0 0 18px", padding: 0 }}>
+                <li>All test Sales Invoices & Payment Receipts</li>
+                <li>All recorded Expenses & Credit Notes</li>
+                <li>All Stock Movements (All stock quantities reset to 0)</li>
+                <li>All Invoice Numbering sequences (Resets back to 1)</li>
+              </ul>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12, background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+              <strong style={{ fontSize: 12, color: "#334155" }}>Optional Cleans:</strong>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, cursor: "pointer", color: "#475569" }}>
+                <input type="checkbox" checked={clearProductsCheck} onChange={e => setClearProductsCheck(e.target.checked)} />
+                Also delete sample Items & Inventory products
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, cursor: "pointer", color: "#475569" }}>
+                <input type="checkbox" checked={clearPartiesCheck} onChange={e => setClearPartiesCheck(e.target.checked)} />
+                Also delete sample Customers & Suppliers (Parties)
+              </label>
+            </div>
+
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#475569", display: "block", marginBottom: 6 }}>
+                To confirm, type <code style={{ color: "#dc2626", fontWeight: 700 }}>RESET_LIVE</code> below:
+              </label>
+              <input
+                type="text"
+                placeholder="Type RESET_LIVE"
+                value={resetConfirmInput}
+                onChange={e => setResetConfirmInput(e.target.value)}
+                style={{ width: "100%", padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: 6 }}
+              />
+            </div>
+
+            <div className="modal-actions full">
+              <button type="button" className="secondary" onClick={() => setResetModalOpen(false)} disabled={resetting}>Cancel</button>
+              <button
+                type="submit"
+                className="primary"
+                style={{ background: "#dc2626", color: "#fff", borderColor: "#dc2626" }}
+                disabled={resetConfirmInput !== "RESET_LIVE" || resetting}
+              >
+                {resetting ? "Clearing..." : "Yes, Clear Database for Live Launch"}
+              </button>
+            </div>
+          </form>
         </Modal>
       )}
     </>

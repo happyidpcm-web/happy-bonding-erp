@@ -84,7 +84,9 @@ export interface Branch {
   name: string;
   address?: string | null;
   phone?: string | null;
+  memberships?: Array<{ user?: { id: string; name: string; email: string; role?: { name: string } } }>;
 }
+
 
 export interface OwnerBranchSummary {
   branchId: string;
