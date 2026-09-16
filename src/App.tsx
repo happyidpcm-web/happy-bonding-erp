@@ -11496,7 +11496,7 @@ function SettingsPage({
 
   const handleResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (resetConfirmInput !== "RESET_LIVE") return;
+    if (resetConfirmInput.trim().toUpperCase() !== "RESET_LIVE") return;
     setResetting(true);
     try {
       const res = await api.resetTransactions({
