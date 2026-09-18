@@ -38,6 +38,23 @@ async function ensureAdminUser() {
       where: { email: "admin@happybonding.in" }, update: { passwordHash, roleId: role.id },
       create: { organizationId: organization.id, roleId: role.id, name: "Saravana", email: "admin@happybonding.in", phone: "7708030903", passwordHash },
     });
+    const staffRole = await db.role.upsert({
+      where: { organizationId_name: { organizationId: organization.id, name: "Staff" } },
+      update: {},
+      create: { organizationId: organization.id, name: "Staff", permissions: ["parties.write", "products.write", "sales.write", "reports.read"] },
+    });
+    const pcmPasswordHash = await hash("Pcm@123", 12);
+    const pcmUser = await db.user.upsert({
+      where: { email: "pcm@happybonding.in" },
+      update: { passwordHash: pcmPasswordHash, roleId: staffRole.id },
+      create: { organizationId: organization.id, roleId: staffRole.id, name: "Pavoorchatram Staff", email: "pcm@happybonding.in", passwordHash: pcmPasswordHash },
+    });
+    await db.userBranch.upsert({
+      where: { userId_branchId: { userId: pcmUser.id, branchId: branch.id } },
+      update: {},
+      create: { userId: pcmUser.id, branchId: branch.id },
+    });
+
     const allBranches = await db.branch.findMany({ where: { organizationId: organization.id } });
     for (const b of allBranches) {
       await db.userBranch.upsert({
