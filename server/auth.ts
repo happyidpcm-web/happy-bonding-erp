@@ -40,7 +40,10 @@ export function requirePermission(permission: string) {
 }
 
 export function requireBranch(req: Request, res: Response) {
-  const branchId = String(req.headers["x-branch-id"] ?? "");
+  let branchId = String(req.headers["x-branch-id"] ?? "").trim();
+  if (!branchId) {
+    branchId = req.session?.branchIds?.[0] || "";
+  }
   if (!branchId) {
     res.status(400).json({ error: "Branch ID header (x-branch-id) is required" });
     return null;

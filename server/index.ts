@@ -648,6 +648,124 @@ app.post("/api/products", requirePermission("products.write"), async (req, res) 
   await audit(req, "product.created", "Product", row.id); res.status(201).json(row);
 });
 
+app.put("/api/products/:id", requirePermission("products.write"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  const targetId = String(req.params.id || "");
+  const organizationId = req.session!.organizationId;
+  const input = parseInput(productInput, req.body);
+
+  const variant = await db.productVariant.findFirst({
+    where: {
+      OR: [{ id: targetId }, { productId: targetId }],
+      product: { organizationId },
+    },
+    include: { product: true },
+  });
+
+  if (!variant) return res.status(404).json({ error: "Item not found" });
+
+  const updated = await db.$transaction(async tx => {
+    const tax = await tx.taxRate.upsert({
+      where: { organizationId_rate: { organizationId, rate: new Prisma.Decimal(input.taxRate) } },
+      create: { organizationId, name: `GST ${input.taxRate}%`, rate: input.taxRate },
+      update: {},
+    });
+
+    await tx.product.update({
+      where: { id: variant.productId },
+      data: {
+        name: input.name,
+        category: input.category,
+        brand: input.brand,
+        hsnCode: input.hsnCode,
+        taxRateId: tax.id,
+      },
+    });
+
+    const updatedVariant = await tx.productVariant.update({
+      where: { id: variant.id },
+      data: {
+        sku: input.sku,
+        barcode: input.barcode,
+        size: input.size,
+        color: input.color,
+        purchasePrice: input.purchasePrice,
+        sellingPrice: input.sellingPrice,
+        mrp: input.mrp,
+      },
+    });
+
+    if (input.openingStock >= 0) {
+      await tx.stockBalance.upsert({
+        where: { branchId_variantId: { branchId, variantId: variant.id } },
+        create: { branchId, variantId: variant.id, quantity: input.openingStock },
+        update: { quantity: input.openingStock },
+      });
+    }
+
+    return updatedVariant;
+  });
+
+  await audit(req, "product.updated", "Product", variant.productId);
+  res.json(updated);
+});
+
+app.delete("/api/products/:id", requirePermission("products.write"), async (req, res) => {
+  const targetId = String(req.params.id || "");
+  const organizationId = req.session!.organizationId;
+
+  const variant = await db.productVariant.findFirst({
+    where: {
+      OR: [{ id: targetId }, { productId: targetId }],
+      product: { organizationId },
+    },
+  });
+
+  if (!variant) return res.status(404).json({ error: "Item not found" });
+
+  await db.productVariant.update({
+    where: { id: variant.id },
+    data: { active: false },
+  });
+
+  await db.product.update({
+    where: { id: variant.productId },
+    data: { active: false },
+  });
+
+  await audit(req, "product.deleted", "Product", variant.productId);
+  res.json({ ok: true, message: "Item deleted successfully" });
+});
+
+app.post("/api/products/bulk-delete", requirePermission("products.write"), async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : [];
+  if (!ids.length) return res.status(400).json({ error: "No product IDs provided" });
+  const organizationId = req.session!.organizationId;
+
+  const variants = await db.productVariant.findMany({
+    where: {
+      OR: [{ id: { in: ids } }, { productId: { in: ids } }],
+      product: { organizationId },
+    },
+  });
+
+  const variantIds = variants.map(v => v.id);
+  const productIds = variants.map(v => v.productId);
+
+  await db.productVariant.updateMany({
+    where: { id: { in: variantIds } },
+    data: { active: false },
+  });
+
+  await db.product.updateMany({
+    where: { id: { in: productIds } },
+    data: { active: false },
+  });
+
+  await audit(req, "products.bulk_deleted", "Product", organizationId, { count: variants.length });
+  res.json({ ok: true, count: variants.length });
+});
+
 app.post("/api/purchases/stock-receipt", requirePermission("products.write"), async (req, res) => {
   const branchId = requireBranch(req, res); if (!branchId) return;
   const input = parseInput(purchaseStockInput, req.body);

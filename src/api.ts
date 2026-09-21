@@ -309,6 +309,30 @@ export const api = {
       return [newProd];
     }
   },
+  async updateProduct(id: string | number, input: { name: string; sku: string; category: string; size: string; openingStock: number; purchasePrice: number; sellingPrice: number; mrp: number; hsnCode?: string; taxRate?: number }): Promise<Product[]> {
+    try {
+      await request(`/products/${id}`, { method: "PUT", body: JSON.stringify({ ...input, hsnCode: input.hsnCode || "6205", taxRate: input.taxRate ?? 5 }) });
+      return await api.products();
+    } catch {
+      return await api.products();
+    }
+  },
+  async deleteProduct(id: string | number): Promise<Product[]> {
+    try {
+      await request<{ ok: boolean }>(`/products/${id}`, { method: "DELETE" });
+      return await api.products();
+    } catch {
+      return await api.products();
+    }
+  },
+  async deleteProductsBulk(ids: (string | number)[]): Promise<Product[]> {
+    try {
+      await request<{ ok: boolean; count: number }>(`/products/bulk-delete`, { method: "POST", body: JSON.stringify({ ids }) });
+      return await api.products();
+    } catch {
+      return await api.products();
+    }
+  },
   async createPurchaseStockReceipt(input: { purchaseDate: Date; purchaseNumber: string; partyName?: string; notes?: string; lines: Array<{ variantId: string | number; quantity: number; unitCost: number }> }): Promise<{ ok: boolean; purchaseNumber: string; lines: number }> {
     return request("/purchases/stock-receipt", {
       method: "POST",
