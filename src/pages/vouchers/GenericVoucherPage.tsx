@@ -52,7 +52,7 @@ import {
   CustomDateRangePopover,
   customRangeLabel,
   defaultInvoiceSetting,
-  EmptyState,
+  defaultSignatureUrl,
   isInvoiceInDateRange,
   Metric,
   Modal,
@@ -104,9 +104,9 @@ export function CreateQuotationScreen({
   const code = type === "Sales Return" ? "SR" : type === "Credit Note" ? "CN" : type === "Delivery Challan" ? "DC" : type === "Proforma Invoice" ? "PF" : type === "Quotation" ? "QUO" : type.toUpperCase().replace(/\s+/g, "").slice(0, 2);
   const [prefix, setPrefix] = useState(`HB/${code}/26-27/`);
   const [number, setNumber] = useState("1");
-  const [date, setDate] = useState("10 Aug 2026");
+  const [date, setDate] = useState(() => new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }));
   const [validDays, setValidDays] = useState(30);
-  const [validityDate, setValidityDate] = useState("09 Sep 2026");
+  const [validityDate, setValidityDate] = useState(() => new Date(Date.now() + 30 * 86400000).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }));
   const [linkedInvoice, setLinkedInvoice] = useState("");
 
   const [lines, setLines] = useState<Array<{ id: string; variantId: string | number; name: string; hsn: string; mrp: number; qty: number; price: number; discount: number; tax: number; amount: number }>>([]);
@@ -121,7 +121,7 @@ export function CreateQuotationScreen({
   const [overallDiscount, setOverallDiscount] = useState(0);
   const [showDiscount, setShowDiscount] = useState(false);
   const [signatureUrl, setSignatureUrl] = useState<string>(() => localStorage.getItem("hb_digital_signature") || "");
-  const [signatoryName, setSignatoryName] = useState<string>(() => localStorage.getItem("hb_signature_name") || "M. Saravanan");
+  const [signatoryName, setSignatoryName] = useState<string>(() => localStorage.getItem("hb_signature_name") || "");
 
   // Fetch official digital signature from PostgreSQL backend database on component mount
   useEffect(() => {
@@ -678,7 +678,7 @@ export function QuickVoucherSettingsModal({
 
   const [priceHistoryEnabled, setPriceHistoryEnabled] = useState(false);
   const [signatureUrl, setSignatureUrl] = useState(() => localStorage.getItem("hb_digital_signature") || "");
-  const [signatoryName, setSignatoryName] = useState(() => localStorage.getItem("hb_signature_name") || "M. Saravanan");
+  const [signatoryName, setSignatoryName] = useState(() => localStorage.getItem("hb_signature_name") || "");
 
   const handleSave = async () => {
     localStorage.setItem(`hb_settings_prefix_${type}`, prefix);
@@ -914,28 +914,30 @@ export function GenericVoucherPage({
 
   useEffect(() => {
     let alive = true;
-    api.vouchers(type).then(dbVouchers => {
-      if (!alive) return;
-      const dbDerived: VoucherRecord[] = dbVouchers.map(v => ({
-        id: v.id,
-        date: new Date(v.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
-        number: v.number,
-        party: v.partyName,
-        dueIn: v.dueIn || "30 Days",
-        amount: Number(v.amount || 0),
-        status: v.status || "Open",
-        notes: v.notes || `${type} record`,
-        items: v.lines?.map(line => ({
-          name: line.itemName,
-          hsn: line.hsn || "6205",
-          qty: Number(line.quantity || 1),
-          price: Number(line.unitPrice || 0),
-          amount: Number(line.total || 0),
-        })),
-      }));
-      setRecords(dbDerived);
-      localStorage.setItem(`hb_vouchers_${type}`, JSON.stringify(dbDerived));
-    }).catch(() => {});
+    if (typeof (api as any).vouchers === "function") {
+      (api as any).vouchers(type).then((dbVouchers: any[]) => {
+        if (!alive) return;
+        const dbDerived: VoucherRecord[] = dbVouchers.map(v => ({
+          id: v.id,
+          date: new Date(v.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+          number: v.number,
+          party: v.partyName,
+          dueIn: v.dueIn || "30 Days",
+          amount: Number(v.amount || 0),
+          status: v.status || "Open",
+          notes: v.notes || `${type} record`,
+          items: v.lines?.map((line: any) => ({
+            name: line.itemName,
+            hsn: line.hsn || "6205",
+            qty: Number(line.quantity || 1),
+            price: Number(line.unitPrice || 0),
+            amount: Number(line.total || 0),
+          })),
+        }));
+        setRecords(dbDerived);
+        localStorage.setItem(`hb_vouchers_${type}`, JSON.stringify(dbDerived));
+      }).catch(() => {});
+    }
     return () => {
       alive = false;
     };

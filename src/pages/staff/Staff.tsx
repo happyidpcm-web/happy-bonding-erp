@@ -140,16 +140,23 @@ export function Staff() {
   const [salary, setSalary] = useState("18000");
 
   useEffect(() => {
-    // Fetch real staff members from database branches/users
-    api.branches().then(branches => {
-      const activeBranch = branches[0];
-      if (activeBranch) {
-        // Populated from DB session user if available
-        setStaffList([
-          { id: "db-admin", name: "Saravana Kumar", phone: activeBranch.phone || "", role: "Store Admin / Owner", salary: 0, status: "Present" }
-        ]);
+    // Fetch real staff members from database API
+    api.staff().then(users => {
+      if (users && users.length > 0) {
+        setStaffList(users.map(u => ({
+          id: u.id,
+          name: u.name,
+          phone: u.phone || "",
+          role: u.role || "Staff Member",
+          salary: 0,
+          status: "Present",
+        })));
+      } else {
+        setStaffList([]);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      setStaffList([]);
+    });
   }, []);
 
   const presentCount = staffList.filter(s => s.status === "Present").length;

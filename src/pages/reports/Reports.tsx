@@ -19,8 +19,8 @@ export function EmailExcelReportModal({
   onClose: () => void;
   notify: (msg: string) => void;
 }) {
-  const [userEmail, setUserEmail] = useState("sarvan.auto@gmail.com");
-  const [caEmail, setCaEmail] = useState("happybondingskm@gmail.com");
+  const [userEmail, setUserEmail] = useState("");
+  const [caEmail, setCaEmail] = useState("");
   const [brevoKey, setBrevoKey] = useState(() => localStorage.getItem("hb_brevo_api_key") || "");
   const [showBrevoConfig, setShowBrevoConfig] = useState(false);
   const [sending, setSending] = useState(false);
@@ -38,9 +38,7 @@ export function EmailExcelReportModal({
       // Generate real base64 Excel data
       let base64Excel: string | undefined = undefined;
       try {
-        const excelRows = (products.length > 0 ? products : [
-          { id: 1, name: "CODEX Shirt 1785770273", sku: "TEST-1785770273", category: "Shirt", size: "2 M", stock: 12, purchasePrice: 200, sellingPrice: 400, mrp: 499, hsnCode: "6205", taxRate: 5 }
-        ]).map((p, idx) => ({
+        const excelRows = products.map((p, idx) => ({
           "S.No": idx + 1,
           "Item Name": p.name,
           "SKU / Item Code": p.sku,
