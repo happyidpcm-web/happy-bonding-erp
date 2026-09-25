@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-export const loginInput = z.object({ email: z.string().email(), password: z.string().min(8) });
+// Login verifies existing credentials; password creation enforces its own policy.
+export const loginInput = z.object({ email: z.string().trim().email(), password: z.string().min(1).max(256) });
 const optString = (maxLen?: number) => z.preprocess(v => (v === "" || v === null ? undefined : v), maxLen ? z.string().trim().max(maxLen).optional() : z.string().trim().optional());
 const optEmail = () => z.preprocess(v => (v === "" || v === null ? undefined : v), z.string().trim().email().optional());
 const optGstin = () => z.preprocess(v => (v === "" || v === null ? undefined : v), z.string().trim().length(15).optional());
@@ -26,7 +27,7 @@ export const invoiceInput = z.object({
   idempotencyKey: z.string().min(8).max(100), partyId: z.string().optional(), invoiceDate: z.coerce.date(),
   placeOfSupply: z.string().length(2), paidAmount: z.number().nonnegative().default(0), paymentMode: z.enum(["Cash", "UPI", "Card", "Bank"]).default("Cash"),
   notes: z.string().max(1000).optional(), invoiceDiscount: z.number().nonnegative().default(0), additionalCharges: z.number().nonnegative().default(0),
-  lines: z.array(z.object({ variantId: z.string(), quantity: z.number().positive(), unitPrice: z.number().nonnegative(), discount: z.number().nonnegative().default(0), taxRate: z.number().min(0).max(100).optional() })).min(1),
+  lines: z.array(z.object({ variantId: z.string(), quantity: z.number().positive(), unitPrice: z.number().nonnegative(), mrp: z.number().nonnegative().optional(), discount: z.number().nonnegative().default(0), taxRate: z.number().min(0).max(100).optional() })).min(1),
 });
 
 export const purchaseStockInput = z.object({

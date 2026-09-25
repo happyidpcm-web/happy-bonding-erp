@@ -1728,6 +1728,23 @@ body{background:#fffdf7;color:#140d08}.sidebar{background:linear-gradient(180deg
   gap: 4px !important;
 }
 
+.invoice-number-display {
+  border: 1px solid transparent;
+  cursor: text;
+  font: inherit;
+  width: 100%;
+}
+.invoice-number-display:focus-visible { outline: 2px solid #4f46e5; }
+.invoice-number-editor {
+  width: 100%;
+  min-width: 55px;
+  padding: 8px;
+  border: 1px solid #4f46e5;
+  border-radius: 4px;
+  font: inherit;
+  text-align: center;
+  box-sizing: border-box;
+}
 .qty-mini-input {
   width: 45px !important;
   border: 1px solid #cbd5e1 !important;

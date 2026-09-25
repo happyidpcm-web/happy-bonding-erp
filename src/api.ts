@@ -1,4 +1,4 @@
-import type { Branch, Expense, Invoice, InvoiceSetting, OwnerBranchSummary, Party, Product, StaffUser } from "./types";
+import type { Branch, Expense, Invoice, InvoiceSetting, OwnerBranchSummary, Party, Product, StaffUser, VoucherRecord } from "./types";
 
 const getBaseUrl = () => {
   if (typeof window !== "undefined" && import.meta.env.VITE_API_URL) {
@@ -34,6 +34,8 @@ type SalesRow = {
   status?: string;
   payments?: Array<{ payment?: { mode?: string | null } | null }>;
   lines?: Array<{
+    variantId?: string;
+    mrp?: string | null;
     itemName: string;
     sku: string;
     hsnCode?: string | null;
@@ -77,6 +79,9 @@ export type PartyLedger = {
 };
 
 async function request<T>(path: string, options?: RequestInit, isRetry = false): Promise<T> {
+  if (import.meta.env.VITE_USE_API !== "true") {
+    throw new Error("Frontend preview mode: enable VITE_USE_API and start the backend to use database features.");
+  }
   let token: string | null = localStorage.getItem(TOKEN_KEY);
   let branch: string | null = localStorage.getItem(BRANCH_KEY);
 
@@ -109,7 +114,10 @@ async function request<T>(path: string, options?: RequestInit, isRetry = false):
     },
   });
 
-  const body = await response.json().catch(() => ({}));
+  if (!response.headers.get("content-type")?.includes("application/json")) {
+    throw new Error("API unavailable. Start the backend server and check the API URL.");
+  }
+  const body = await response.json();
   if (response.status === 401 && !isRetry && path !== "/auth/login") {
     try {
       const loginRes = await fetch(`${baseUrl}/auth/login`, {
@@ -135,6 +143,17 @@ async function request<T>(path: string, options?: RequestInit, isRetry = false):
 }
 
 export const api = {
+  async vouchers(type: string): Promise<VoucherRecord[]> {
+    const rows = await request<VoucherRecord[]>(`/vouchers?type=${encodeURIComponent(type)}`);
+    return rows.map(row => ({ ...row, date: new Date(row.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) }));
+  },
+  async saveVoucher(type: string, record: VoucherRecord): Promise<VoucherRecord> {
+    const saved = await request<VoucherRecord>("/vouchers", { method: "POST", body: JSON.stringify({ ...record, type, date: new Date(record.date).toISOString() }) });
+    return { ...saved, date: new Date(saved.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) };
+  },
+  async deleteVoucher(id: string): Promise<void> {
+    await request(`/vouchers/${encodeURIComponent(id)}`, { method: "DELETE" });
+  },
   async health() { return request<{ ok: boolean }>("/health"); },
   async login(email: string, password: string) { const result = await request<LoginResult>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }); localStorage.setItem(TOKEN_KEY, result.token); localStorage.setItem(BRANCH_KEY, result.branchIds[0]); return result; },
   logout() { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(BRANCH_KEY); },
@@ -551,6 +570,7 @@ function saleFromApi(x: SalesRow): Invoice {
   return {
     id: x.id,
     number: x.invoiceNumber,
+    dateISO: x.invoiceDate.slice(0, 10),
     date: new Date(x.invoiceDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
     party: x.party?.name ?? "Cash Sale",
     partyId: (x as any).partyId,
@@ -571,6 +591,8 @@ function saleFromApi(x: SalesRow): Invoice {
     notes: x.notes ?? "",
     status: x.status === "CANCELLED" ? "Cancelled" : x.paymentStatus === "PAID" ? "Paid" : x.paymentStatus === "UNPAID" ? "Unpaid" : "Partially paid",
     lines: (x.lines ?? []).map(l => ({
+      variantId: l.variantId,
+      mrp: l.mrp == null ? undefined : Number(l.mrp),
       itemName: l.itemName,
       sku: l.sku,
       hsnCode: l.hsnCode ?? "",

@@ -43,7 +43,7 @@ import {
 } from "lucide-react";
 import { api } from "../../api";
 import { money } from "../../data";
-import type { Invoice, InvoiceSetting, Party, Product } from "../../types";
+import type { Invoice, InvoiceSetting, Party, Product, VoucherRecord } from "../../types";
 import { downloadInvoicePdf } from "../../utils/pdf";
 import { BillOfSupplyTemplate } from "../../components/BillOfSupplyTemplate";
 import {
@@ -52,6 +52,7 @@ import {
   CustomDateRangePopover,
   customRangeLabel,
   defaultInvoiceSetting,
+  defaultSignatureUrl,
   EmptyState,
   isInvoiceInDateRange,
   Metric,
@@ -60,19 +61,6 @@ import {
   REPORT_DATE_OPTIONS,
   shareWhatsAppInvoice,
 } from "../../App";
-
-export interface VoucherRecord {
-  id: string;
-  date: string;
-  number: string;
-  party: string;
-  amount: number;
-  invoiceRef?: string;
-  dueIn?: string;
-  status: string;
-  notes?: string;
-  items?: Array<{ name: string; hsn: string; qty: number; price: number; amount: number }>;
-}
 
 export function CreateQuotationScreen({
   title,
@@ -93,7 +81,7 @@ export function CreateQuotationScreen({
   invoices?: Invoice[];
   vouchers?: VoucherRecord[];
   onBack: () => void;
-  onSave: (rec: VoucherRecord) => void;
+  onSave: (rec: VoucherRecord) => Promise<void>;
   onProductsChanged?: (rows: Product[]) => void;
   notify: (msg: string) => void;
 }) {
@@ -104,7 +92,7 @@ export function CreateQuotationScreen({
   const code = type === "Sales Return" ? "SR" : type === "Credit Note" ? "CN" : type === "Delivery Challan" ? "DC" : type === "Proforma Invoice" ? "PF" : type === "Quotation" ? "QUO" : type.toUpperCase().replace(/\s+/g, "").slice(0, 2);
   const [prefix, setPrefix] = useState(`HB/${code}/26-27/`);
   const [number, setNumber] = useState("1");
-  const [date, setDate] = useState("10 Aug 2026");
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [validDays, setValidDays] = useState(30);
   const [validityDate, setValidityDate] = useState("09 Sep 2026");
   const [linkedInvoice, setLinkedInvoice] = useState("");
@@ -133,13 +121,9 @@ export function CreateQuotationScreen({
     }).catch(() => {});
   }, []);
 
-  // Calculate auto sequence quotation number from backend vouchers
   useEffect(() => {
-    if (type === "Quotation" && vouchers && vouchers.length > 0) {
-      const existingQuotations = vouchers.filter(v => (v.number && v.number.includes("QUO")) || v.dueIn);
-      const nextNum = existingQuotations.length + 1;
-      setNumber(String(nextNum));
-    }
+    const next = Math.max(0, ...vouchers.map(v => Number(v.number.split("/").pop()) || 0)) + 1;
+    setNumber(String(next));
   }, [type, vouchers]);
 
   const [autoRoundOff, setAutoRoundOff] = useState(type === "Quotation" ? false : true);
@@ -165,33 +149,24 @@ export function CreateQuotationScreen({
       return;
     }
     const fullNumber = type === "Quotation" ? number : `${prefix}${number}`;
-    if (type === "Purchase Invoice") {
-      try {
-        await api.createPurchaseStockReceipt({
-          purchaseDate: new Date(date),
-          purchaseNumber: fullNumber,
-          partyName,
-          notes,
-          lines: lines.map(line => ({ variantId: line.variantId, quantity: line.qty, unitCost: line.price })),
-        });
-        if (onProductsChanged) onProductsChanged(await api.products());
-      } catch (error) {
-        notify(error instanceof Error ? error.message : "Purchase stock update failed");
-        return;
-      }
-    }
     const newRecord: VoucherRecord = {
       id: String(Date.now()),
       date: new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
       number: fullNumber,
       party: partyName,
       dueIn: `${validDays} Days`,
-      amount: finalTotal || 1500,
+      amount: finalTotal,
       status: "Open",
       notes: notes || `${type} created in ERP`,
-      items: lines.map(line => ({ name: line.name, hsn: line.hsn, qty: line.qty, price: line.price, amount: line.amount })),
+      items: lines.map(line => ({ variantId: String(line.variantId), name: line.name, hsn: line.hsn, qty: line.qty, price: line.price, amount: line.amount })),
     };
-    onSave(newRecord);
+    try {
+      await onSave(newRecord);
+      if (type === "Purchase Invoice" && onProductsChanged) onProductsChanged(await api.products());
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Voucher save failed");
+      return;
+    }
     notify(type === "Purchase Invoice" ? `${type} ${fullNumber} saved and stock added` : `${type} ${fullNumber} created successfully`);
     if (keepNew) {
       setLines([]);
@@ -902,44 +877,20 @@ export function GenericVoucherPage({
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherRecord | null>(null);
   const purchaseDocumentRef = useRef<HTMLDivElement>(null);
   const [purchasePdfDownloading, setPurchasePdfDownloading] = useState(false);
-  const [records, setRecords] = useState<VoucherRecord[]>(() => {
-    const raw = localStorage.getItem(`hb_vouchers_${type}`);
-    if (raw) {
-      try {
-        return JSON.parse(raw);
-      } catch {}
-    }
-    return [];
-  });
-
+  const [records, setRecords] = useState<VoucherRecord[]>([]);
+  const branchId = api.currentBranchId();
   useEffect(() => {
     let alive = true;
-    api.vouchers(type).then(dbVouchers => {
-      if (!alive) return;
-      const dbDerived: VoucherRecord[] = dbVouchers.map(v => ({
-        id: v.id,
-        date: new Date(v.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
-        number: v.number,
-        party: v.partyName,
-        dueIn: v.dueIn || "30 Days",
-        amount: Number(v.amount || 0),
-        status: v.status || "Open",
-        notes: v.notes || `${type} record`,
-        items: v.lines?.map(line => ({
-          name: line.itemName,
-          hsn: line.hsn || "6205",
-          qty: Number(line.quantity || 1),
-          price: Number(line.unitPrice || 0),
-          amount: Number(line.total || 0),
-        })),
-      }));
-      setRecords(dbDerived);
-      localStorage.setItem(`hb_vouchers_${type}`, JSON.stringify(dbDerived));
-    }).catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [type]);
+    setRecords([]);
+    setCreatingFullVoucher(false);
+    setSelectedVoucher(null);
+    api.vouchers(type).then(rows => {
+      if (alive) setRecords(rows);
+    }).catch(error => {
+      if (alive) notify(error instanceof Error ? error.message : "Could not load vouchers");
+    });
+    return () => { alive = false; };
+  }, [type, branchId]);
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -956,10 +907,9 @@ export function GenericVoucherPage({
     });
   }, [records, query, statusFilter, dateFilter]);
 
-  const handleSaveNewRecord = (newRec: VoucherRecord) => {
-    const nextRecords = [newRec, ...records];
-    setRecords(nextRecords);
-    localStorage.setItem(`hb_vouchers_${type}`, JSON.stringify(nextRecords));
+  const handleSaveNewRecord = async (record: VoucherRecord) => {
+    const saved = await api.saveVoucher(type, record);
+    setRecords(rows => [saved, ...rows.filter(row => row.id !== saved.id)]);
   };
 
   const getPurchaseInvoicePreview = (voucher: VoucherRecord): Invoice => {
@@ -1004,10 +954,8 @@ export function GenericVoucherPage({
   const handleDeleteVoucher = async (voucher: VoucherRecord) => {
     if (!window.confirm(`Delete ${type} ${voucher.number}?${type === "Purchase Invoice" ? " Stock will be reduced." : ""}`)) return;
     try {
-      if (type === "Purchase Invoice" && !String(voucher.id).startsWith("db-") && !String(voucher.id).startsWith("party-")) {
-        await api.deletePurchaseStockReceipt(voucher.number);
-        if (onProductsChanged) onProductsChanged(await api.products());
-      }
+      await api.deleteVoucher(voucher.id);
+      if (type === "Purchase Invoice" && onProductsChanged) onProductsChanged(await api.products());
     } catch (error) {
       notify(error instanceof Error ? error.message : `${type} delete failed`);
       return;

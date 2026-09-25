@@ -3,6 +3,19 @@ export type Page =
   | "quotation" | "payment_in" | "sales_return" | "credit_note" | "delivery_challan" | "proforma_invoice"
   | "payment_out" | "purchase_return" | "debit_note" | "purchase_orders" | "expenses" | "reminders";
 
+export interface VoucherRecord {
+  id: string;
+  date: string;
+  number: string;
+  party: string;
+  amount: number;
+  invoiceRef?: string;
+  dueIn?: string;
+  status: string;
+  notes?: string;
+  items?: Array<{ variantId?: string; name: string; hsn: string; qty: number; price: number; amount: number }>;
+}
+
 export interface Expense {
   id: string;
   category: string;
@@ -28,6 +41,8 @@ export interface Party {
 }
 
 export interface InvoiceLineItem {
+  variantId?: string;
+  mrp?: number;
   itemName: string;
   sku: string;
   hsnCode?: string;
@@ -44,6 +59,7 @@ export interface InvoiceLineItem {
 }
 
 export interface Invoice {
+  dateISO?: string;
   id: string | number;
   number: string;
   date: string;

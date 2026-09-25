@@ -10,6 +10,7 @@ import { z, ZodError } from "zod";
 import { db } from "./db.js";
 import { createToken, requireAuth, requireBranch, requirePermission } from "./auth.js";
 import fs from "fs";
+import { voucherRouter } from "./vouchers.js";
 import { expenseInput, invoiceInput, invoiceSettingInput, loginInput, parseInput, partyInput, productInput, purchaseStockInput } from "./validation.js";
 
 const app = express();
@@ -113,6 +114,7 @@ app.post("/api/auth/login", async (req, res) => {
 
 
 app.use("/api", requireAuth);
+app.use("/api/vouchers", voucherRouter);
 
 app.get("/api/branches", async (req, res) => {
   const isOwner = req.session!.permissions.includes("*");
@@ -895,7 +897,7 @@ app.post("/api/sales", requirePermission("sales.write"), async (req, res) => {
     const setting = await tx.invoiceSetting.upsert({ where: { organizationId }, create: { organizationId }, update: {} });
     const fy = financialYear(input.invoiceDate); const sequence = await tx.documentSequence.upsert({ where: { organizationId_branchId_documentType_financialYear: { organizationId, branchId, documentType: "SALES", financialYear: fy } }, create: { organizationId, branchId, documentType: "SALES", financialYear: fy, prefix: `${setting.invoicePrefix}/${fy}/`, nextNumber: 2 }, update: { nextNumber: { increment: 1 } } });
     const number = `${sequence.prefix}${sequence.nextNumber - 1}`;
-    const invoice = await tx.salesInvoice.create({ data: { organizationId, branchId, partyId: input.partyId, invoiceNumber: number, invoiceDate: input.invoiceDate, status: "POSTED", paymentStatus: paymentStatus(input.paidAmount, grandTotal), placeOfSupply: input.placeOfSupply, subtotal: lineSubtotal, discountTotal: round2(lineDiscount + input.invoiceDiscount), invoiceDiscount: input.invoiceDiscount, additionalCharges: input.additionalCharges, taxableTotal: lineTaxable, cgstTotal: calculated.reduce((s,x)=>s+x.cgst,0), sgstTotal: calculated.reduce((s,x)=>s+x.sgst,0), igstTotal: calculated.reduce((s,x)=>s+x.igst,0), grandTotal, paidAmount: Math.min(input.paidAmount, grandTotal), notes: input.notes, idempotencyKey: input.idempotencyKey, postedAt: new Date(), lines: { create: calculated.map(x => ({ variantId: x.v.id, itemName: x.v.product.name, sku: x.v.sku, hsnCode: x.v.product.hsnCode ?? "", quantity: x.input.quantity, unitPrice: x.input.unitPrice, purchasePriceAtSale: x.v.purchasePrice, totalCostAtSale: Number(x.v.purchasePrice) * x.input.quantity, discount: x.input.discount, taxableAmount: x.taxable, taxRate: x.rate, cgst: x.cgst, sgst: x.sgst, igst: x.igst, total: x.total })) } } });
+    const invoice = await tx.salesInvoice.create({ data: { organizationId, branchId, partyId: input.partyId, invoiceNumber: number, invoiceDate: input.invoiceDate, status: "POSTED", paymentStatus: paymentStatus(input.paidAmount, grandTotal), placeOfSupply: input.placeOfSupply, subtotal: lineSubtotal, discountTotal: round2(lineDiscount + input.invoiceDiscount), invoiceDiscount: input.invoiceDiscount, additionalCharges: input.additionalCharges, taxableTotal: lineTaxable, cgstTotal: calculated.reduce((s,x)=>s+x.cgst,0), sgstTotal: calculated.reduce((s,x)=>s+x.sgst,0), igstTotal: calculated.reduce((s,x)=>s+x.igst,0), grandTotal, paidAmount: Math.min(input.paidAmount, grandTotal), notes: input.notes, idempotencyKey: input.idempotencyKey, postedAt: new Date(), lines: { create: calculated.map(x => ({ variantId: x.v.id, itemName: x.v.product.name, sku: x.v.sku, hsnCode: x.v.product.hsnCode ?? "", quantity: x.input.quantity, unitPrice: x.input.unitPrice, mrp: x.input.mrp ?? x.v.mrp, purchasePriceAtSale: x.v.purchasePrice, totalCostAtSale: Number(x.v.purchasePrice) * x.input.quantity, discount: x.input.discount, taxableAmount: x.taxable, taxRate: x.rate, cgst: x.cgst, sgst: x.sgst, igst: x.igst, total: x.total })) } } });
     for (const x of calculated) { await tx.stockBalance.update({ where: { branchId_variantId: { branchId, variantId: x.v.id } }, data: { quantity: { decrement: x.input.quantity } } }); await tx.stockMovement.create({ data: { branchId, variantId: x.v.id, type: "SALE", quantity: -x.input.quantity, referenceType: "SalesInvoice", referenceId: invoice.id } }); }
     if (input.paidAmount > 0) { const payment = await tx.payment.create({ data: { organizationId, branchId, direction: "IN", mode: input.paymentMode, amount: Math.min(input.paidAmount, grandTotal) } }); await tx.paymentAllocation.create({ data: { paymentId: payment.id, salesInvoiceId: invoice.id, amount: Math.min(input.paidAmount, grandTotal) } }); }
     await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: "sales.posted", entityType: "SalesInvoice", entityId: invoice.id, metadata: { invoiceNumber: number } } }); return invoice;
@@ -934,7 +936,7 @@ app.put("/api/sales/:id", requirePermission("sales.write"), async (req, res) => 
   const lineTaxable = round2(calculated.reduce((s, x) => s + x.taxable, 0));
   const grandTotal = Math.max(0, round2(calculated.reduce((s, x) => s + x.total, 0) + input.additionalCharges));
 
-  const existingPaymentTotal = oldInvoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+  const existingPaymentTotal = Math.max(Number(oldInvoice.paidAmount), oldInvoice.payments.reduce((sum, p) => sum + Number(p.amount), 0));
   if (grandTotal < existingPaymentTotal) {
     return res.status(400).json({ error: `Edited total (${grandTotal}) cannot be less than already received amount (${existingPaymentTotal}). Please issue a refund or credit note.` });
   }
@@ -979,7 +981,7 @@ app.put("/api/sales/:id", requirePermission("sales.write"), async (req, res) => 
         grandTotal,
         paidAmount: finalPaidAmount,
         notes: input.notes,
-        lines: { create: calculated.map(x => ({ variantId: x.v.id, itemName: x.v.product.name, sku: x.v.sku, hsnCode: x.v.product.hsnCode ?? "", quantity: x.input.quantity, unitPrice: x.input.unitPrice, purchasePriceAtSale: x.v.purchasePrice, totalCostAtSale: Number(x.v.purchasePrice) * x.input.quantity, discount: x.input.discount, taxableAmount: x.taxable, taxRate: x.rate, cgst: x.cgst, sgst: x.sgst, igst: x.igst, total: x.total })) },
+        lines: { create: calculated.map(x => ({ variantId: x.v.id, itemName: x.v.product.name, sku: x.v.sku, hsnCode: x.v.product.hsnCode ?? "", quantity: x.input.quantity, unitPrice: x.input.unitPrice, mrp: x.input.mrp ?? x.v.mrp, purchasePriceAtSale: x.v.purchasePrice, totalCostAtSale: Number(x.v.purchasePrice) * x.input.quantity, discount: x.input.discount, taxableAmount: x.taxable, taxRate: x.rate, cgst: x.cgst, sgst: x.sgst, igst: x.igst, total: x.total })) },
       },
     });
     for (const x of calculated) {
@@ -1164,11 +1166,17 @@ app.post("/api/credit-notes", requirePermission("sales.write"), async (req, res)
   const organizationId = req.session!.organizationId;
   const input = parseInput(creditNoteInput, req.body);
   
-  const inv = await db.salesInvoice.findFirst({ where: { id: input.salesInvoiceId, organizationId }});
+  const inv = await db.salesInvoice.findFirst({ where: { id: input.salesInvoiceId, organizationId, branchId }});
   if (!inv) return res.status(404).json({ error: "Original invoice not found" });
 
-  const num = await generateNextDocumentNumber(organizationId, branchId, "CN");
   const creditNote = await db.$transaction(async tx => {
+    const fy = financialYear(input.date);
+    const sequence = await tx.documentSequence.upsert({
+      where: { organizationId_branchId_documentType_financialYear: { organizationId, branchId: "organization", documentType: "CN", financialYear: fy } },
+      create: { organizationId, branchId: "organization", documentType: "CN", financialYear: fy, prefix: `HB/CN/${fy}/`, nextNumber: 2 },
+      update: { nextNumber: { increment: 1 } },
+    });
+    const num = `${sequence.prefix}${sequence.nextNumber - 1}`;
     const cn = await tx.creditNote.create({
       data: {
         organizationId,
@@ -1297,7 +1305,7 @@ app.delete("/api/expenses/:id", requirePermission("sales.write"), async (req, re
 async function generateFullBackupData(organizationId: string) {
   const [
     branches, users, parties, products, taxRates, stockBalances, stockMovements,
-    invoices, invoiceLines, payments, expenses, invoiceSetting
+    invoices, invoiceLines, payments, expenses, invoiceSetting, paymentAllocations, vouchers
   ] = await Promise.all([
     db.branch.findMany({ where: { organizationId } }),
     db.user.findMany({ where: { organizationId }, select: { id: true, name: true, email: true, phone: true, roleId: true } }),
@@ -1311,6 +1319,8 @@ async function generateFullBackupData(organizationId: string) {
     db.payment.findMany({ where: { organizationId } }),
     db.expense.findMany({ where: { organizationId } }),
     db.invoiceSetting.findUnique({ where: { organizationId } }),
+    db.paymentAllocation.findMany({ where: { payment: { organizationId } } }),
+    db.voucher.findMany({ where: { organizationId } }),
   ]);
 
   return {
@@ -1319,7 +1329,7 @@ async function generateFullBackupData(organizationId: string) {
     organizationId,
     data: {
       branches, users, parties, products, taxRates, stockBalances, stockMovements,
-      invoices, invoiceLines, payments, expenses, invoiceSetting
+      invoices, invoiceLines, payments, expenses, invoiceSetting, paymentAllocations, vouchers
     }
   };
 }
@@ -1468,7 +1478,7 @@ const port = Number(process.env.PORT || process.env.API_PORT || 4000);
 app.listen(port, "0.0.0.0", () => {
   console.log(`Happy Bonding API running on 0.0.0.0:${port}`);
   setupDailyBackupScheduler();
-  import("child_process").then(({ exec }) => {
+  if (process.env.AUTO_SETUP_DATABASE === "true") import("child_process").then(({ exec }) => {
     exec("npx prisma db push && tsx prisma/seed.ts", (err, stdout) => {
       if (err) console.error("Auto DB push/seed warning:", err.message);
       else console.log("Auto DB push & seed result:", stdout);

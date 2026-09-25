@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { money } from "./data";
 import { api } from "./api";
+import { EditableInvoiceNumber } from "./components/EditableInvoiceNumber";
 import type { Branch, Expense, Invoice, InvoiceLineItem, InvoiceSetting, OwnerBranchSummary, Page, Party, Product, StaffUser } from "./types";
 import * as XLSX from "xlsx";
 import happyBondingLogo from "./assets/happy-bonding-logo-white.png";
@@ -75,7 +76,7 @@ const nav: { section: string; items: { id: Page; label: string; icon: typeof Lay
   ]},
 ];
 
-const defaultSignatureUrl = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 70" width="220" height="60"><path d="M10 45 C30 10, 45 5, 55 45 C65 25, 75 15, 85 45 C95 10, 110 30, 130 40 C140 15, 155 25, 175 35 C185 10, 205 35, 240 15" stroke="%23111827" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M25 50 C80 48, 140 52, 210 48" stroke="%23111827" stroke-width="1.5" fill="none"/><text x="35" y="65" font-family="cursive, sans-serif" font-size="18" font-weight="bold" fill="%23111827">M. Saravana</text></svg>`;
+export const defaultSignatureUrl = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 70" width="220" height="60"><path d="M10 45 C30 10, 45 5, 55 45 C65 25, 75 15, 85 45 C95 10, 110 30, 130 40 C140 15, 155 25, 175 35 C185 10, 205 35, 240 15" stroke="%23111827" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M25 50 C80 48, 140 52, 210 48" stroke="%23111827" stroke-width="1.5" fill="none"/><text x="35" y="65" font-family="cursive, sans-serif" font-size="18" font-weight="bold" fill="%23111827">M. Saravana</text></svg>`;
 
 export const defaultInvoiceSetting: InvoiceSetting = { invoicePrefix: "HB/SL", paymentTermsDays: 30, terms: "NO REFUND ONCE SOLD. EXCHANGE ONLY AS PER STORE POLICY.", bankName: "", accountName: "", accountNumber: "", ifsc: "", upiId: "", qrText: "", signatureText: "Authorized signatory for Happy Bonding Men's Wear", signatureUrl: defaultSignatureUrl };
 
@@ -864,7 +865,7 @@ export function Metric({ label, value, icon: Icon, tone = "amber", hint }: { lab
 }
 
 
-function EmptyState({icon:Icon,title,text}:{icon:typeof ReceiptIndianRupee;title:string;text:string}){return <div className="empty"><Icon/><h3>{title}</h3><p>{text}</p></div>;}
+export function EmptyState({icon:Icon,title,text}:{icon:typeof ReceiptIndianRupee;title:string;text:string}){return <div className="empty"><Icon/><h3>{title}</h3><p>{text}</p></div>;}
 
 function SearchRow({ value, onChange, placeholder }: { value: string; onChange: (v:string)=>void; placeholder: string }) { return <div className="search-box"><Search size={17}/><input value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}/></div>; }
 
@@ -2321,7 +2322,12 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   useEffect(()=>{if(autoCreateKey)setCreating(true);},[autoCreateKey]);
   useEffect(()=>{setPaymentTerms(setting.paymentTermsDays);},[setting.paymentTermsDays]);
   useEffect(()=>{setTerms(setting.terms);},[setting.terms]);
-  useEffect(()=>{if(creating) api.nextSaleNumber(new Date(invoiceDate)).then(x=>setNextNumber(x.invoiceNumber)).catch(()=>setNextNumber(""));},[creating,rows.length,invoiceDate]);
+  useEffect(() => {
+    if (editingInvoice) { setNextNumber(editingInvoice.number); return; }
+    let alive = true;
+    if (creating) api.nextSaleNumber(new Date(invoiceDate)).then(x => { if (alive) setNextNumber(x.invoiceNumber); }).catch(() => { if (alive) setNextNumber(""); });
+    return () => { alive = false; };
+  }, [creating, rows.length, invoiceDate, editingInvoice]);
   
   const addLine=(product:Product, taxRate?:number)=>{setLines(current=>{const found=current.find(x=>x.product.id===product.id);return found?current.map(x=>x.product.id===product.id?{...x,qty:x.qty+1}:x):[...current,{product,qty:1,discount:0,taxRate:taxRate??product.taxRate??0}]});setItemSearch("");};
   const addBatchLines=(items: Array<{ product: Product; qty: number; taxRate: number }>) => {
@@ -2373,7 +2379,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
     try{
 {/* ... */}
       if (editingInvoice) {
-        const existingPaymentTotal = editingInvoice.payments?.reduce((sum, p) => sum + Number(p.amount), 0) ?? 0;
+        const existingPaymentTotal = editingInvoice.paidAmount ?? 0;
         if (total < existingPaymentTotal) {
            return notify(`Edited total (₹${total.toLocaleString("en-IN")}) cannot be less than already received amount (₹${existingPaymentTotal.toLocaleString("en-IN")}). Please issue refund/credit note instead.`);
         }
@@ -2381,9 +2387,9 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
       setSaving(true);
       let partyId=selectedParty?.id ? String(selectedParty.id) : undefined;
       const received=markPaid?total:paid;
-      const payload={partyId,invoiceDate:new Date(invoiceDate),paidAmount:Math.min(received,total),paymentMode,notes:[notes,showTerms?terms:""].filter(Boolean).join("\n"),invoiceDiscount,additionalCharges,lines:lines.map(x=>({variantId:String(x.product.id),quantity:x.qty,unitPrice:x.product.sellingPrice,discount:x.discount,taxRate:x.taxRate??x.product.taxRate??0}))};
+      const payload={partyId,invoiceDate:new Date(invoiceDate),paidAmount:Math.min(received,total),paymentMode,notes:[notes,showTerms?terms:""].filter(Boolean).join("\n"),invoiceDiscount,additionalCharges,lines:lines.map(x=>({variantId:String(x.product.id),quantity:x.qty,unitPrice:x.product.sellingPrice,mrp:x.product.mrp,discount:x.discount,taxRate:x.taxRate??x.product.taxRate??0}))};
       const next=editingInvoice?await api.updateSale(editingInvoice.id,payload):await api.createSale(payload);
-      setRows(next); setProducts(await api.products()); setEditingInvoice(null); resetInvoiceForm(); setCreating(keepOpen && !editingInvoice); notify(editingInvoice?`Sales invoice ${editingInvoice.number} updated`:keepOpen?"Sales invoice saved. Ready for next invoice.":"Sales invoice saved");
+      setRows(next); setProducts(await api.products()); setParties(await api.parties()); setEditingInvoice(null); resetInvoiceForm(); setCreating(keepOpen && !editingInvoice); notify(editingInvoice?`Sales invoice ${editingInvoice.number} updated`:keepOpen?"Sales invoice saved. Ready for next invoice.":"Sales invoice saved");
     }catch(error){notify(error instanceof Error?error.message:"Invoice save failed");}finally{setSaving(false);}
   };
   const deleteInvoice = async (inv: Invoice) => {
@@ -2432,7 +2438,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   const duplicateInvoice = (inv: Invoice) => {
     const copiedLines = (inv.lines ?? []).map(line => {
       const product = products.find(p => String(p.id) === String((line as InvoiceLineItem & { productId?: string }).productId) || p.sku === line.sku);
-      return product ? { product, qty: line.quantity, discount: line.discount, taxRate: line.taxRate } : null;
+      return product ? { product: { ...product, name: line.itemName, hsnCode: line.hsnCode, sellingPrice: line.unitPrice, mrp: line.mrp ?? product.mrp }, qty: line.quantity, discount: line.discount, taxRate: line.taxRate } : null;
     }).filter(Boolean) as InvoiceLineDraft[];
     setLines(copiedLines);
     const party = parties.find(p => p.name === inv.party || p.phone === inv.partyPhone);
@@ -2445,12 +2451,14 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
     setCreating(true);
     notify(`Invoice ${inv.number} duplicated. Check and save as new invoice.`);
   };
-  const editInvoice = (inv: Invoice) => {
+  const editInvoice = async (selected: Invoice) => {
+    let inv: Invoice;
+    try { inv = await api.sale(selected.id); } catch (error) { notify(error instanceof Error ? error.message : "Could not load invoice"); return; }
     const editLines = (inv.lines ?? []).map(line => {
       const product = products.find(p => p.sku === line.sku);
-      return product ? { product, qty: line.quantity, discount: line.discount, taxRate: line.taxRate } : null;
+      return product ? { product: { ...product, name: line.itemName, hsnCode: line.hsnCode, sellingPrice: line.unitPrice, mrp: line.mrp ?? product.mrp }, qty: line.quantity, discount: line.discount, taxRate: line.taxRate } : null;
     }).filter(Boolean) as InvoiceLineDraft[];
-    if (!editLines.length) {
+    if (!editLines.length || editLines.length !== inv.lines?.length) {
       notify("This invoice items are not available in product master, cannot edit safely.");
       return;
     }
@@ -2464,7 +2472,8 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
     setInvoiceDiscount(inv.invoiceDiscount ?? 0);
     setAdditionalCharges(inv.additionalCharges ?? 0);
     setNotes(inv.notes ?? "");
-    setInvoiceDate(new Date(inv.date).toISOString().slice(0,10));
+    const date = new Date(inv.date);
+    setInvoiceDate(inv.dateISO ?? `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`);
     setMarkPaid((inv.paidAmount ?? 0) >= inv.amount);
     setCreating(true);
     notify(`Editing ${inv.number}`);
@@ -2712,18 +2721,18 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
                     <td className="center-cell">{line.product.hsnCode || "-"}</td>
                     <td>
                       <div className="mrp-cell-wrap">
-                        <div className="gray-val-box">{money(line.product.mrp)}</div>
-                        <small className="discount-badge-off">({Math.round(((line.product.mrp - line.product.sellingPrice) / line.product.mrp) * 100) || 7.7}% OFF)</small>
+                        <EditableInvoiceNumber label={`MRP for ${line.product.name}`} value={line.product.mrp} currency onChange={mrp => setLines(rows => rows.map(x => x.product.id === line.product.id ? { ...x, product: { ...x.product, mrp } } : x))} />
+                        <small className="discount-badge-off">({line.product.mrp > 0 ? Math.max(0, Math.round(((line.product.mrp - line.product.sellingPrice) / line.product.mrp) * 100)) : 0}% OFF)</small>
                       </div>
                     </td>
                     <td>
                       <div className="qty-cell-wrap">
-                        <input className="qty-mini-input" type="number" value={line.qty} min={1} onChange={e => setLines(lines.map(x => x.product.id === line.product.id ? { ...x, qty: Number(e.target.value) } : x))} />
+                        <EditableInvoiceNumber label={`Quantity for ${line.product.name}`} value={line.qty} min={1} integer onChange={qty => setLines(rows => rows.map(x => x.product.id === line.product.id ? { ...x, qty } : x))} />
                         <select className="unit-select"><option>PCS</option><option>BOX</option><option>KG</option></select>
                       </div>
                     </td>
                     <td>
-                      <div className="gray-val-box">{money(line.product.sellingPrice)}</div>
+                      <EditableInvoiceNumber label={`Price for ${line.product.name}`} value={line.product.sellingPrice} currency onChange={sellingPrice => setLines(rows => rows.map(x => x.product.id === line.product.id ? { ...x, product: { ...x.product, sellingPrice } } : x))} />
                     </td>
                     <td>
                       <div className="discount-cell-wrap">
@@ -3509,7 +3518,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
               const prod = products.find(p => String(p.id) === String(ul.variantId) || p.name === ul.name);
               if (prod) {
                 newLines.push({
-                  product: prod,
+                  product: { ...prod, mrp: ul.mrp, sellingPrice: ul.price },
                   qty: ul.qty,
                   discount: ul.discount || 0,
                   taxRate: ul.tax ?? prod.taxRate ?? 0
@@ -3638,13 +3647,14 @@ export function AddItemModal({ products, currentLines, onClose, onApplyItems, no
       if (qty <= 0) return;
       const prod = products.find(p => String(p.id) === id);
       if (prod) {
-        const price = prod.sellingPrice;
+        const current = currentLines.find(line => String(line.variantId ?? line.id) === id);
+        const price = current?.price ?? prod.sellingPrice;
         newLines.push({
           id: "L-" + id,
           variantId: prod.id,
           name: prod.name,
           hsn: prod.hsnCode || "6205",
-          mrp: prod.mrp || price,
+          mrp: current?.mrp ?? prod.mrp,
           qty,
           price,
           discount: 0,
