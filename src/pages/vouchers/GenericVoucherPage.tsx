@@ -108,8 +108,8 @@ export function CreateQuotationScreen({
   const [showAdditionalCharges, setShowAdditionalCharges] = useState(false);
   const [overallDiscount, setOverallDiscount] = useState(0);
   const [showDiscount, setShowDiscount] = useState(false);
-  const [signatureUrl, setSignatureUrl] = useState<string>(() => localStorage.getItem("hb_digital_signature") || "");
-  const [signatoryName, setSignatoryName] = useState<string>(() => localStorage.getItem("hb_signature_name") || "M. Saravanan");
+  const [signatureUrl, setSignatureUrl] = useState<string>(() => "");
+  const [signatoryName, setSignatoryName] = useState<string>(() => "");
 
   // Fetch official digital signature from PostgreSQL backend database on component mount
   useEffect(() => {
@@ -599,7 +599,7 @@ export function CreateQuotationScreen({
             </span>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <img
-                src={signatureUrl || localStorage.getItem("hb_digital_signature") || defaultSignatureUrl}
+                src={signatureUrl || undefined}
                 alt="Digital Signature"
                 style={{ height: 48, objectFit: "contain" }}
               />
@@ -652,8 +652,8 @@ export function QuickVoucherSettingsModal({
   const [showItemImage, setShowItemImage] = useState(false);
 
   const [priceHistoryEnabled, setPriceHistoryEnabled] = useState(false);
-  const [signatureUrl, setSignatureUrl] = useState(() => localStorage.getItem("hb_digital_signature") || "");
-  const [signatoryName, setSignatoryName] = useState(() => localStorage.getItem("hb_signature_name") || "M. Saravanan");
+  const [signatureUrl, setSignatureUrl] = useState(() => "");
+  const [signatoryName, setSignatoryName] = useState(() => "");
 
   const handleSave = async () => {
     localStorage.setItem(`hb_settings_prefix_${type}`, prefix);
@@ -675,7 +675,7 @@ export function QuickVoucherSettingsModal({
         signatureUrl: signatureUrl || "",
         signatureText: `Authorized signatory for Happy Bonding Men's Wear (${signatoryName})`,
       });
-    } catch {}
+    } catch (error) { notify(error instanceof Error ? error.message : "Settings save failed"); return; }
 
     if (onSaveSignature) {
       onSaveSignature(signatureUrl, signatoryName);

@@ -198,7 +198,7 @@ export function RateListReportScreen({
             <ArrowLeft size={18} />
           </button>
           <h1>Rate List</h1>
-          <button type="button" className="secondary" style={{ padding: "4px 8px", fontSize: 12 }} onClick={() => notify("Added Rate List to Favourites")}>
+          <button type="button" className="secondary" style={{ padding: "4px 8px", fontSize: 12 }} onClick={() => notify("Report favourites are not available yet")}>
             <Star size={14} /> Favourite
           </button>
         </div>
@@ -303,7 +303,7 @@ export function StockSummaryReportScreen({
             <ArrowLeft size={18} />
           </button>
           <h1>Stock Summary</h1>
-          <button type="button" className="secondary" style={{ padding: "4px 8px", fontSize: 12 }} onClick={() => notify("Added Stock Summary to Favourites")}>
+          <button type="button" className="secondary" style={{ padding: "4px 8px", fontSize: 12 }} onClick={() => notify("Report favourites are not available yet")}>
             <Star size={14} /> Favourite
           </button>
         </div>
@@ -444,7 +444,7 @@ export function LowStockSummaryReportScreen({
             <ArrowLeft size={18} />
           </button>
           <h1>Low Stock Summary</h1>
-          <button type="button" className="secondary" style={{ padding: "4px 8px", fontSize: 12 }} onClick={() => notify("Added Low Stock Summary to Favourites")}>
+          <button type="button" className="secondary" style={{ padding: "4px 8px", fontSize: 12 }} onClick={() => notify("Report favourites are not available yet")}>
             <Star size={14} /> Favourite
           </button>
         </div>
@@ -569,7 +569,7 @@ export function ItemSalesSummaryReportScreen({
             <ArrowLeft size={18} />
           </button>
           <h1>Item Sales and Purchase Summary</h1>
-          <button type="button" className="secondary" style={{ padding: "4px 8px", fontSize: 12 }} onClick={() => notify("Added Item Sales Summary to Favourites")}>
+          <button type="button" className="secondary" style={{ padding: "4px 8px", fontSize: 12 }} onClick={() => notify("Report favourites are not available yet")}>
             <Star size={14} /> Favourite
           </button>
         </div>
@@ -711,7 +711,7 @@ export function SalesSummaryReportScreen({
             <ArrowLeft size={18} />
           </button>
           <h1>Sales Summary - Staff wise</h1>
-          <button type="button" className="secondary" style={{ padding: "4px 8px", fontSize: 12 }} onClick={() => notify("Added Sales Summary to Favourites")}>
+          <button type="button" className="secondary" style={{ padding: "4px 8px", fontSize: 12 }} onClick={() => notify("Report favourites are not available yet")}>
             <Star size={14} /> Favourite
           </button>
         </div>
@@ -852,7 +852,7 @@ export function DayBookReportScreen({
             <ArrowLeft size={18} />
           </button>
           <h1>DayBook</h1>
-          <button type="button" className="secondary" style={{ padding: "4px 8px", fontSize: 12 }} onClick={() => notify("Added DayBook to Favourites")}>
+          <button type="button" className="secondary" style={{ padding: "4px 8px", fontSize: 12 }} onClick={() => notify("Report favourites are not available yet")}>
             <Star size={14} /> Favourite
           </button>
         </div>
@@ -963,7 +963,7 @@ export function BillWiseProfitReportScreen({
             <ArrowLeft size={18} />
           </button>
           <h1>Bill Wise Profit</h1>
-          <button type="button" className="secondary" style={{ padding: "4px 8px", fontSize: 12 }} onClick={() => notify("Added Bill Wise Profit to Favourites")}>
+          <button type="button" className="secondary" style={{ padding: "4px 8px", fontSize: 12 }} onClick={() => notify("Report favourites are not available yet")}>
             <Star size={14} /> Favourite
           </button>
         </div>
@@ -1054,6 +1054,7 @@ export function Reports({
     }
   }, [initialReport]);
 
+  if (activeReport && !["Stock summary", "Stock valuation", "Low stock", "Sales summary", "Bill-wise profit", "Fast & slow moving", "DayBook"].includes(activeReport)) return <><button onClick={() => setActiveReport(null)}>Back</button><h2>{activeReport}</h2><p>This report is not available yet.</p></>;
   if (activeReport === "Stock summary" || activeReport === "Stock valuation") {
     return (
       <StockSummaryReportScreen
@@ -1224,7 +1225,10 @@ export function Reports({
               <button
                 className="report-item-row"
                 key={x.name}
-                onClick={() => setActiveReport(x.targetKey)}
+                onClick={() => {
+ const supported = ["Stock Summary", "Stock Detail Report", "Low Stock Summary", "Sales Summary", "Bill Wise Profit", "DayBook"];
+ if (supported.includes(x.name)) setActiveReport(x.targetKey); else notify(x.name + " is not available yet.");
+}}
               >
                 <span className="report-item-name">
                   {x.name}
@@ -1246,7 +1250,7 @@ export function Reports({
       <div className="reports-hub-wrapper">
         <div className="reports-hub-topbar">
           <h1 className="reports-hub-title">Reports</h1>
-          <button className="ca-reports-btn" onClick={() => notify("CA Reports Sharing feature active")}>
+          <button className="ca-reports-btn" onClick={() => notify("CA Reports Sharing is not available yet")}>
             <ShieldCheck size={16} /> CA Reports Sharing
           </button>
         </div>

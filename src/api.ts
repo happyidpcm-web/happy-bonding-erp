@@ -78,68 +78,23 @@ export type PartyLedger = {
   payments: Array<{ id: string; mode: string; amount: number; reference?: string | null; paidAt: string; allocations: Array<{ invoiceId: string; invoiceNumber: string; amount: number }> }>;
 };
 
-async function request<T>(path: string, options?: RequestInit, isRetry = false): Promise<T> {
-  if (import.meta.env.VITE_USE_API !== "true") {
-    throw new Error("Frontend preview mode: enable VITE_USE_API and start the backend to use database features.");
-  }
-  let token: string | null = localStorage.getItem(TOKEN_KEY);
-  let branch: string | null = localStorage.getItem(BRANCH_KEY);
-
-  if (!token && path !== "/auth/login") {
-    try {
-      const loginRes = await fetch(`${baseUrl}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: "admin@happybonding.in", password: "HappyBonding@2026" }),
-      });
-      const loginBody = await loginRes.json();
-      if (loginRes.ok && loginBody.token) {
-        token = loginBody.token as string;
-        localStorage.setItem(TOKEN_KEY, token);
-        if (!branch && loginBody.branchIds?.[0]) {
-          branch = loginBody.branchIds[0];
-          if (branch) localStorage.setItem(BRANCH_KEY, branch);
-        }
-      }
-    } catch {}
-  }
-
-  const response = await fetch(`${baseUrl}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(branch ? { "x-branch-id": branch } : {}),
-      ...options?.headers,
-    },
-  });
-
-  if (!response.headers.get("content-type")?.includes("application/json")) {
-    throw new Error("API unavailable. Start the backend server and check the API URL.");
-  }
-  const body = await response.json();
-  if (response.status === 401 && !isRetry && path !== "/auth/login") {
-    try {
-      const loginRes = await fetch(`${baseUrl}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: "admin@happybonding.in", password: "HappyBonding@2026" }),
-      });
-      const loginBody = await loginRes.json();
-      if (loginRes.ok && loginBody.token) {
-        localStorage.setItem(TOKEN_KEY, loginBody.token);
-        if (!localStorage.getItem(BRANCH_KEY) && loginBody.branchIds?.[0]) {
-          localStorage.setItem(BRANCH_KEY, loginBody.branchIds[0]);
-        }
-        return request<T>(path, options, true);
-      }
-    } catch {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(BRANCH_KEY);
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const branch = localStorage.getItem(BRANCH_KEY);
+    const response = await fetch(baseUrl + path, { ...options, headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}), ...(branch ? { "x-branch-id": branch } : {}), ...options?.headers }});
+    if (response.status === 401 && path !== "/auth/login") {
+      localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(BRANCH_KEY);
+      window.dispatchEvent(new Event("hb-session-expired"));
     }
+    if (!response.headers.get("content-type")?.includes("application/json")) throw new Error("Backend unavailable. Please retry when the server is connected.");
+    const body = await response.json();
+    if (!response.ok) throw new Error(formatApiError(body));
+    return body as T;
+  } catch (error) {
+    window.dispatchEvent(new CustomEvent("hb-api-error", { detail: error instanceof Error ? error.message : "Backend request failed" }));
+    throw error;
   }
-  if (!response.ok) throw new Error(formatApiError(body));
-  return body as T;
 }
 
 export const api = {
@@ -157,7 +112,7 @@ export const api = {
   async health() { return request<{ ok: boolean }>("/health"); },
   async login(email: string, password: string) { const result = await request<LoginResult>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }); localStorage.setItem(TOKEN_KEY, result.token); localStorage.setItem(BRANCH_KEY, result.branchIds[0]); return result; },
   logout() { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(BRANCH_KEY); },
-  hasSession() { return Boolean(localStorage.getItem(TOKEN_KEY)); },
+  hasSession() { return Boolean(localStorage.getItem(TOKEN_KEY) && localStorage.getItem(TOKEN_KEY) !== "mock_local_token_2026"); },
   currentBranchId() { return localStorage.getItem(BRANCH_KEY) || ""; },
   setCurrentBranch(branchId: string) { localStorage.setItem(BRANCH_KEY, branchId); },
   async branches(): Promise<Branch[]> { return request<Branch[]>("/branches"); },
@@ -181,24 +136,12 @@ export const api = {
   async ownerSummary(): Promise<OwnerBranchSummary[]> { return request<OwnerBranchSummary[]>("/owner/summary"); },
   async staff(): Promise<StaffUser[]> { return request<StaffUser[]>("/staff"); },
   async changePassword(currentPassword: string, newPassword: string): Promise<{ ok: boolean; message: string }> {
-    try {
       return await request("/auth/change-password", { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) });
-    } catch (err: any) {
-      if (err instanceof Error && (err.message.includes("Failed to fetch") || err.message.includes("404"))) {
-        return { ok: true, message: "Password updated successfully!" };
-      }
-      throw err;
-    }
+
   },
   async updateStaffPassword(staffId: string, newPassword: string): Promise<{ ok: boolean; message: string }> {
-    try {
       return await request(`/staff/${staffId}/password`, { method: "PUT", body: JSON.stringify({ newPassword }) });
-    } catch (err: any) {
-      if (err instanceof Error && (err.message.includes("Failed to fetch") || err.message.includes("404"))) {
-        return { ok: true, message: "Staff password updated successfully!" };
-      }
-      throw err;
-    }
+
   },
   async createStaff(input: { name: string; email: string; phone?: string; password: string; branchIds: string[] }): Promise<StaffUser> {
     return request<StaffUser>("/staff", { method: "POST", body: JSON.stringify(input) });
@@ -208,149 +151,54 @@ export const api = {
     return request("/sync/push", { method: "POST", body: JSON.stringify({ items }) });
   },
   async parties(): Promise<Party[]> {
-    try {
       const rows = await request<PartyRow[]>("/parties");
       return rows.map(partyFromApi);
-    } catch {
-      return [];
-    }
+
   },
   async partyLedger(id: string | number): Promise<PartyLedger | null> {
-    try {
       return await request<PartyLedger>(`/parties/${id}/ledger`);
-    } catch {
-      return null;
-    }
+
   },
   async createParty(input: PartyInput): Promise<Party> {
     const payload = cleanPayload({ ...input, phone: input.phone || undefined, type: input.type === "Supplier" ? "SUPPLIER" : "CUSTOMER" });
-    try {
       const row = await request<PartyRow>("/parties", { method: "POST", body: JSON.stringify(payload) });
       return partyFromApi(row);
-    } catch {
-      // Local fallback party creation if backend is offline
-      return {
-        id: "P-" + Date.now(),
-        name: input.name,
-        phone: input.phone || "",
-        type: input.type || "Customer",
-        balance: input.openingBalance || 0,
-        openingBalanceType: "TO_COLLECT",
-        email: input.email || "",
-        gstin: input.gstin || "",
-        pan: input.pan || "",
-        category: input.category || "",
-        address: input.address || "",
-        shippingAddress: input.shippingAddress || "",
-        sameAsBilling: input.sameAsBilling ?? true,
-        creditPeriodDays: input.creditPeriodDays ?? 30,
-        creditLimit: input.creditLimit ? Number(input.creditLimit) : 0,
-        contactPersonName: input.contactPersonName || "",
-        contactPersonDob: input.contactPersonDob || "",
-        bankName: input.bankName || "",
-        bankAccountName: input.bankAccountName || "",
-        bankAccountNumber: input.bankAccountNumber || "",
-        bankIfsc: input.bankIfsc || "",
-        bankBranch: input.bankBranch || "",
-        customBirthday: input.customBirthday || "",
-        customKovilThiruvila: input.customKovilThiruvila || "",
-      };
-    }
+
   },
   async updateParty(id: string | number, input: PartyInput): Promise<Party> {
     const payload = cleanPayload({ ...input, phone: input.phone || undefined, type: input.type === "Supplier" ? "SUPPLIER" : "CUSTOMER" });
-    try {
       const row = await request<PartyRow>(`/parties/${id}`, { method: "PUT", body: JSON.stringify(payload) });
       return partyFromApi(row);
-    } catch {
-      return {
-        id: String(id),
-        name: input.name,
-        phone: input.phone || "",
-        type: input.type || "Customer",
-        balance: input.openingBalance || 0,
-        openingBalanceType: "TO_COLLECT",
-        email: input.email || "",
-        gstin: input.gstin || "",
-        pan: input.pan || "",
-        category: input.category || "",
-        address: input.address || "",
-        shippingAddress: input.shippingAddress || "",
-        sameAsBilling: input.sameAsBilling ?? true,
-        creditPeriodDays: input.creditPeriodDays ?? 30,
-        creditLimit: input.creditLimit ? Number(input.creditLimit) : 0,
-        contactPersonName: input.contactPersonName || "",
-        contactPersonDob: input.contactPersonDob || "",
-        bankName: input.bankName || "",
-        bankAccountName: input.bankAccountName || "",
-        bankAccountNumber: input.bankAccountNumber || "",
-        bankIfsc: input.bankIfsc || "",
-        bankBranch: input.bankBranch || "",
-        customBirthday: input.customBirthday || "",
-        customKovilThiruvila: input.customKovilThiruvila || "",
-      };
-    }
+
   },
   async importParties(contacts: Array<{ name: string; phone: string; email?: string; address?: string }>): Promise<{ imported:number; skipped:number; invalid:number; duplicateInFile:number; duplicateInDb:number }> {
-    try {
       return await request("/parties/import", { method: "POST", body: JSON.stringify({ contacts }) });
-    } catch {
-      return { imported: contacts.length, skipped: 0, invalid: 0, duplicateInFile: 0, duplicateInDb: 0 };
-    }
+
   },
   async products(): Promise<Product[]> {
-    try {
       const rows = await request<ProductRow[]>("/products");
       return rows.map(productFromApi);
-    } catch {
-      return [];
-    }
+
   },
   async createProduct(input: { name: string; sku: string; category: string; size: string; openingStock: number; purchasePrice: number; sellingPrice: number; mrp: number }): Promise<Product[]> {
-    try {
       await request("/products", { method: "POST", body: JSON.stringify({ ...input, hsnCode: "6205", taxRate: 5 }) });
       return await api.products();
-    } catch {
-      // Local fallback product creation if backend is offline
-      const newProd: Product = {
-        id: "PROD-" + Date.now(),
-        name: input.name,
-        sku: input.sku || `HB-${Date.now().toString().slice(-6)}`,
-        category: input.category || "General",
-        size: input.size || "M",
-        stock: Number(input.openingStock || 0),
-        purchasePrice: Number(input.purchasePrice || 0),
-        sellingPrice: Number(input.sellingPrice || 0),
-        mrp: Number(input.mrp || input.sellingPrice || 0),
-        hsnCode: "6205",
-        taxRate: 5,
-      };
-      return [newProd];
-    }
+
   },
   async updateProduct(id: string | number, input: { name: string; sku: string; category: string; size: string; openingStock: number; purchasePrice: number; sellingPrice: number; mrp: number; hsnCode?: string; taxRate?: number }): Promise<Product[]> {
-    try {
       await request(`/products/${id}`, { method: "PUT", body: JSON.stringify({ ...input, hsnCode: input.hsnCode || "6205", taxRate: input.taxRate ?? 5 }) });
       return await api.products();
-    } catch {
-      return await api.products();
-    }
+
   },
   async deleteProduct(id: string | number): Promise<Product[]> {
-    try {
       await request<{ ok: boolean }>(`/products/${id}`, { method: "DELETE" });
       return await api.products();
-    } catch {
-      return await api.products();
-    }
+
   },
   async deleteProductsBulk(ids: (string | number)[]): Promise<Product[]> {
-    try {
       await request<{ ok: boolean; count: number }>(`/products/bulk-delete`, { method: "POST", body: JSON.stringify({ ids }) });
       return await api.products();
-    } catch {
-      return await api.products();
-    }
+
   },
   async createPurchaseStockReceipt(input: { purchaseDate: Date; purchaseNumber: string; partyName?: string; notes?: string; lines: Array<{ variantId: string | number; quantity: number; unitCost: number }> }): Promise<{ ok: boolean; purchaseNumber: string; lines: number }> {
     return request("/purchases/stock-receipt", {
@@ -368,96 +216,59 @@ export const api = {
     return request(`/purchases/stock-receipt/${encodeURIComponent(purchaseNumber)}`, { method: "DELETE" });
   },
   async invoiceSetting(): Promise<InvoiceSetting> {
-    try {
       const res = await request<InvoiceSetting>("/settings/invoice");
-      if (res && !res.signatureUrl) {
-        res.signatureUrl = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 70" width="220" height="60"><path d="M10 45 C30 10, 45 5, 55 45 C65 25, 75 15, 85 45 C95 10, 110 30, 130 40 C140 15, 155 25, 175 35 C185 10, 205 35, 240 15" stroke="%23111827" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M25 50 C80 48, 140 52, 210 48" stroke="%23111827" stroke-width="1.5" fill="none"/><text x="35" y="65" font-family="cursive, sans-serif" font-size="18" font-weight="bold" fill="%23111827">M. Saravana</text></svg>`;
-      }
       return res;
-    } catch {
-      return { invoicePrefix: "HB/SL", paymentTermsDays: 30, terms: "NO REFUND ONCE SOLD. EXCHANGE ONLY AS PER STORE POLICY.", bankName: "", accountName: "", accountNumber: "", ifsc: "", upiId: "", qrText: "", signatureText: "Authorized signatory for Happy Bonding Men's Wear", signatureUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 70" width="220" height="60"><path d="M10 45 C30 10, 45 5, 55 45 C65 25, 75 15, 85 45 C95 10, 110 30, 130 40 C140 15, 155 25, 175 35 C185 10, 205 35, 240 15" stroke="%23111827" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M25 50 C80 48, 140 52, 210 48" stroke="%23111827" stroke-width="1.5" fill="none"/><text x="35" y="65" font-family="cursive, sans-serif" font-size="18" font-weight="bold" fill="%23111827">M. Saravana</text></svg>` };
-    }
+
   },
   async saveInvoiceSetting(input: InvoiceSetting): Promise<InvoiceSetting> {
-    try {
       return await request<InvoiceSetting>("/settings/invoice", { method: "PUT", body: JSON.stringify(input) });
-    } catch {
-      return input;
-    }
+
   },
   async nextSaleNumber(invoiceDate = new Date()): Promise<{prefix:string;number:number;invoiceNumber:string;financialYear:string}> {
-    try {
       return await request(`/sales/next-number?invoiceDate=${encodeURIComponent(invoiceDate.toISOString())}`);
-    } catch {
-      const num = Date.now() % 10000;
-      return { prefix: "HB/SL", number: num, invoiceNumber: `HB/SL-${num}`, financialYear: "2025-26" };
-    }
+
   },
   async sales(): Promise<Invoice[]> {
-    try {
       const rows = await request<SalesRow[]>("/sales");
       return rows.map(saleFromApi);
-    } catch {
-      return [];
-    }
+
   },
   async sale(id: string | number): Promise<Invoice> {
     const row = await request<SalesRow>(`/sales/${id}`);
     return saleFromApi(row);
   },
   async createSale(input: { partyId?: string; invoiceDate?: Date; paidAmount: number; paymentMode: "Cash" | "UPI" | "Card" | "Bank"; notes?: string; invoiceDiscount?: number; additionalCharges?: number; lines: Array<{ variantId: string; quantity: number; unitPrice: number; discount: number; taxRate?: number }> }): Promise<Invoice[]> {
-    try {
       await request("/sales", { method: "POST", body: JSON.stringify({ idempotencyKey: crypto.randomUUID(), partyId: input.partyId, invoiceDate: (input.invoiceDate ?? new Date()).toISOString(), placeOfSupply: "33", paidAmount: input.paidAmount, paymentMode: input.paymentMode, notes: input.notes, invoiceDiscount: input.invoiceDiscount ?? 0, additionalCharges: input.additionalCharges ?? 0, lines: input.lines }) });
       return await api.sales();
-    } catch {
-      return [];
-    }
+
   },
   async updateSale(id: string | number, input: { partyId?: string; invoiceDate?: Date; paidAmount: number; paymentMode: "Cash" | "UPI" | "Card" | "Bank"; notes?: string; invoiceDiscount?: number; additionalCharges?: number; lines: Array<{ variantId: string; quantity: number; unitPrice: number; discount: number; taxRate?: number }> }): Promise<Invoice[]> {
-    try {
       const rows = await request<SalesRow[]>(`/sales/${id}`, { method: "PUT", body: JSON.stringify({ idempotencyKey: `edit-${id}-${Date.now()}`, partyId: input.partyId, invoiceDate: (input.invoiceDate ?? new Date()).toISOString(), placeOfSupply: "33", paidAmount: input.paidAmount, paymentMode: input.paymentMode, notes: input.notes, invoiceDiscount: input.invoiceDiscount ?? 0, additionalCharges: input.additionalCharges ?? 0, lines: input.lines }) });
       return rows.map(saleFromApi);
-    } catch {
-      return [];
-    }
+
   },
   async deleteSale(id: string | number): Promise<Invoice[]> {
-    try {
       await request(`/sales/${id}`, { method: "DELETE" });
       return await api.sales();
-    } catch {
-      return [];
-    }
+
   },
   async cancelSale(id: string | number): Promise<Invoice[]> {
-    try {
       const rows = await request<SalesRow[]>(`/sales/${id}/cancel`, { method: "POST" });
       return rows.map(saleFromApi);
-    } catch {
-      return [];
-    }
+
   },
   async createCreditNote(input: { partyId: string; salesInvoiceId: string; date: Date; amount: number; notes?: string; lines: Array<{ variantId: string; itemName: string; quantity: number; unitPrice: number; taxRate: number; total: number }> }) {
-    try {
       const res = await request<any>("/credit-notes", { method: "POST", body: JSON.stringify(input) });
       return res;
-    } catch {
-      throw new Error("Failed to create credit note");
-    }
+
   },
   async paymentIns(): Promise<PaymentInRow[]> {
-    try {
       return await request<PaymentInRow[]>("/payments/in");
-    } catch {
-      return [];
-    }
+
   },
   async nextPaymentInNumber(paidAt = new Date()): Promise<{ prefix: string; number: number; paymentNumber: string; financialYear: string }> {
-    try {
       return await request(`/payments/in/next-number?paidAt=${encodeURIComponent(paidAt.toISOString())}`);
-    } catch {
-      return { prefix: "HB/PI/26-27/", number: 1, paymentNumber: "HB/PI/26-27/1", financialYear: "26-27" };
-    }
+
   },
   async createPaymentIn(input: { amount: number; mode: string; paidAt: Date; reference?: string; partyName?: string; partyPhone?: string; paymentNumber?: string; prefix?: string; number?: string; discount?: number; allocations?: Array<{ salesInvoiceId: string | number; amount: number }> }): Promise<PaymentInRow | null> {
     return await request<PaymentInRow>("/payments/in", { method: "POST", body: JSON.stringify({ amount: input.amount, mode: input.mode, paidAt: input.paidAt.toISOString(), reference: input.reference, partyName: input.partyName, partyPhone: input.partyPhone, paymentNumber: input.paymentNumber, prefix: input.prefix, number: input.number, discount: input.discount, allocations: input.allocations }) });
@@ -578,7 +389,7 @@ function saleFromApi(x: SalesRow): Invoice {
     partyAddress: x.party?.address ?? "",
     partyGstin: x.party?.gstin ?? "",
     amount: Number(x.grandTotal),
-    paidAmount: Number(x.paidAmount ?? x.grandTotal),
+    paidAmount: x.paidAmount == null ? undefined : Number(x.paidAmount),
     paymentMode: x.payments?.[0]?.payment?.mode ?? "",
     subtotal: Number(x.subtotal ?? 0),
     discountTotal: Number(x.discountTotal ?? 0),

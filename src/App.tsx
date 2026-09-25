@@ -78,7 +78,7 @@ const nav: { section: string; items: { id: Page; label: string; icon: typeof Lay
 
 export const defaultSignatureUrl = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 70" width="220" height="60"><path d="M10 45 C30 10, 45 5, 55 45 C65 25, 75 15, 85 45 C95 10, 110 30, 130 40 C140 15, 155 25, 175 35 C185 10, 205 35, 240 15" stroke="%23111827" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M25 50 C80 48, 140 52, 210 48" stroke="%23111827" stroke-width="1.5" fill="none"/><text x="35" y="65" font-family="cursive, sans-serif" font-size="18" font-weight="bold" fill="%23111827">M. Saravana</text></svg>`;
 
-export const defaultInvoiceSetting: InvoiceSetting = { invoicePrefix: "HB/SL", paymentTermsDays: 30, terms: "NO REFUND ONCE SOLD. EXCHANGE ONLY AS PER STORE POLICY.", bankName: "", accountName: "", accountNumber: "", ifsc: "", upiId: "", qrText: "", signatureText: "Authorized signatory for Happy Bonding Men's Wear", signatureUrl: defaultSignatureUrl };
+export const defaultInvoiceSetting: InvoiceSetting = { invoicePrefix: "HB/SL", paymentTermsDays: 30, terms: "NO REFUND ONCE SOLD. EXCHANGE ONLY AS PER STORE POLICY.", bankName: "", accountName: "", accountNumber: "", ifsc: "", upiId: "", qrText: "", signatureText: "Authorized signatory for Happy Bonding Men's Wear", signatureUrl: "" };
 
 function BarcodeIcon() {
   return <div className="barcode-icon" title="Barcode Scanner"><span/><span/><span/><span/><span/><span/><span/></div>;
@@ -86,8 +86,8 @@ function BarcodeIcon() {
 
 
 export default function App() {
-  const apiMode = import.meta.env.VITE_USE_API === "true";
-  const [authenticated, setAuthenticated] = useState(!apiMode || api.hasSession());
+  const apiMode = true;
+  const [authenticated, setAuthenticated] = useState(api.hasSession());
   const [page, setPage] = useState<Page>("dashboard");
   const [sidebar, setSidebar] = useState(false);
   const [productRows, setProductRows] = useState<Product[]>([]);
@@ -112,30 +112,25 @@ export default function App() {
   };
 
 
+  const [dataError, setDataError] = useState("");
+  const [dataLoading, setDataLoading] = useState(true);
   const refreshAppData = async () => {
-    const [nextProducts, nextParties, nextInvoices, nextSetting, nextBranches, nextSummary] = await Promise.all([
-      api.products().catch(() => null),
-      api.parties().catch(() => null),
-      api.sales().catch(() => null),
-      api.invoiceSetting().catch(() => null),
-      api.branches().catch(() => null),
-      api.ownerSummary().catch(() => null),
-    ]);
-    if (nextProducts) setProductRows(nextProducts);
-    if (nextParties) setPartyRows(nextParties);
-    if (nextInvoices) setInvoiceRows(nextInvoices);
-    if (nextSetting) setInvoiceSetting({ ...defaultInvoiceSetting, ...nextSetting });
-    if (nextBranches) {
-      setBranchRows(nextBranches);
-      if (api.currentBranchId()) {
-        setCurrentBranchId(api.currentBranchId());
-      } else if (nextBranches[0]) {
-        api.setCurrentBranch(nextBranches[0].id);
-        setCurrentBranchId(nextBranches[0].id);
-      }
-    }
-    if (nextSummary) setOwnerSummary(nextSummary);
+    setDataLoading(true); setDataError("");
+    try {
+      const [nextProducts, nextParties, nextInvoices, nextSetting, nextBranches, nextSummary] = await Promise.all([api.products(), api.parties(), api.sales(), api.invoiceSetting(), api.branches(), api.ownerSummary()]);
+      setProductRows(nextProducts); setPartyRows(nextParties); setInvoiceRows(nextInvoices);
+      setInvoiceSetting(nextSetting); setBranchRows(nextBranches); setOwnerSummary(nextSummary);
+      const branch = nextBranches.find(b => b.id === api.currentBranchId()) ?? nextBranches[0];
+      if (branch) { api.setCurrentBranch(branch.id); setCurrentBranchId(branch.id); }
+    } catch (error) { setDataError(error instanceof Error ? error.message : "Could not load backend data"); }
+    finally { setDataLoading(false); }
   };
+  useEffect(() => {
+    const failed = (event: Event) => setToast((event as CustomEvent<string>).detail);
+    const expired = () => { setAuthenticated(false); setProductRows([]); setPartyRows([]); setInvoiceRows([]); };
+    window.addEventListener("hb-api-error", failed); window.addEventListener("hb-session-expired", expired);
+    return () => { window.removeEventListener("hb-api-error", failed); window.removeEventListener("hb-session-expired", expired); };
+  }, []);
 
   useEffect(() => {
     if (authenticated) {
@@ -289,6 +284,7 @@ export default function App() {
   }, []);
 
   if (!authenticated) return <LoginScreen onLogin={async () => { setAuthenticated(true); await refreshAppData(); }}/>;
+  if (dataLoading || dataError) return <main style={{ padding: 32 }}><h1>Happy Bonding ERP</h1>{dataLoading ? <p>Loading backend data...</p> : <><p role="alert">{dataError}</p><button onClick={() => void refreshAppData()}>Retry</button><button onClick={handleLogout}>Sign out</button></>}</main>;
 
   return <div className="app-shell">
     <aside className={`sidebar ${sidebar ? "open" : ""}`}>
@@ -779,12 +775,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
       }
       onLogin();
     } catch (err: any) {
-      if (passVal === "HappyBonding@2026" || passVal === "admin" || passVal === "123456") {
-        localStorage.setItem("hb_erp_token", "mock_local_token_2026");
-        onLogin();
-      } else {
-        setError(err?.message || "Invalid email or password");
-      }
+      setError(err?.message || "Login failed. Check backend connection.");
     } finally {
       setBusy(false);
     }
@@ -1047,7 +1038,7 @@ function InvoiceDetailModal({
   };
 
   const total = invoice.amount;
-  const paid = invoice.paidAmount ?? total;
+  const paid = invoice.paidAmount ?? 0;
   const balance = Math.max(0, total - paid);
   const profitLines = invoice.lines ?? [];
   const totalCost = profitLines.reduce((sum, line) => sum + (line.purchasePrice ?? 0) * line.quantity, 0);
@@ -2376,6 +2367,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   const resetInvoiceForm=()=>{setLines([]);setPartyOpen(false);setPaid(0);setNotes("");setInvoiceDiscount(0);setAdditionalCharges(0);setShowNotes(false);setShowTerms(false);setShowBank(false);setShowQr(false);setNewParty({name:"",phone:"",address:"",gstin:""});setPartySearch("");setSelectedParty(undefined);setMarkPaid(false);setInvoiceDate(new Date().toISOString().slice(0,10));};
   const saveInvoice=async(keepOpen=false)=>{
     if(!lines.length)return notify("Add at least one item");
+    if (!nextNumber) return notify("Invoice number is unavailable. Reopen the form after connecting to the backend.");
     try{
 {/* ... */}
       if (editingInvoice) {
@@ -2512,7 +2504,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
           onClose={() => setQuickSettingsOpen(false)}
           onSave={updated => {
             setSetting({ ...setting, ...updated });
-            api.saveInvoiceSetting({ ...setting, ...updated }).catch(() => {});
+            api.saveInvoiceSetting({ ...setting, ...updated }).then(setSetting).catch(error => notify(error.message));
           }}
           notify={notify}
         />
@@ -2972,7 +2964,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
             <div className="ref-signature-area">
               <span className="ref-sig-title">{setting.signatureText || `Authorized signatory for Happy Bonding Men's Wear (${localStorage.getItem("hb_signature_name") || "M. Saravanan"})`}</span>
               <div className="ref-sig-img">
-                <img src={localStorage.getItem("hb_digital_signature") || setting.signatureUrl || defaultSignatureUrl} alt="Digital Signature" style={{ height: 48, objectFit: "contain" }} />
+                <img src={setting.signatureUrl || undefined} alt="Digital Signature" style={{ height: 48, objectFit: "contain" }} />
               </div>
             </div>
 
@@ -3559,7 +3551,7 @@ function InvoiceSettingsEditor({setting,setSetting,onSave}:{setting:InvoiceSetti
     <div className="signature-editor-box">
       <strong>Stored Digital Signature (Applied automatically to all invoices)</strong>
       <div className="signature-preview">
-        <img src={setting.signatureUrl || defaultSignatureUrl} alt="Stored Digital Signature Preview" />
+        <img src={setting.signatureUrl || undefined} alt="Stored Digital Signature Preview" />
       </div>
       <label>Upload New Signature Image (PNG / JPEG / SVG):
         <input type="file" accept="image/*" onChange={e => handleSignatureUpload(e.target.files?.[0])} />

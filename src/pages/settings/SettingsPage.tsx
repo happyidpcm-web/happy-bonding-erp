@@ -164,7 +164,8 @@ export function SettingsPage({
         </div>
 
         {/* Tab 1: Business Profile */}
-        {activeTab === "profile" && (
+        {activeTab === "profile" && (<p>This settings section is not connected to the backend yet.</p>)}
+          {false && (
           <article className="card settings-form">
             <h2>Business profile</h2>
             <p>These details appear on GST invoices and receipts.</p>
@@ -203,7 +204,8 @@ export function SettingsPage({
         )}
 
         {/* Tab 2: GST & tax */}
-        {activeTab === "gst" && (
+        {activeTab === "gst" && (<p>This settings section is not connected to the backend yet.</p>)}
+          {false && (
           <article className="card settings-form">
             <h2>GST & Tax Configuration</h2>
             <p>Configure tax rates, HSN rules, and GSTIN details.</p>
@@ -236,7 +238,8 @@ export function SettingsPage({
         )}
 
         {/* Tab 3: Invoice Numbering */}
-        {activeTab === "numbering" && (
+        {activeTab === "numbering" && (<p>This settings section is not connected to the backend yet.</p>)}
+          {false && (
           <article className="card settings-form">
             <h2>Invoice Numbering & Prefix</h2>
             <p>Customize automatic invoice numbers for Sales, Quotations, and Purchases.</p>
@@ -263,7 +266,8 @@ export function SettingsPage({
         )}
 
         {/* Tab 4: Print Templates */}
-        {activeTab === "print" && (
+        {activeTab === "print" && (<p>This settings section is not connected to the backend yet.</p>)}
+          {false && (
           <article className="card settings-form">
             <h2>Print & Receipt Templates</h2>
             <p>Customize invoice printing and POS slip formats.</p>
@@ -294,7 +298,8 @@ export function SettingsPage({
         )}
 
         {/* Tab 5: Users & Roles */}
-        {activeTab === "users" && (
+        {activeTab === "users" && (<p>This settings section is not connected to the backend yet.</p>)}
+          {false && (
           <article className="card settings-form">
             <h2>Users & Staff Roles</h2>
             <p>Manage store staff accounts and access permissions.</p>

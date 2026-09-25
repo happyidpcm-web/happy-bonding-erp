@@ -1352,10 +1352,10 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
 
   const handleDeleteProduct = async (p: Product) => {
     if (!window.confirm(`Are you sure you want to delete item "${p.name}"?`)) return;
-    setRows(prev => prev.filter(r => r.id !== p.id));
+
     setSelectedItemIds(prev => prev.filter(id => id !== p.id));
     try {
-      if (apiMode) {
+      {
         const fresh = await api.deleteProduct(p.id);
         setRows(fresh);
       }
@@ -1369,10 +1369,10 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
     if (!selectedItemIds.length) return;
     if (!window.confirm(`Are you sure you want to delete ${selectedItemIds.length} selected item(s)?`)) return;
     const idsToDelete = [...selectedItemIds];
-    setRows(prev => prev.filter(r => !idsToDelete.includes(r.id)));
+
     setSelectedItemIds([]);
     try {
-      if (apiMode) {
+      {
         const fresh = await api.deleteProductsBulk(idsToDelete);
         setRows(fresh);
       }
@@ -1401,17 +1401,8 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
       if (editingItem) {
         if (apiMode) {
           setRows(await api.updateProduct(editingItem.id, payload));
-        } else {
-          setRows(rows.map(r => r.id === editingItem.id ? { ...r, ...payload, stock: payload.openingStock } : r));
         }
         notify("Item updated successfully");
-      } else {
-        if (apiMode) {
-          setRows(await api.createProduct(payload));
-        } else {
-          setRows([...rows, { id: Date.now(), ...payload, stock: payload.openingStock }]);
-        }
-        notify("Item saved successfully");
       }
       setEditingItem(null);
       if (reset) return "reset";
@@ -1434,7 +1425,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
       return p;
     });
     setRows(updatedProducts);
-    setActiveSubScreen("offers");
+    notify("This bulk/offer feature is not connected to the backend yet.");
   };
 
   if (activeSubScreen === "bulk_edit_gst_rate") {
@@ -1553,7 +1544,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
           <button
             type="button"
             className="secondary manage-offer-btn"
-            onClick={() => setActiveSubScreen("offers")}
+            onClick={() => notify("This bulk/offer feature is not connected to the backend yet.")}
             style={{ borderColor: "#6366f1", color: "#4f46e5", background: "#f5f3ff", fontWeight: 700 }}
           >
             <Tag size={15} /> Manage Offer
@@ -1596,7 +1587,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
             <QrCode size={15} /> Barcode Generator
           </button>
 
-          <button className="icon-button" title="Item Settings" onClick={() => setItemSettingsModalOpen(true)}>
+          <button className="icon-button" title="Item Settings" onClick={() => notify("This feature is not connected to the backend yet.")}>
             <Settings size={17} />
           </button>
         </div>
@@ -1700,7 +1691,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
                           className="bulk-sub-item-btn"
                           onClick={() => {
                             setBulkActionsDropdownOpen(false);
-                            setActiveSubScreen("bulk_add_items");
+                            notify("This bulk/offer feature is not connected to the backend yet.");
                           }}
                           style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", border: "none", background: "transparent", cursor: "pointer", width: "100%", textAlign: "left", fontSize: 13, color: "#334155" }}
                         >
@@ -1713,7 +1704,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
                           className="bulk-sub-item-btn"
                           onClick={() => {
                             setBulkActionsDropdownOpen(false);
-                            setPurchaseBillModalOpen(true);
+                            notify("This feature is not connected to the backend yet.");
                           }}
                           style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", border: "none", background: "transparent", cursor: "pointer", width: "100%", textAlign: "left", fontSize: 13, color: "#334155" }}
                         >
@@ -1726,7 +1717,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
                           className="bulk-sub-item-btn"
                           onClick={() => {
                             setBulkActionsDropdownOpen(false);
-                            setActiveSubScreen("product_library");
+                            notify("This bulk/offer feature is not connected to the backend yet.");
                           }}
                           style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", border: "none", background: "transparent", cursor: "pointer", width: "100%", textAlign: "left", fontSize: 13, color: "#334155" }}
                         >
@@ -1774,7 +1765,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
                           className="bulk-sub-item-btn"
                           onClick={() => {
                             setBulkActionsDropdownOpen(false);
-                            setBulkEditSelectModalOpen(true);
+                            notify("This feature is not connected to the backend yet.");
                           }}
                           style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", border: "none", background: "transparent", cursor: "pointer", width: "100%", textAlign: "left", fontSize: 13, color: "#334155" }}
                         >
@@ -1787,7 +1778,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
                           className="bulk-sub-item-btn"
                           onClick={() => {
                             setBulkActionsDropdownOpen(false);
-                            setActiveSubScreen("bulk_edit_gst_rate");
+                            notify("This bulk/offer feature is not connected to the backend yet.");
                           }}
                           style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", border: "none", background: "transparent", cursor: "pointer", width: "100%", textAlign: "left", fontSize: 13, color: "#334155" }}
                         >
@@ -1922,7 +1913,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
           totalProductsCount={rows.length}
           onProceed={() => {
             setBulkEditSelectModalOpen(false);
-            setActiveSubScreen("bulk_edit_spreadsheet");
+            notify("This bulk/offer feature is not connected to the backend yet.");
           }}
           onClose={() => setBulkEditSelectModalOpen(false)}
         />
