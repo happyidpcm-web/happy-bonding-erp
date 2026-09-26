@@ -30,11 +30,39 @@ try {
  const saved=await request('/sales/'+bill.id);assert.equal(Number(saved.paidAmount),100);assert.equal(saved.paymentStatus,'PAID');assert.equal(saved.payments.length,2);
  const edited = await request('/sales/'+bill.id,{idempotencyKey:'verification-edit',invoiceDate:'2026-09-25',placeOfSupply:'33',paidAmount:100,lines:[{variantId:p.id,quantity:1,unitPrice:450,mrp:700,taxRate:0}]},'PUT');
  const reopened=await request('/sales/'+bill.id);assert.equal(Number(reopened.lines[0].unitPrice),450);assert.equal(Number(reopened.lines[0].mrp),700);assert.equal(reopened.invoiceNumber,bill.invoiceNumber);assert.equal(reopened.invoiceDate.slice(0,10),'2026-09-25');assert.equal(Number(edited.find(i=>i.id===bill.id).grandTotal),450);console.log('PASS invoice edit snapshot: price, MRP, total, number, date');
+ const correction = {invoiceDate:'2026-09-25',placeOfSupply:'33',paidAmount:90,lines:[{variantId:p.id,quantity:1,unitPrice:90,mrp:700,taxRate:0}]};
+ await request('/sales/'+bill.id,correction,'PUT');
+ await request('/sales/'+bill.id,correction,'PUT');
+ let corrected=await request('/sales/'+bill.id);
+ assert.equal(Number(corrected.grandTotal),90);assert.equal(Number(corrected.paidAmount),90);assert.equal(corrected.paymentStatus,'PAID');
+ assert.equal(corrected.payments.reduce((s,a)=>s+Number(a.amount),0),90);
+ assert.equal(Number((await db.payment.aggregate({_sum:{amount:true}}))._sum.amount),90);
+ assert.equal(await db.payment.count(),2);
+ for (const received of [40,0,90]) {
+   await request('/sales/'+bill.id,{...correction,paidAmount:received},'PUT');
+   corrected=await request('/sales/'+bill.id);
+   assert.equal(Number(corrected.paidAmount),received);
+   assert.equal(corrected.payments.reduce((s,a)=>s+Number(a.amount),0),received);
+   assert.equal(Number((await db.payment.aggregate({_sum:{amount:true}}))._sum.amount),received);
+ }
+ const audit=await db.auditEvent.findFirst({where:{entityId:bill.id,action:'sales.updated'},orderBy:{occurredAt:'desc'}});
+ assert.ok(audit.metadata.paymentCorrections);
+ console.log('PASS paid invoice correction, partial/zero payments, receipts, audit and retry');
  const purchase={id:crypto.randomUUID(),type:'Purchase Invoice',number:'VERIFY-PUR-1',date:new Date().toISOString(),party:'Verification supplier',amount:50,items:[{variantId:p.id,name:p.product.name,hsn:'6205',qty:1,price:50,amount:50}]};
  await request('/vouchers',purchase);await request('/vouchers',purchase);
  assert.equal((await request('/vouchers?type=Purchase%20Invoice')).length,1);
  assert.equal(Number((await db.stockBalance.findUnique({where:{branchId_variantId:{branchId:branch,variantId:p.id}}})).quantity),before);
  await request('/vouchers/'+purchase.id,undefined,'DELETE');
  assert.equal(Number((await db.stockBalance.findUnique({where:{branchId_variantId:{branchId:branch,variantId:p.id}}})).quantity),before-1);
+ const other=await request('/sales',{idempotencyKey:'shared-receipt-bill',invoiceDate:new Date().toISOString(),placeOfSupply:'33',paidAmount:0,lines:[{variantId:p.id,quantity:1,unitPrice:100,taxRate:0}]});
+ await request('/payments/in',{amount:30,mode:'Cash',allocations:[{salesInvoiceId:other.id,amount:30}]});
+ const sharedAllocation=await db.paymentAllocation.findFirst({where:{salesInvoiceId:other.id}});
+ await db.payment.update({where:{id:sharedAllocation.paymentId},data:{amount:{increment:10}}});
+ await db.paymentAllocation.create({data:{paymentId:sharedAllocation.paymentId,salesInvoiceId:bill.id,amount:10}});
+ await db.salesInvoice.update({where:{id:bill.id},data:{paidAmount:100}});
+ await request('/sales/'+bill.id,{...correction,paidAmount:0},'PUT');
+ assert.equal(Number((await db.payment.findUnique({where:{id:sharedAllocation.paymentId}})).amount),30);
+ assert.equal(Number((await request('/sales/'+other.id)).paidAmount),30);
+ console.log('PASS shared receipt preserves other invoice payment');
  console.log(JSON.stringify({staffLogin:'PASS',saleSave:'PASS',paymentAllocation:'PASS',purchasePersistence:'PASS',purchaseRetryNoDuplicateStock:'PASS',purchaseReversal:'PASS',isolatedDatabase:name}));
 }finally{ child.kill();await db.$disconnect(); }

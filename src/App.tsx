@@ -106,6 +106,7 @@ export default function App() {
   const [activeInvoiceModal, setActiveInvoiceModal] = useState<Invoice | null>(null);
 
   const handleLogout = () => {
+    ++loadSequence.current;
     api.logout();
     setAuthenticated(false);
     notify("Logged out successfully");
@@ -114,27 +115,31 @@ export default function App() {
 
   const [dataError, setDataError] = useState("");
   const [dataLoading, setDataLoading] = useState(true);
+  const loadSequence = useRef(0);
   const refreshAppData = async () => {
+    const sequence = ++loadSequence.current;
+    const branchAtStart = api.currentBranchId();
     setDataLoading(true); setDataError("");
     try {
       const [nextProducts, nextParties, nextInvoices, nextSetting, nextBranches, nextSummary] = await Promise.all([api.products(), api.parties(), api.sales(), api.invoiceSetting(), api.branches(), api.ownerSummary()]);
+      if (sequence !== loadSequence.current || branchAtStart !== api.currentBranchId()) return;
       setProductRows(nextProducts); setPartyRows(nextParties); setInvoiceRows(nextInvoices);
       setInvoiceSetting(nextSetting); setBranchRows(nextBranches); setOwnerSummary(nextSummary);
       const branch = nextBranches.find(b => b.id === api.currentBranchId()) ?? nextBranches[0];
       if (branch) { api.setCurrentBranch(branch.id); setCurrentBranchId(branch.id); }
-    } catch (error) { setDataError(error instanceof Error ? error.message : "Could not load backend data"); }
-    finally { setDataLoading(false); }
+    } catch (error) { if (sequence === loadSequence.current) setDataError(error instanceof Error ? error.message : "Could not load backend data"); }
+    finally { if (sequence === loadSequence.current) setDataLoading(false); }
   };
   useEffect(() => {
     const failed = (event: Event) => setToast((event as CustomEvent<string>).detail);
-    const expired = () => { setAuthenticated(false); setProductRows([]); setPartyRows([]); setInvoiceRows([]); };
+    const expired = () => { ++loadSequence.current; setAuthenticated(false); setProductRows([]); setPartyRows([]); setInvoiceRows([]); };
     window.addEventListener("hb-api-error", failed); window.addEventListener("hb-session-expired", expired);
     return () => { window.removeEventListener("hb-api-error", failed); window.removeEventListener("hb-session-expired", expired); };
   }, []);
 
   useEffect(() => {
     if (authenticated) {
-      refreshAppData().catch(() => {});
+      void refreshAppData();
     }
   }, [authenticated, currentBranchId]);
 
@@ -283,8 +288,11 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleGlobalShortcuts);
   }, []);
 
-  if (!authenticated) return <LoginScreen onLogin={async () => { setAuthenticated(true); await refreshAppData(); }}/>;
-  if (dataLoading || dataError) return <main style={{ padding: 32 }}><h1>Happy Bonding ERP</h1>{dataLoading ? <p>Loading backend data...</p> : <><p role="alert">{dataError}</p><button onClick={() => void refreshAppData()}>Retry</button><button onClick={handleLogout}>Sign out</button></>}</main>;
+  if (!authenticated) return <LoginScreen onLogin={() => { setDataLoading(true); setDataError(""); setCurrentBranchId(api.currentBranchId()); setAuthenticated(true); }}/>;
+  if (dataLoading) return <div className="erp-startup" role="status" aria-live="polite" aria-busy="true">
+    <div className="erp-startup-card"><span className="erp-startup-spinner" aria-hidden="true" /><h1>Happy Bonding ERP</h1><p>Loading your workspace…</p></div>
+  </div>;
+  if (dataError) return <div className="erp-startup"><div className="erp-startup-card"><h1>Unable to load your workspace</h1><p role="alert">{dataError}</p><div className="erp-startup-actions"><button className="primary" onClick={() => void refreshAppData()}>Retry</button><button className="secondary" onClick={handleLogout}>Sign out</button></div></div></div>;
 
   return <div className="app-shell">
     <aside className={`sidebar ${sidebar ? "open" : ""}`}>
@@ -511,7 +519,7 @@ export default function App() {
     {branchModalOpen && <BranchManagementModal branches={branchRows} onClose={() => setBranchModalOpen(false)} onSaved={async () => { await refreshAppData(); setBranchModalOpen(false); notify("Branch saved"); }} notify={notify} />}
     {staffModalOpen && <StaffManagementModal branches={branchRows} onClose={() => setStaffModalOpen(false)} notify={notify} />}
     {changePasswordModalOpen && <ChangePasswordModal onClose={() => setChangePasswordModalOpen(false)} notify={notify} />}
-    {pendingSwitchBranch && <BranchSwitchAuthModal branch={pendingSwitchBranch} onClose={() => setPendingSwitchBranch(null)} onSuccess={async (bId) => { api.setCurrentBranch(bId); setCurrentBranchId(bId); await refreshAppData(); }} notify={notify} />}
+    {pendingSwitchBranch && <BranchSwitchAuthModal branch={pendingSwitchBranch} onClose={() => setPendingSwitchBranch(null)} onSuccess={(bId) => { api.setCurrentBranch(bId); setDataLoading(true); setCurrentBranchId(bId); }} notify={notify} />}
   </div>;
 
 }
@@ -2370,12 +2378,6 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
     if (!nextNumber) return notify("Invoice number is unavailable. Reopen the form after connecting to the backend.");
     try{
 {/* ... */}
-      if (editingInvoice) {
-        const existingPaymentTotal = editingInvoice.paidAmount ?? 0;
-        if (total < existingPaymentTotal) {
-           return notify(`Edited total (₹${total.toLocaleString("en-IN")}) cannot be less than already received amount (₹${existingPaymentTotal.toLocaleString("en-IN")}). Please issue refund/credit note instead.`);
-        }
-      }
       setSaving(true);
       let partyId=selectedParty?.id ? String(selectedParty.id) : undefined;
       const received=markPaid?total:paid;
@@ -2969,11 +2971,11 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
             </div>
 
             <div className="ref-actions-row">
-              <button type="button" className="secondary" onClick={() => saveInvoice(true)} disabled={saving || !lines.length}>Save & New</button>
+              {!editingInvoice && <button type="button" className="secondary" onClick={() => saveInvoice(true)} disabled={saving || !lines.length}>Save & New</button>}
               <button type="button" className="whatsapp-btn" onClick={() => shareWhatsAppInvoice({ phone: selectedParty?.phone, partyName: selectedParty?.name, number: nextNumber || "HB-INV", amount: total, paidAmount: (markPaid ? total : paid), paymentMode })} disabled={!lines.length}>
                 <MessageCircle size={15} /> WhatsApp Share
               </button>
-              <button type="button" className="primary" onClick={() => saveInvoice(false)} disabled={saving || !lines.length}>{saving ? "Saving..." : "Save Invoice"}</button>
+              <button type="button" className="primary" onClick={() => saveInvoice(false)} disabled={saving || !lines.length}>{saving ? "Saving..." : editingInvoice ? "Update Invoice" : "Save Invoice"}</button>
             </div>
           </div>
         </div>

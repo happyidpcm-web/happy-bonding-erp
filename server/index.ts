@@ -936,14 +936,36 @@ app.put("/api/sales/:id", requirePermission("sales.write"), async (req, res) => 
   const lineTaxable = round2(calculated.reduce((s, x) => s + x.taxable, 0));
   const grandTotal = Math.max(0, round2(calculated.reduce((s, x) => s + x.total, 0) + input.additionalCharges));
 
-  const existingPaymentTotal = Math.max(Number(oldInvoice.paidAmount), oldInvoice.payments.reduce((sum, p) => sum + Number(p.amount), 0));
-  if (grandTotal < existingPaymentTotal) {
-    return res.status(400).json({ error: `Edited total (${grandTotal}) cannot be less than already received amount (${existingPaymentTotal}). Please issue a refund or credit note.` });
-  }
-  const newlyReceived = Math.max(0, input.paidAmount - existingPaymentTotal);
-  const finalPaidAmount = Math.min(grandTotal, existingPaymentTotal + newlyReceived);
+  const finalPaidAmount = round2(Math.min(grandTotal, input.paidAmount));
 
   await db.$transaction(async tx => {
+    // Read receipts inside the transaction to protect concurrent payment edits.
+    const oldInvoice = await tx.salesInvoice.findFirstOrThrow({
+      where: { id: invoiceId, organizationId, branchId },
+      include: { lines: true, payments: { include: { payment: true } } },
+    });
+    if (oldInvoice.status === "CANCELLED") throw new Error("Cancelled invoice cannot be edited");
+    const linkedPaid = round2(oldInvoice.payments.reduce((sum, p) => sum + Number(p.amount), 0));
+    const existingPaymentTotal = Math.max(Number(oldInvoice.paidAmount), linkedPaid);
+    const newlyReceived = round2(Math.max(0, finalPaidAmount - existingPaymentTotal));
+    const paymentCorrections: { paymentId: string; allocationId: string; before: number; after: number }[] = [];
+    let reduction = round2(Math.max(0, linkedPaid - finalPaidAmount));
+    // Reduce only this invoice's share of each receipt, retaining zero rows
+    // and audit history. Never guess links for imported, unallocated receipts.
+    const allocations = [...oldInvoice.payments].sort((a, b) => b.payment.paidAt.getTime() - a.payment.paidAt.getTime());
+    for (const allocation of allocations) {
+      if (reduction <= 0) break;
+      const before = Number(allocation.amount);
+      const decrease = Math.min(before, reduction);
+      if (decrease <= 0) continue;
+      const payment = await tx.payment.findFirstOrThrow({ where: { id: allocation.paymentId, organizationId, branchId, direction: "IN" } });
+      if (Number(payment.amount) < decrease) throw new Error("Payment records are inconsistent; review the linked receipt before correcting this invoice.");
+      const after = round2(before - decrease);
+      await tx.paymentAllocation.update({ where: { id: allocation.id }, data: { amount: after } });
+      await tx.payment.update({ where: { id: payment.id }, data: { amount: { decrement: decrease } } });
+      paymentCorrections.push({ paymentId: payment.id, allocationId: allocation.id, before, after });
+      reduction = round2(reduction - decrease);
+    }
     for (const line of oldInvoice.lines) {
       const qty = Number(line.quantity);
       await tx.stockBalance.upsert({
@@ -959,7 +981,7 @@ app.put("/api/sales/:id", requirePermission("sales.write"), async (req, res) => 
       if (stock < line.input.quantity) throw new Error(`Insufficient stock for ${line.v.sku}`);
     }
 
-    // Do NOT delete existing payment allocations to preserve history.
+    // Preserve receipt rows; corrections are recorded in the audit event.
     await tx.salesInvoiceLine.deleteMany({ where: { invoiceId: oldInvoice.id } });
     await tx.stockMovement.deleteMany({ where: { branchId, referenceType: "SalesInvoice", referenceId: oldInvoice.id, type: "SALE" } });
 
@@ -968,7 +990,7 @@ app.put("/api/sales/:id", requirePermission("sales.write"), async (req, res) => 
       data: {
         partyId: input.partyId,
         invoiceDate: input.invoiceDate,
-        paymentStatus: paymentStatus(input.paidAmount, grandTotal),
+        paymentStatus: paymentStatus(finalPaidAmount, grandTotal),
         placeOfSupply: input.placeOfSupply,
         subtotal: lineSubtotal,
         discountTotal: round2(lineDiscount + input.invoiceDiscount),
@@ -992,7 +1014,7 @@ app.put("/api/sales/:id", requirePermission("sales.write"), async (req, res) => 
       const payment = await tx.payment.create({ data: { organizationId, branchId, direction: "IN", mode: input.paymentMode, amount: newlyReceived } });
       await tx.paymentAllocation.create({ data: { paymentId: payment.id, salesInvoiceId: oldInvoice.id, amount: newlyReceived } });
     }
-    await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: "sales.updated", entityType: "SalesInvoice", entityId: oldInvoice.id, metadata: { invoiceNumber: oldInvoice.invoiceNumber } } });
+    await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: "sales.updated", entityType: "SalesInvoice", entityId: oldInvoice.id, metadata: { invoiceNumber: oldInvoice.invoiceNumber, previousTotal: Number(oldInvoice.grandTotal), total: grandTotal, previousPaidAmount: Number(oldInvoice.paidAmount), paidAmount: finalPaidAmount, paymentCorrections, unlinkedPaidCorrection: round2(Math.max(0, existingPaymentTotal - linkedPaid) - Math.max(0, finalPaidAmount - linkedPaid - newlyReceived)) } } });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
   const rows = await db.salesInvoice.findMany({ where: { organizationId, branchId }, include: { party: true, lines: { include: { variant: true } } }, orderBy: { invoiceDate: "desc" }, take: 50000 });

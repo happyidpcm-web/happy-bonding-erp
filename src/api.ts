@@ -79,10 +79,12 @@ export type PartyLedger = {
 };
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 30000);
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const branch = localStorage.getItem(BRANCH_KEY);
-    const response = await fetch(baseUrl + path, { ...options, headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}), ...(branch ? { "x-branch-id": branch } : {}), ...options?.headers }});
+    const response = await fetch(baseUrl + path, { ...options, signal: controller.signal, headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}), ...(branch ? { "x-branch-id": branch } : {}), ...options?.headers }});
     if (response.status === 401 && path !== "/auth/login") {
       localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(BRANCH_KEY);
       window.dispatchEvent(new Event("hb-session-expired"));
@@ -92,9 +94,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     if (!response.ok) throw new Error(formatApiError(body));
     return body as T;
   } catch (error) {
-    window.dispatchEvent(new CustomEvent("hb-api-error", { detail: error instanceof Error ? error.message : "Backend request failed" }));
-    throw error;
-  }
+    const failure = controller.signal.aborted ? new Error(`Backend request timed out (${path}). Check your connection and retry. If you were saving, check the records before saving again.`) : error;
+    window.dispatchEvent(new CustomEvent("hb-api-error", { detail: failure instanceof Error ? failure.message : "Backend request failed" }));
+    throw failure;
+  } finally { window.clearTimeout(timeout); }
 }
 
 export const api = {
@@ -180,8 +183,8 @@ export const api = {
       return rows.map(productFromApi);
 
   },
-  async createProduct(input: { name: string; sku: string; category: string; size: string; openingStock: number; purchasePrice: number; sellingPrice: number; mrp: number }): Promise<Product[]> {
-      await request("/products", { method: "POST", body: JSON.stringify({ ...input, hsnCode: "6205", taxRate: 5 }) });
+  async createProduct(input: { name: string; sku: string; category: string; size: string; openingStock: number; purchasePrice: number; sellingPrice: number; mrp: number; hsnCode?: string; taxRate?: number }): Promise<Product[]> {
+      await request("/products", { method: "POST", body: JSON.stringify({ ...input, hsnCode: input.hsnCode || "6205", taxRate: input.taxRate ?? 5 }) });
       return await api.products();
 
   },

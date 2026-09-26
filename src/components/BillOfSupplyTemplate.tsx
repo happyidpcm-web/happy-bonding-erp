@@ -125,7 +125,7 @@ export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: 
           </thead>
           <tbody>
             {lines.map((l, idx) => {
-              const mrp = Math.round(l.unitPrice * 1.1);
+              const mrp = l.mrp;
               return (
                 <tr key={idx}>
                   <td style={{ textAlign: "center" }}>{idx + 1}</td>
@@ -136,11 +136,11 @@ export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: 
                   </td>
                   <td style={{ textAlign: "center" }}>{l.quantity} PCS</td>
                   <td style={{ textAlign: "right" }}>
-                    {mrp}
-                    {l.discount > 0 && <div className="discount-off">({Math.round((l.discount / mrp) * 100)}% OFF)</div>}
+                    {mrp == null ? "—" : amountText(mrp)}
+                    {mrp != null && mrp > 0 && l.discount > 0 && <div className="discount-off">({Math.round((l.discount / (mrp * l.quantity)) * 100)}% OFF)</div>}
                   </td>
                   <td style={{ textAlign: "right" }}>{amountText(l.unitPrice)}</td>
-                  <td style={{ textAlign: "right" }}><strong>{amountText(l.total)}</strong></td>
+                  <td style={{ textAlign: "right" }}><strong>{amountText(l.unitPrice * l.quantity)}</strong></td>
                 </tr>
               );
             })}

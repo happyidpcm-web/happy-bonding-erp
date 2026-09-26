@@ -1399,11 +1399,15 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
     try {
       setSaving(true);
       if (editingItem) {
-        if (apiMode) {
-          setRows(await api.updateProduct(editingItem.id, payload));
-        }
+        setRows(await api.updateProduct(editingItem.id, payload));
         notify("Item updated successfully");
+      } else {
+        setRows(await api.createProduct(payload));
+        notify("Item created successfully");
       }
+      setQuery("");
+      setCategoryFilter("All Categories");
+      setLowStockOnly(false);
       setEditingItem(null);
       if (reset) return "reset";
       setModal(false);
@@ -1809,7 +1813,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
           </div>
         </div>
 
-        <div className="table-scroll">
+        <div className="table-scroll inventory-table-scroll" tabIndex={0} aria-label="Inventory items">
           <table>
             <thead>
               <tr>
