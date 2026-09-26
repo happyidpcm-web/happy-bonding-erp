@@ -752,7 +752,7 @@ export function Parties({
 
   useEffect(() => {
     if (autoOpenShareLedger) {
-      setShareLedgerModalOpen(true);
+      notify("The customer ledger portal is not connected yet.");
       if (onClearAutoOpenShareLedger) onClearAutoOpenShareLedger();
     }
   }, [autoOpenShareLedger, onClearAutoOpenShareLedger]);
@@ -784,11 +784,9 @@ export function Parties({
     const input = partyPayloadFromForm(new FormData(e.currentTarget));
     try {
       setSaving(true);
-      if (apiMode) {
+      {
         const saved = await api.createParty(input);
         setRows([...rows, saved]);
-      } else {
-        setRows([...rows, { id: Date.now(), ...input, balance: input.openingBalance || 0 } as Party]);
       }
       setModal(false);
       notify("Party created successfully");
@@ -805,11 +803,9 @@ export function Parties({
     const input = partyPayloadFromForm(new FormData(e.currentTarget));
     try {
       setSaving(true);
-      if (apiMode) {
+      {
         const saved = await api.updateParty(editing.id, input);
         setRows(rows.map(row => row.id === saved.id ? saved : row));
-      } else {
-        setRows(rows.map(row => row.id === editing.id ? ({ ...row, ...input, balance: input.openingBalance || 0 } as Party) : row));
       }
       setEditing(undefined);
       notify("Party updated successfully");
@@ -835,7 +831,7 @@ export function Parties({
           <button
             type="button"
             className="secondary share-ledger-btn"
-            onClick={() => setShareLedgerModalOpen(true)}
+            onClick={() => notify("The customer ledger portal is not connected yet.")}
           >
             <Share2 size={15} /> ShareLedger Portal
           </button>
@@ -863,7 +859,7 @@ export function Parties({
             )}
           </div>
 
-          <button className="icon-button" title="Party Settings" onClick={() => setSettingsModalOpen(true)}>
+          <button className="icon-button" title="Party Settings" onClick={() => notify("Custom party settings are not connected yet.")}>
             <Settings size={17} />
           </button>
         </div>
@@ -921,7 +917,7 @@ export function Parties({
                   <button
                     onClick={() => {
                       setBulkActionDropdownOpen(false);
-                      setBulkModalOpen(true);
+                      notify("Bulk party entry is unavailable. Use Add Party or the backend contact import.");
                     }}
                     className="bulk-add-item-btn"
                   >

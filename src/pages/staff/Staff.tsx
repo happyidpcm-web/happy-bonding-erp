@@ -122,7 +122,7 @@ export function StaffManagementModal({ branches, onClose, notify }: { branches: 
   );
 }
 
-interface StaffMember {
+export interface StaffMember {
   id: string;
   name: string;
   phone: string;

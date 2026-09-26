@@ -65,10 +65,10 @@ export function paymentInRecordFromApi(row: PaymentInApiRow, fallbackIndex: numb
   const amount = Number(row.amount || 0);
   const paidAt = new Date(row.paidAt);
   const date = paidAt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-  const number = meta.paymentNumber || `HB/PI/26-27/${fallbackIndex}`;
-  const numOnly = meta.number || number.split("/").pop() || String(fallbackIndex);
-  const prefix = meta.prefix || number.replace(numOnly, "");
-  const partyName = meta.partyName || party?.name || "Cash Sale";
+  const number = meta.paymentNumber || "Not recorded";
+  const numOnly = meta.number || "";
+  const prefix = meta.prefix || "";
+  const partyName = meta.partyName || party?.name || "Not recorded";
   const discount = Number(meta.discount || 0);
   return {
     id: row.id,
@@ -245,7 +245,6 @@ export function PaymentInModule({
       if (!alive) return;
       const mapped = rows.map((row, idx) => paymentInRecordFromApi(row, rows.length - idx));
       setRecords(mapped);
-      localStorage.setItem("hb_payment_in_records", JSON.stringify(mapped));
     }).catch(() => {});
     return () => {
       alive = false;
@@ -325,29 +324,8 @@ export function PaymentInModule({
     }).finally(() => setNumberLoading(false));
   };
 
-  const handleOpenEdit = (rec: PaymentInRecord) => {
-    setEditingRecord(rec);
-    setPartyInput(rec.partyName);
-    setPartySearch(rec.partyName);
-    setPartyDropdownOpen(false);
-    setAmountInput(String(rec.amountReceived));
-    setDiscountInput(String(rec.discount || 0));
-    setDateInput(rec.date.includes("2026") ? "2026-02-21" : "2026-08-10");
-    setModeInput(rec.mode || "Cash");
-    setPrefixInput(rec.prefix || "HB/PI/25-26/");
-    setNumberInput(rec.numOnly || "1");
-    setNotesInput(rec.notes || "");
-    setActiveMenuId(null);
-    setViewMode("edit");
-  };
-
-  const handleDelete = (id: string) => {
-    const next = records.filter(r => r.id !== id);
-    setRecords(next);
-    localStorage.setItem("hb_payment_in_records", JSON.stringify(next));
-    setActiveMenuId(null);
-    notify("Payment In entry deleted successfully");
-  };
+  const handleOpenEdit = (_rec: PaymentInRecord) => notify("Payment editing is unavailable: no backend update endpoint exists.");
+  const handleDelete = (_id: string) => notify("Payment deletion is unavailable: no backend delete endpoint exists.");
 
   const handleSave = async () => {
     if (!partyInput.trim()) {
@@ -362,23 +340,7 @@ export function PaymentInModule({
     const fullNum = `${prefixInput}${numberInput}`;
 
     if (viewMode === "edit" && editingRecord) {
-      const updated: PaymentInRecord = {
-        ...editingRecord,
-        partyName: partyInput.trim(),
-        amountReceived: amt,
-        totalSettled: amt,
-        discount: Number(discountInput) || 0,
-        mode: modeInput,
-        prefix: prefixInput,
-        numOnly: numberInput,
-        number: fullNum,
-        notes: notesInput.trim(),
-        date: new Date(dateInput).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
-      };
-      const next = records.map(r => r.id === editingRecord.id ? updated : r);
-      setRecords(next);
-      localStorage.setItem("hb_payment_in_records", JSON.stringify(next));
-      notify(`Payment In #${fullNum} updated successfully`);
+      notify("Payment editing is unavailable."); return;
     } else {
       const selectedParty = parties.find(p => p.name === partyInput);
       let remainingAllocation = Math.min(amt, settledTotals);
@@ -409,7 +371,6 @@ export function PaymentInModule({
       const newRec = paymentInRecordFromApi(saved, Number(numberInput) || records.length + 1);
       const next = [newRec, ...records.filter(r => r.id !== newRec.id)];
       setRecords(next);
-      localStorage.setItem("hb_payment_in_records", JSON.stringify(next));
       setQuery("");
       setDateFilter("Last 365 Days");
       setDateMenuOpen(false);

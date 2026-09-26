@@ -1,0 +1,1 @@
+ALTER TABLE "SalesInvoiceLine" ADD COLUMN "mrp" DECIMAL(14,2);

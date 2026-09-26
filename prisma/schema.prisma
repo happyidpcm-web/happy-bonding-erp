@@ -285,6 +285,7 @@ model SalesInvoiceLine {
   hsnCode       String
   quantity      Decimal        @db.Decimal(14, 3)
   unitPrice     Decimal        @db.Decimal(14, 2)
+  mrp           Decimal?       @db.Decimal(14, 2)
   purchasePriceAtSale Decimal? @db.Decimal(14, 2)
   totalCostAtSale     Decimal? @db.Decimal(14, 2)
   discount      Decimal        @default(0) @db.Decimal(14, 2)
@@ -441,4 +442,23 @@ model Expense {
   branch         Branch       @relation(fields: [branchId], references: [id])
 
   @@index([organizationId, branchId, expenseDate])
+}
+
+model Voucher {
+  id             String   @id
+  organizationId String
+  branchId       String
+  type           String
+  number         String
+  date           DateTime
+  party          String
+  amount         Decimal  @db.Decimal(14, 2)
+  status         String   @default("Open")
+  dueIn          String?
+  notes          String?
+  items          Json
+  createdAt      DateTime @default(now())
+
+  @@unique([organizationId, branchId, type, number])
+  @@index([organizationId, branchId, type, date])
 }

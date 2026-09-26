@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { money } from "./data";
 import { api } from "./api";
+import { EditableInvoiceNumber } from "./components/EditableInvoiceNumber";
 import type { Branch, Expense, Invoice, InvoiceLineItem, InvoiceSetting, OwnerBranchSummary, Page, Party, Product, StaffUser } from "./types";
 import * as XLSX from "xlsx";
 import happyBondingLogo from "./assets/happy-bonding-logo-white.png";
@@ -77,7 +78,7 @@ const nav: { section: string; items: { id: Page; label: string; icon: typeof Lay
 
 export const defaultSignatureUrl = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 70" width="220" height="60"><path d="M10 45 C30 10, 45 5, 55 45 C65 25, 75 15, 85 45 C95 10, 110 30, 130 40 C140 15, 155 25, 175 35 C185 10, 205 35, 240 15" stroke="%23111827" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M25 50 C80 48, 140 52, 210 48" stroke="%23111827" stroke-width="1.5" fill="none"/><text x="35" y="65" font-family="cursive, sans-serif" font-size="18" font-weight="bold" fill="%23111827">M. Saravana</text></svg>`;
 
-export const defaultInvoiceSetting: InvoiceSetting = { invoicePrefix: "HB/SL", paymentTermsDays: 30, terms: "NO REFUND ONCE SOLD. EXCHANGE ONLY AS PER STORE POLICY.", bankName: "", accountName: "", accountNumber: "", ifsc: "", upiId: "", qrText: "", signatureText: "Authorized signatory for Happy Bonding Men's Wear", signatureUrl: defaultSignatureUrl };
+export const defaultInvoiceSetting: InvoiceSetting = { invoicePrefix: "HB/SL", paymentTermsDays: 30, terms: "NO REFUND ONCE SOLD. EXCHANGE ONLY AS PER STORE POLICY.", bankName: "", accountName: "", accountNumber: "", ifsc: "", upiId: "", qrText: "", signatureText: "Authorized signatory for Happy Bonding Men's Wear", signatureUrl: "" };
 
 function BarcodeIcon() {
   return <div className="barcode-icon" title="Barcode Scanner"><span/><span/><span/><span/><span/><span/><span/></div>;
@@ -85,8 +86,8 @@ function BarcodeIcon() {
 
 
 export default function App() {
-  const apiMode = import.meta.env.VITE_USE_API === "true";
-  const [authenticated, setAuthenticated] = useState(!apiMode || api.hasSession());
+  const apiMode = true;
+  const [authenticated, setAuthenticated] = useState(api.hasSession());
   const [page, setPage] = useState<Page>("dashboard");
   const [sidebar, setSidebar] = useState(false);
   const [productRows, setProductRows] = useState<Product[]>([]);
@@ -105,40 +106,40 @@ export default function App() {
   const [activeInvoiceModal, setActiveInvoiceModal] = useState<Invoice | null>(null);
 
   const handleLogout = () => {
+    ++loadSequence.current;
     api.logout();
     setAuthenticated(false);
     notify("Logged out successfully");
   };
 
 
+  const [dataError, setDataError] = useState("");
+  const [dataLoading, setDataLoading] = useState(true);
+  const loadSequence = useRef(0);
   const refreshAppData = async () => {
-    const [nextProducts, nextParties, nextInvoices, nextSetting, nextBranches, nextSummary] = await Promise.all([
-      api.products().catch(() => null),
-      api.parties().catch(() => null),
-      api.sales().catch(() => null),
-      api.invoiceSetting().catch(() => null),
-      api.branches().catch(() => null),
-      api.ownerSummary().catch(() => null),
-    ]);
-    if (nextProducts) setProductRows(nextProducts);
-    if (nextParties) setPartyRows(nextParties);
-    if (nextInvoices) setInvoiceRows(nextInvoices);
-    if (nextSetting) setInvoiceSetting({ ...defaultInvoiceSetting, ...nextSetting });
-    if (nextBranches) {
-      setBranchRows(nextBranches);
-      if (api.currentBranchId()) {
-        setCurrentBranchId(api.currentBranchId());
-      } else if (nextBranches[0]) {
-        api.setCurrentBranch(nextBranches[0].id);
-        setCurrentBranchId(nextBranches[0].id);
-      }
-    }
-    if (nextSummary) setOwnerSummary(nextSummary);
+    const sequence = ++loadSequence.current;
+    const branchAtStart = api.currentBranchId();
+    setDataLoading(true); setDataError("");
+    try {
+      const [nextProducts, nextParties, nextInvoices, nextSetting, nextBranches, nextSummary] = await Promise.all([api.products(), api.parties(), api.sales(), api.invoiceSetting(), api.branches(), api.ownerSummary()]);
+      if (sequence !== loadSequence.current || branchAtStart !== api.currentBranchId()) return;
+      setProductRows(nextProducts); setPartyRows(nextParties); setInvoiceRows(nextInvoices);
+      setInvoiceSetting(nextSetting); setBranchRows(nextBranches); setOwnerSummary(nextSummary);
+      const branch = nextBranches.find(b => b.id === api.currentBranchId()) ?? nextBranches[0];
+      if (branch) { api.setCurrentBranch(branch.id); setCurrentBranchId(branch.id); }
+    } catch (error) { if (sequence === loadSequence.current) setDataError(error instanceof Error ? error.message : "Could not load backend data"); }
+    finally { if (sequence === loadSequence.current) setDataLoading(false); }
   };
+  useEffect(() => {
+    const failed = (event: Event) => setToast((event as CustomEvent<string>).detail);
+    const expired = () => { ++loadSequence.current; setAuthenticated(false); setProductRows([]); setPartyRows([]); setInvoiceRows([]); };
+    window.addEventListener("hb-api-error", failed); window.addEventListener("hb-session-expired", expired);
+    return () => { window.removeEventListener("hb-api-error", failed); window.removeEventListener("hb-session-expired", expired); };
+  }, []);
 
   useEffect(() => {
     if (authenticated) {
-      refreshAppData().catch(() => {});
+      void refreshAppData();
     }
   }, [authenticated, currentBranchId]);
 
@@ -287,7 +288,11 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleGlobalShortcuts);
   }, []);
 
-  if (!authenticated) return <LoginScreen onLogin={async () => { setAuthenticated(true); await refreshAppData(); }}/>;
+  if (!authenticated) return <LoginScreen onLogin={() => { setDataLoading(true); setDataError(""); setCurrentBranchId(api.currentBranchId()); setAuthenticated(true); }}/>;
+  if (dataLoading) return <div className="erp-startup" role="status" aria-live="polite" aria-busy="true">
+    <div className="erp-startup-card"><span className="erp-startup-spinner" aria-hidden="true" /><h1>Happy Bonding ERP</h1><p>Loading your workspace…</p></div>
+  </div>;
+  if (dataError) return <div className="erp-startup"><div className="erp-startup-card"><h1>Unable to load your workspace</h1><p role="alert">{dataError}</p><div className="erp-startup-actions"><button className="primary" onClick={() => void refreshAppData()}>Retry</button><button className="secondary" onClick={handleLogout}>Sign out</button></div></div></div>;
 
   return <div className="app-shell">
     <aside className={`sidebar ${sidebar ? "open" : ""}`}>
@@ -514,7 +519,7 @@ export default function App() {
     {branchModalOpen && <BranchManagementModal branches={branchRows} onClose={() => setBranchModalOpen(false)} onSaved={async () => { await refreshAppData(); setBranchModalOpen(false); notify("Branch saved"); }} notify={notify} />}
     {staffModalOpen && <StaffManagementModal branches={branchRows} onClose={() => setStaffModalOpen(false)} notify={notify} />}
     {changePasswordModalOpen && <ChangePasswordModal onClose={() => setChangePasswordModalOpen(false)} notify={notify} />}
-    {pendingSwitchBranch && <BranchSwitchAuthModal branch={pendingSwitchBranch} onClose={() => setPendingSwitchBranch(null)} onSuccess={async (bId) => { api.setCurrentBranch(bId); setCurrentBranchId(bId); await refreshAppData(); }} notify={notify} />}
+    {pendingSwitchBranch && <BranchSwitchAuthModal branch={pendingSwitchBranch} onClose={() => setPendingSwitchBranch(null)} onSuccess={(bId) => { api.setCurrentBranch(bId); setDataLoading(true); setCurrentBranchId(bId); }} notify={notify} />}
   </div>;
 
 }
@@ -778,12 +783,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
       }
       onLogin();
     } catch (err: any) {
-      if (passVal === "HappyBonding@2026" || passVal === "admin" || passVal === "123456") {
-        localStorage.setItem("hb_erp_token", "mock_local_token_2026");
-        onLogin();
-      } else {
-        setError(err?.message || "Invalid email or password");
-      }
+      setError(err?.message || "Login failed. Check backend connection.");
     } finally {
       setBusy(false);
     }
@@ -864,7 +864,7 @@ export function Metric({ label, value, icon: Icon, tone = "amber", hint }: { lab
 }
 
 
-function EmptyState({icon:Icon,title,text}:{icon:typeof ReceiptIndianRupee;title:string;text:string}){return <div className="empty"><Icon/><h3>{title}</h3><p>{text}</p></div>;}
+export function EmptyState({icon:Icon,title,text}:{icon:typeof ReceiptIndianRupee;title:string;text:string}){return <div className="empty"><Icon/><h3>{title}</h3><p>{text}</p></div>;}
 
 function SearchRow({ value, onChange, placeholder }: { value: string; onChange: (v:string)=>void; placeholder: string }) { return <div className="search-box"><Search size={17}/><input value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}/></div>; }
 
@@ -1046,7 +1046,7 @@ function InvoiceDetailModal({
   };
 
   const total = invoice.amount;
-  const paid = invoice.paidAmount ?? total;
+  const paid = invoice.paidAmount ?? 0;
   const balance = Math.max(0, total - paid);
   const profitLines = invoice.lines ?? [];
   const totalCost = profitLines.reduce((sum, line) => sum + (line.purchasePrice ?? 0) * line.quantity, 0);
@@ -2321,7 +2321,12 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   useEffect(()=>{if(autoCreateKey)setCreating(true);},[autoCreateKey]);
   useEffect(()=>{setPaymentTerms(setting.paymentTermsDays);},[setting.paymentTermsDays]);
   useEffect(()=>{setTerms(setting.terms);},[setting.terms]);
-  useEffect(()=>{if(creating) api.nextSaleNumber(new Date(invoiceDate)).then(x=>setNextNumber(x.invoiceNumber)).catch(()=>setNextNumber(""));},[creating,rows.length,invoiceDate]);
+  useEffect(() => {
+    if (editingInvoice) { setNextNumber(editingInvoice.number); return; }
+    let alive = true;
+    if (creating) api.nextSaleNumber(new Date(invoiceDate)).then(x => { if (alive) setNextNumber(x.invoiceNumber); }).catch(() => { if (alive) setNextNumber(""); });
+    return () => { alive = false; };
+  }, [creating, rows.length, invoiceDate, editingInvoice]);
   
   const addLine=(product:Product, taxRate?:number)=>{setLines(current=>{const found=current.find(x=>x.product.id===product.id);return found?current.map(x=>x.product.id===product.id?{...x,qty:x.qty+1}:x):[...current,{product,qty:1,discount:0,taxRate:taxRate??product.taxRate??0}]});setItemSearch("");};
   const addBatchLines=(items: Array<{ product: Product; qty: number; taxRate: number }>) => {
@@ -2370,20 +2375,15 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   const resetInvoiceForm=()=>{setLines([]);setPartyOpen(false);setPaid(0);setNotes("");setInvoiceDiscount(0);setAdditionalCharges(0);setShowNotes(false);setShowTerms(false);setShowBank(false);setShowQr(false);setNewParty({name:"",phone:"",address:"",gstin:""});setPartySearch("");setSelectedParty(undefined);setMarkPaid(false);setInvoiceDate(new Date().toISOString().slice(0,10));};
   const saveInvoice=async(keepOpen=false)=>{
     if(!lines.length)return notify("Add at least one item");
+    if (!nextNumber) return notify("Invoice number is unavailable. Reopen the form after connecting to the backend.");
     try{
 {/* ... */}
-      if (editingInvoice) {
-        const existingPaymentTotal = editingInvoice.payments?.reduce((sum, p) => sum + Number(p.amount), 0) ?? 0;
-        if (total < existingPaymentTotal) {
-           return notify(`Edited total (₹${total.toLocaleString("en-IN")}) cannot be less than already received amount (₹${existingPaymentTotal.toLocaleString("en-IN")}). Please issue refund/credit note instead.`);
-        }
-      }
       setSaving(true);
       let partyId=selectedParty?.id ? String(selectedParty.id) : undefined;
       const received=markPaid?total:paid;
-      const payload={partyId,invoiceDate:new Date(invoiceDate),paidAmount:Math.min(received,total),paymentMode,notes:[notes,showTerms?terms:""].filter(Boolean).join("\n"),invoiceDiscount,additionalCharges,lines:lines.map(x=>({variantId:String(x.product.id),quantity:x.qty,unitPrice:x.product.sellingPrice,discount:x.discount,taxRate:x.taxRate??x.product.taxRate??0}))};
+      const payload={partyId,invoiceDate:new Date(invoiceDate),paidAmount:Math.min(received,total),paymentMode,notes:[notes,showTerms?terms:""].filter(Boolean).join("\n"),invoiceDiscount,additionalCharges,lines:lines.map(x=>({variantId:String(x.product.id),quantity:x.qty,unitPrice:x.product.sellingPrice,mrp:x.product.mrp,discount:x.discount,taxRate:x.taxRate??x.product.taxRate??0}))};
       const next=editingInvoice?await api.updateSale(editingInvoice.id,payload):await api.createSale(payload);
-      setRows(next); setProducts(await api.products()); setEditingInvoice(null); resetInvoiceForm(); setCreating(keepOpen && !editingInvoice); notify(editingInvoice?`Sales invoice ${editingInvoice.number} updated`:keepOpen?"Sales invoice saved. Ready for next invoice.":"Sales invoice saved");
+      setRows(next); setProducts(await api.products()); setParties(await api.parties()); setEditingInvoice(null); resetInvoiceForm(); setCreating(keepOpen && !editingInvoice); notify(editingInvoice?`Sales invoice ${editingInvoice.number} updated`:keepOpen?"Sales invoice saved. Ready for next invoice.":"Sales invoice saved");
     }catch(error){notify(error instanceof Error?error.message:"Invoice save failed");}finally{setSaving(false);}
   };
   const deleteInvoice = async (inv: Invoice) => {
@@ -2432,7 +2432,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   const duplicateInvoice = (inv: Invoice) => {
     const copiedLines = (inv.lines ?? []).map(line => {
       const product = products.find(p => String(p.id) === String((line as InvoiceLineItem & { productId?: string }).productId) || p.sku === line.sku);
-      return product ? { product, qty: line.quantity, discount: line.discount, taxRate: line.taxRate } : null;
+      return product ? { product: { ...product, name: line.itemName, hsnCode: line.hsnCode, sellingPrice: line.unitPrice, mrp: line.mrp ?? product.mrp }, qty: line.quantity, discount: line.discount, taxRate: line.taxRate } : null;
     }).filter(Boolean) as InvoiceLineDraft[];
     setLines(copiedLines);
     const party = parties.find(p => p.name === inv.party || p.phone === inv.partyPhone);
@@ -2445,12 +2445,14 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
     setCreating(true);
     notify(`Invoice ${inv.number} duplicated. Check and save as new invoice.`);
   };
-  const editInvoice = (inv: Invoice) => {
+  const editInvoice = async (selected: Invoice) => {
+    let inv: Invoice;
+    try { inv = await api.sale(selected.id); } catch (error) { notify(error instanceof Error ? error.message : "Could not load invoice"); return; }
     const editLines = (inv.lines ?? []).map(line => {
       const product = products.find(p => p.sku === line.sku);
-      return product ? { product, qty: line.quantity, discount: line.discount, taxRate: line.taxRate } : null;
+      return product ? { product: { ...product, name: line.itemName, hsnCode: line.hsnCode, sellingPrice: line.unitPrice, mrp: line.mrp ?? product.mrp }, qty: line.quantity, discount: line.discount, taxRate: line.taxRate } : null;
     }).filter(Boolean) as InvoiceLineDraft[];
-    if (!editLines.length) {
+    if (!editLines.length || editLines.length !== inv.lines?.length) {
       notify("This invoice items are not available in product master, cannot edit safely.");
       return;
     }
@@ -2464,7 +2466,8 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
     setInvoiceDiscount(inv.invoiceDiscount ?? 0);
     setAdditionalCharges(inv.additionalCharges ?? 0);
     setNotes(inv.notes ?? "");
-    setInvoiceDate(new Date(inv.date).toISOString().slice(0,10));
+    const date = new Date(inv.date);
+    setInvoiceDate(inv.dateISO ?? `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`);
     setMarkPaid((inv.paidAmount ?? 0) >= inv.amount);
     setCreating(true);
     notify(`Editing ${inv.number}`);
@@ -2503,7 +2506,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
           onClose={() => setQuickSettingsOpen(false)}
           onSave={updated => {
             setSetting({ ...setting, ...updated });
-            api.saveInvoiceSetting({ ...setting, ...updated }).catch(() => {});
+            api.saveInvoiceSetting({ ...setting, ...updated }).then(setSetting).catch(error => notify(error.message));
           }}
           notify={notify}
         />
@@ -2712,18 +2715,18 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
                     <td className="center-cell">{line.product.hsnCode || "-"}</td>
                     <td>
                       <div className="mrp-cell-wrap">
-                        <div className="gray-val-box">{money(line.product.mrp)}</div>
-                        <small className="discount-badge-off">({Math.round(((line.product.mrp - line.product.sellingPrice) / line.product.mrp) * 100) || 7.7}% OFF)</small>
+                        <EditableInvoiceNumber label={`MRP for ${line.product.name}`} value={line.product.mrp} currency onChange={mrp => setLines(rows => rows.map(x => x.product.id === line.product.id ? { ...x, product: { ...x.product, mrp } } : x))} />
+                        <small className="discount-badge-off">({line.product.mrp > 0 ? Math.max(0, Math.round(((line.product.mrp - line.product.sellingPrice) / line.product.mrp) * 100)) : 0}% OFF)</small>
                       </div>
                     </td>
                     <td>
                       <div className="qty-cell-wrap">
-                        <input className="qty-mini-input" type="number" value={line.qty} min={1} onChange={e => setLines(lines.map(x => x.product.id === line.product.id ? { ...x, qty: Number(e.target.value) } : x))} />
+                        <EditableInvoiceNumber label={`Quantity for ${line.product.name}`} value={line.qty} min={1} integer onChange={qty => setLines(rows => rows.map(x => x.product.id === line.product.id ? { ...x, qty } : x))} />
                         <select className="unit-select"><option>PCS</option><option>BOX</option><option>KG</option></select>
                       </div>
                     </td>
                     <td>
-                      <div className="gray-val-box">{money(line.product.sellingPrice)}</div>
+                      <EditableInvoiceNumber label={`Price for ${line.product.name}`} value={line.product.sellingPrice} currency onChange={sellingPrice => setLines(rows => rows.map(x => x.product.id === line.product.id ? { ...x, product: { ...x.product, sellingPrice } } : x))} />
                     </td>
                     <td>
                       <div className="discount-cell-wrap">
@@ -2963,16 +2966,16 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
             <div className="ref-signature-area">
               <span className="ref-sig-title">{setting.signatureText || `Authorized signatory for Happy Bonding Men's Wear (${localStorage.getItem("hb_signature_name") || "M. Saravanan"})`}</span>
               <div className="ref-sig-img">
-                <img src={localStorage.getItem("hb_digital_signature") || setting.signatureUrl || defaultSignatureUrl} alt="Digital Signature" style={{ height: 48, objectFit: "contain" }} />
+                <img src={setting.signatureUrl || undefined} alt="Digital Signature" style={{ height: 48, objectFit: "contain" }} />
               </div>
             </div>
 
             <div className="ref-actions-row">
-              <button type="button" className="secondary" onClick={() => saveInvoice(true)} disabled={saving || !lines.length}>Save & New</button>
+              {!editingInvoice && <button type="button" className="secondary" onClick={() => saveInvoice(true)} disabled={saving || !lines.length}>Save & New</button>}
               <button type="button" className="whatsapp-btn" onClick={() => shareWhatsAppInvoice({ phone: selectedParty?.phone, partyName: selectedParty?.name, number: nextNumber || "HB-INV", amount: total, paidAmount: (markPaid ? total : paid), paymentMode })} disabled={!lines.length}>
                 <MessageCircle size={15} /> WhatsApp Share
               </button>
-              <button type="button" className="primary" onClick={() => saveInvoice(false)} disabled={saving || !lines.length}>{saving ? "Saving..." : "Save Invoice"}</button>
+              <button type="button" className="primary" onClick={() => saveInvoice(false)} disabled={saving || !lines.length}>{saving ? "Saving..." : editingInvoice ? "Update Invoice" : "Save Invoice"}</button>
             </div>
           </div>
         </div>
@@ -3509,7 +3512,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
               const prod = products.find(p => String(p.id) === String(ul.variantId) || p.name === ul.name);
               if (prod) {
                 newLines.push({
-                  product: prod,
+                  product: { ...prod, mrp: ul.mrp, sellingPrice: ul.price },
                   qty: ul.qty,
                   discount: ul.discount || 0,
                   taxRate: ul.tax ?? prod.taxRate ?? 0
@@ -3550,7 +3553,7 @@ function InvoiceSettingsEditor({setting,setSetting,onSave}:{setting:InvoiceSetti
     <div className="signature-editor-box">
       <strong>Stored Digital Signature (Applied automatically to all invoices)</strong>
       <div className="signature-preview">
-        <img src={setting.signatureUrl || defaultSignatureUrl} alt="Stored Digital Signature Preview" />
+        <img src={setting.signatureUrl || undefined} alt="Stored Digital Signature Preview" />
       </div>
       <label>Upload New Signature Image (PNG / JPEG / SVG):
         <input type="file" accept="image/*" onChange={e => handleSignatureUpload(e.target.files?.[0])} />
@@ -3638,13 +3641,14 @@ export function AddItemModal({ products, currentLines, onClose, onApplyItems, no
       if (qty <= 0) return;
       const prod = products.find(p => String(p.id) === id);
       if (prod) {
-        const price = prod.sellingPrice;
+        const current = currentLines.find(line => String(line.variantId ?? line.id) === id);
+        const price = current?.price ?? prod.sellingPrice;
         newLines.push({
           id: "L-" + id,
           variantId: prod.id,
           name: prod.name,
           hsn: prod.hsnCode || "6205",
-          mrp: prod.mrp || price,
+          mrp: current?.mrp ?? prod.mrp,
           qty,
           price,
           discount: 0,

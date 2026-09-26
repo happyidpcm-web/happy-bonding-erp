@@ -1728,6 +1728,23 @@ body{background:#fffdf7;color:#140d08}.sidebar{background:linear-gradient(180deg
   gap: 4px !important;
 }
 
+.invoice-number-display {
+  border: 1px solid transparent;
+  cursor: text;
+  font: inherit;
+  width: 100%;
+}
+.invoice-number-display:focus-visible { outline: 2px solid #4f46e5; }
+.invoice-number-editor {
+  width: 100%;
+  min-width: 55px;
+  padding: 8px;
+  border: 1px solid #4f46e5;
+  border-radius: 4px;
+  font: inherit;
+  text-align: center;
+  box-sizing: border-box;
+}
 .qty-mini-input {
   width: 45px !important;
   border: 1px solid #cbd5e1 !important;
@@ -5307,3 +5324,16 @@ input:checked + .slider:before {
 
 
 
+
+@media screen {
+  .inventory-table-scroll { max-height: min(55vh, 520px); overflow: auto; overscroll-behavior: auto; scrollbar-gutter: stable; }
+}
+
+.erp-startup { min-height: 100dvh; display: grid; place-items: center; padding: 24px; background: #fffdf6; }
+.erp-startup-card { width: min(100%, 480px); text-align: center; color: #172033; }
+.erp-startup-card h1 { font-size: 24px; margin: 20px 0 8px; }
+.erp-startup-card p { color: #697386; line-height: 1.5; overflow-wrap: anywhere; }
+.erp-startup-actions { display: flex; justify-content: center; gap: 12px; margin-top: 24px; }
+.erp-startup-spinner { display: inline-block; width: 36px; height: 36px; border: 3px solid #f5dfad; border-top-color: #cc1539; border-radius: 50%; animation: erp-loading 0.9s linear infinite; }
+@keyframes erp-loading { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .erp-startup-spinner { animation: none; } }
