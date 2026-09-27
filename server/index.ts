@@ -1305,7 +1305,7 @@ async function generateFullBackupData(organizationId: string) {
     db.salesInvoiceLine.findMany({ where: { invoice: { organizationId } } }),
     db.payment.findMany({ where: { organizationId } }),
     db.expense.findMany({ where: { organizationId } }),
-    db.invoiceSetting.findUnique({ where: { organizationId } }),
+    db.invoiceSetting.findMany({ where: { organizationId } }),
     db.paymentAllocation.findMany({ where: { payment: { organizationId } } }),
     db.voucher.findMany({ where: { organizationId } }),
   ]);
