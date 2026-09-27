@@ -42,6 +42,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { api } from "../../api";
+import { NumberInput } from "../../components/NumberInput";
 import { PartyCreateForm, partyPayloadFromForm } from "../parties/Parties";
 import { money } from "../../data";
 import type { Invoice, InvoiceSetting, Party, Product, VoucherRecord } from "../../types";
@@ -118,7 +119,7 @@ export function CreateQuotationScreen({
   const [number, setNumber] = useState("1");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [validDays, setValidDays] = useState(30);
-  const [validityDate, setValidityDate] = useState(() => new Date(Date.now() + 30 * 86400000).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }));
+  const [validityDate, setValidityDate] = useState(() => new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10));
   const [linkedInvoice, setLinkedInvoice] = useState("");
 
   const [lines, setLines] = useState<Array<{ id: string; variantId: string | number; name: string; hsn: string; mrp: number; qty: number; price: number; discount: number; tax: number; amount: number }>>([]);
@@ -146,9 +147,14 @@ export function CreateQuotationScreen({
   }, []);
 
   useEffect(() => {
-    const next = Math.max(0, ...vouchers.map(v => Number(v.number.split("/").pop()) || 0)) + 1;
-    setNumber(String(next));
-  }, [type, vouchers]);
+    let active = true;
+    {
+      api.nextVoucherNumber(type, type === "Quotation" ? "" : prefix).then(next => { if (active) setNumber(next); }).catch(error => {
+        if (active) notify(error instanceof Error ? error.message : "Could not load the next invoice number");
+      });
+    }
+    return () => { active = false; };
+  }, [type, prefix, vouchers]);
 
   const [autoRoundOff, setAutoRoundOff] = useState(type === "Quotation" ? false : true);
 
@@ -162,7 +168,11 @@ export function CreateQuotationScreen({
   const netAmount = Math.max(0, taxableAmount + Number(additionalCharges) - Number(overallDiscount));
   const finalTotal = autoRoundOff ? Math.round(netAmount) : netAmount;
 
+  const draftId = useRef(crypto.randomUUID());
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
   const handleSaveQuotation = async (keepNew = false) => {
+    if (savingRef.current) return;
     const partyName = selectedParty ? selectedParty.name : customPartyName.trim();
     if (!partyName) {
       notify("Please select or add a Party");
@@ -174,25 +184,29 @@ export function CreateQuotationScreen({
     }
     const fullNumber = type === "Quotation" ? number : `${prefix}${number}`;
     const newRecord: VoucherRecord = {
-      id: String(Date.now()),
+      id: draftId.current,
       date: new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
       number: fullNumber,
       party: partyName,
       dueIn: `${validDays} Days`,
       amount: finalTotal,
       status: "Open",
+      details: { paidAmount: markFullyPaid ? finalTotal : amountPaid, paymentMode, terms, additionalCharges, discount: overallDiscount, roundOff: autoRoundOff, dueDate: new Date(Date.parse(date) + validDays * 86400000).toISOString().slice(0, 10), signatureUrl, signatoryName },
       notes: notes || `${type} created in ERP`,
-      items: lines.map(line => ({ variantId: String(line.variantId), name: line.name, hsn: line.hsn, qty: line.qty, price: line.price, amount: line.amount })),
+      items: lines.map(line => ({ variantId: String(line.variantId), name: line.name, hsn: line.hsn, qty: line.qty, price: line.price, amount: line.amount, mrp: line.mrp, discount: line.discount, tax: line.tax })),
     };
+    savingRef.current = true; setSaving(true);
     try {
       await onSave(newRecord);
       if (type === "Purchase Invoice" && onProductsChanged) onProductsChanged(await api.products());
     } catch (error) {
       notify(error instanceof Error ? error.message : "Voucher save failed");
       return;
-    }
+    } finally { savingRef.current = false; setSaving(false); }
     notify(type === "Purchase Invoice" ? `${type} ${fullNumber} saved and stock added` : `${type} ${fullNumber} created successfully`);
     if (keepNew) {
+      draftId.current = crypto.randomUUID();
+      setAmountPaid(0); setMarkFullyPaid(false);
       setLines([]);
       setSelectedParty(undefined);
       setCustomPartyName("");
@@ -217,7 +231,9 @@ export function CreateQuotationScreen({
       tax: 5,
       amount,
     };
-    setLines([...lines, newRow]);
+    setLines(rows => rows.some(row => String(row.variantId) === String(prod.id))
+      ? rows.map(row => String(row.variantId) === String(prod.id) ? { ...row, qty: row.qty + 1, amount: (row.qty + 1) * row.price - row.discount } : row)
+      : [...rows, newRow]);
     setItemSearchOpen(false);
     setItemQuery("");
   };
@@ -254,10 +270,10 @@ export function CreateQuotationScreen({
             <Settings size={15} /> Settings
             <span style={{ position: "absolute", top: 4, right: 6, width: 6, height: 6, borderRadius: "50%", background: "#ef4444" }} />
           </button>
-          <button type="button" className="secondary" onClick={() => handleSaveQuotation(true)}>
+          <button type="button" className="secondary" disabled={saving} onClick={() => handleSaveQuotation(true)}>
             Save & New
           </button>
-          <button type="button" className="primary-purple-btn" style={{ background: "#4f46e5", color: "#fff", border: "none", borderRadius: 8, padding: "8px 24px", font: "600 13px Manrope", cursor: "pointer" }} onClick={() => handleSaveQuotation(false)}>
+          <button type="button" className="primary-purple-btn" style={{ background: "#4f46e5", color: "#fff", border: "none", borderRadius: 8, padding: "8px 24px", font: "600 13px Manrope", cursor: "pointer" }} disabled={saving} onClick={() => handleSaveQuotation(false)}>
             Save
           </button>
         </div>
@@ -375,7 +391,7 @@ export function CreateQuotationScreen({
             <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b", display: "block", marginBottom: 2 }}>
               {type === "Delivery Challan" ? "Challan Date:" : `${type} Date:`}
             </label>
-            <input type="date" defaultValue="2026-08-11" onChange={e => setDate(e.target.value)} style={{ width: "100%", height: 32, padding: "0 8px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 12 }} />
+            <input aria-label="Invoice date" type="date" value={date} onChange={e => { if (e.target.value) setDate(e.target.value); }} style={{ width: "100%", height: 32, padding: "0 8px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 12 }} />
           </div>
 
           {type === "Sales Return" || type === "Credit Note" ? (
@@ -398,18 +414,18 @@ export function CreateQuotationScreen({
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b", display: "block", marginBottom: 2 }}>
-                  {type === "Proforma Invoice" ? "Payment Terms:" : "Valid For (Days)"}
+                  {type === "Purchase Invoice" ? "Payment Terms (Days)" : type === "Proforma Invoice" ? "Payment Terms:" : "Valid For (Days)"}
                 </label>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <input type="number" value={validDays} onChange={e => setValidDays(Number(e.target.value))} style={{ width: "100%", height: 32, padding: "0 8px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 12 }} />
+                  <NumberInput aria-label="Payment terms in days" value={validDays} onValueChange={setValidDays} style={{ width: "100%", height: 32, padding: "0 8px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 12 }} />
                   {type === "Proforma Invoice" && <span style={{ fontSize: 11, color: "#64748b" }}>days</span>}
                 </div>
               </div>
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b", display: "block", marginBottom: 2 }}>
-                  {type === "Proforma Invoice" ? "Expiry Date:" : "Validity Date"}
+                  {type === "Purchase Invoice" ? "Payment Due Date" : type === "Proforma Invoice" ? "Expiry Date:" : "Validity Date"}
                 </label>
-                <input type="date" defaultValue="2026-09-10" onChange={e => setValidityDate(e.target.value)} style={{ width: "100%", height: 32, padding: "0 8px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 12 }} />
+                <input aria-label="Due date" type="date" value={type === "Purchase Invoice" ? new Date(new Date(date + "T12:00:00Z").getTime() + validDays * 86400000).toISOString().slice(0, 10) : validityDate} onChange={e => { if (!e.target.value) return; if (type === "Purchase Invoice") setValidDays(Math.max(0, Math.round((Date.parse(e.target.value) - Date.parse(date)) / 86400000))); else setValidityDate(e.target.value); }} style={{ width: "100%", height: 32, padding: "0 8px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 12 }} />
               </div>
             </div>
           )}
@@ -426,7 +442,7 @@ export function CreateQuotationScreen({
               <th style={{ padding: "10px 12px", width: 90 }}>HSN / SAC</th>
               <th style={{ padding: "10px 12px", width: 80, textAlign: "right" }}>MRP ℹ️</th>
               <th style={{ padding: "10px 12px", width: 70, textAlign: "center" }}>QTY</th>
-              <th style={{ padding: "10px 12px", width: 110, textAlign: "right" }}>PRICE/ITEM (₹)</th>
+              <th style={{ padding: "10px 12px", width: 110, textAlign: "right" }}>{type === "Purchase Invoice" ? "PURCHASE PRICE (₹)" : "PRICE/ITEM (₹)"}</th>
               <th style={{ padding: "10px 12px", width: 90, textAlign: "right" }}>DISCOUNT</th>
               <th style={{ padding: "10px 12px", width: 70, textAlign: "right" }}>TAX</th>
               <th style={{ padding: "10px 12px", width: 110, textAlign: "right" }}>AMOUNT (₹)</th>
@@ -445,17 +461,17 @@ export function CreateQuotationScreen({
                 <td style={{ padding: "10px 12px", color: "#64748b" }}>{line.hsn}</td>
                 <td style={{ padding: "10px 12px", textAlign: "right" }}>₹ {line.mrp}</td>
                 <td style={{ padding: "10px 12px", textAlign: "center" }}>
-                  <input
-                    type="number"
+                  <NumberInput
+                    aria-label={`Quantity for ${line.name}`}
+                    min={1}
                     value={line.qty}
-                    onChange={e => {
-                      const q = Math.max(1, Number(e.target.value));
-                      setLines(lines.map(l => l.id === line.id ? { ...l, qty: q, amount: q * l.price - l.discount } : l));
+                    onValueChange={q => {
+                      setLines(rows => rows.map(l => l.id === line.id ? { ...l, qty: q, amount: q * l.price - l.discount } : l));
                     }}
                     style={{ width: 50, height: 28, textAlign: "center", border: "1px solid #cbd5e1", borderRadius: 4 }}
                   />
                 </td>
-                <td style={{ padding: "10px 12px", textAlign: "right" }}>₹ {line.price}</td>
+                <td style={{ padding: "10px 12px", textAlign: "right" }}>{type === "Purchase Invoice" ? <NumberInput aria-label={`Purchase price for ${line.name}`} min={0} step="0.01" value={line.price} onValueChange={price => { setLines(rows => rows.map(row => row.id === line.id ? { ...row, price, amount: row.qty * price - row.discount } : row)); }} style={{ width: 90 }} /> : <>₹ {line.price}</>}</td>
                 <td style={{ padding: "10px 12px", textAlign: "right" }}>₹ {line.discount}</td>
                 <td style={{ padding: "10px 12px", textAlign: "right" }}>{line.tax}%</td>
                 <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700 }}>₹ {line.amount.toLocaleString("en-IN")}</td>
@@ -464,7 +480,7 @@ export function CreateQuotationScreen({
                 </td>
               </tr>
             ))}
-            {!lines.length && (
+            {(
               <tr>
                 <td colSpan={10} style={{ padding: 12 }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 220px", gap: 16, alignItems: "center" }}>
@@ -528,10 +544,7 @@ export function CreateQuotationScreen({
             <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#f8fafc", padding: "8px 10px", borderRadius: 6, border: "1px solid #cbd5e1" }}>
               <span style={{ fontSize: 12, color: "#475569", fontWeight: 600 }}>Additional Charges:</span>
               <span style={{ fontSize: 12, color: "#64748b" }}>₹</span>
-              <input
-                type="number"
-                value={additionalCharges}
-                onChange={e => setAdditionalCharges(Number(e.target.value))}
+              <NumberInput value={additionalCharges} onValueChange={setAdditionalCharges}
                 style={{ width: 90, height: 28, padding: "0 6px", border: "1px solid #cbd5e1", borderRadius: 4, fontSize: 12, textAlign: "right", background: "#fff" }}
               />
               <X size={14} color="#94a3b8" style={{ cursor: "pointer" }} onClick={() => { setShowAdditionalCharges(false); setAdditionalCharges(0); }} />
@@ -554,10 +567,7 @@ export function CreateQuotationScreen({
             <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#f8fafc", padding: "8px 10px", borderRadius: 6, border: "1px solid #cbd5e1" }}>
               <span style={{ fontSize: 12, color: "#475569", fontWeight: 600 }}>Discount Amount:</span>
               <span style={{ fontSize: 12, color: "#64748b" }}>₹</span>
-              <input
-                type="number"
-                value={overallDiscount}
-                onChange={e => setOverallDiscount(Number(e.target.value))}
+              <NumberInput value={overallDiscount} onValueChange={setOverallDiscount}
                 style={{ width: 90, height: 28, padding: "0 6px", border: "1px solid #cbd5e1", borderRadius: 4, fontSize: 12, textAlign: "right", background: "#fff" }}
               />
               <X size={14} color="#94a3b8" style={{ cursor: "pointer" }} onClick={() => { setShowDiscount(false); setOverallDiscount(0); }} />
@@ -644,6 +654,8 @@ export function CreateQuotationScreen({
       {itemSearchOpen && (
         <AddItemModal
           products={products}
+          onProductsChanged={onProductsChanged}
+          priceMode={type === "Purchase Invoice" ? "purchase" : "sales"}
           currentLines={lines}
           onClose={() => setItemSearchOpen(false)}
           onApplyItems={setLines}
@@ -957,16 +969,17 @@ export function GenericVoucherPage({
       partyAddress: matchedParty?.address,
       partyGstin: matchedParty?.gstin,
       amount: voucher.amount,
-      paidAmount: voucher.status === "Open" ? 0 : voucher.amount,
-      paymentMode: "Cash",
+      paidAmount: voucher.details?.paidAmount ?? (voucher.status === "Open" ? 0 : voucher.amount),
+      paymentMode: voucher.details?.paymentMode || "Cash",
       status: voucher.status === "Open" ? "Unpaid" : "Paid",
       lines: (voucher.items || []).map(item => ({
         itemName: item.name,
         sku: item.hsn || "",
         quantity: item.qty,
         unitPrice: item.price,
-        discount: 0,
-        taxRate: 0,
+        discount: item.discount ?? 0,
+        taxRate: item.tax ?? 0,
+        mrp: item.mrp,
         total: item.amount,
       })),
     };

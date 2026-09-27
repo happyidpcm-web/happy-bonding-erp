@@ -13,7 +13,8 @@ export interface VoucherRecord {
   dueIn?: string;
   status: string;
   notes?: string;
-  items?: Array<{ variantId?: string; name: string; hsn: string; qty: number; price: number; amount: number }>;
+  items?: Array<{ variantId?: string; name: string; hsn: string; qty: number; price: number; amount: number; mrp?: number; discount?: number; tax?: number }>;
+  details?: { paidAmount?: number; paymentMode?: string; terms?: string; additionalCharges?: number; discount?: number; roundOff?: boolean; dueDate?: string; signatureUrl?: string; signatoryName?: string };
 }
 
 export interface Expense {

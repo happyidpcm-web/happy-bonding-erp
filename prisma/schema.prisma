@@ -468,6 +468,7 @@ model Voucher {
   dueIn          String?
   notes          String?
   items          Json
+  details        Json             @default("{}")
   createdAt      DateTime @default(now())
 
   @@unique([organizationId, branchId, type, number])

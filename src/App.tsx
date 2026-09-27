@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { money } from "./data";
 import { api } from "./api";
+import { NumberInput } from "./components/NumberInput";
 import { EditableInvoiceNumber } from "./components/EditableInvoiceNumber";
 import type { Branch, Expense, Invoice, InvoiceLineItem, InvoiceSetting, OwnerBranchSummary, Page, Party, Product, StaffUser } from "./types";
 import * as XLSX from "xlsx";
@@ -21,7 +22,7 @@ import { ExpensesModule } from "./pages/expenses/ExpensesModule";
 import { CashBank } from "./pages/cash-bank/CashBank";
 import { Staff, StaffManagementModal } from "./pages/staff/Staff";
 import { Parties, PartyCreateForm, partyPayloadFromForm } from "./pages/parties/Parties";
-import { Items } from "./pages/inventory/Items";
+import { Items, ItemModal, type ItemFormState } from "./pages/inventory/Items";
 import { Reports, RateListReportScreen, StockSummaryReportScreen, LowStockSummaryReportScreen, ItemSalesSummaryReportScreen, SalesSummaryReportScreen, DayBookReportScreen, BillWiseProfitReportScreen, EmailExcelReportModal } from "./pages/reports/Reports";
 import { SettingsPage } from "./pages/settings/SettingsPage";
 import { DashboardLive } from "./pages/dashboard/DashboardLive";
@@ -3501,11 +3502,14 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
       {showAddItemsModal && (
         <AddItemModal
           products={products}
+          onProductsChanged={setProducts}
           currentLines={lines.map(l => ({
             id: String(l.product.id),
             variantId: l.product.id,
             name: l.product.name,
             qty: l.qty,
+            discount: l.discount,
+            tax: l.taxRate,
             price: l.product.sellingPrice,
             mrp: l.product.mrp || l.product.sellingPrice,
             hsn: l.product.hsnCode || "6205"
@@ -3514,7 +3518,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
           onApplyItems={(updatedLines) => {
             const newLines: InvoiceLineDraft[] = [];
             updatedLines.forEach(ul => {
-              const prod = products.find(p => String(p.id) === String(ul.variantId) || p.name === ul.name);
+              const prod = products.find(p => String(p.id) === String(ul.variantId));
               if (prod) {
                 newLines.push({
                   product: { ...prod, mrp: ul.mrp, sellingPrice: ul.price },
@@ -3580,13 +3584,41 @@ export function Modal({title,onClose,children,wide=false}:{title:string;onClose:
 
 interface AddItemModalProps {
   products: Product[];
-  currentLines: Array<{ id: string; variantId?: string | number; name: string; qty: number; price: number; mrp: number; hsn: string }>;
+  priceMode?: "sales" | "purchase";
+  onProductsChanged?: (rows: Product[]) => void;
+  currentLines: Array<{ id: string; variantId?: string | number; name: string; qty: number; price: number; mrp: number; hsn: string; discount?: number; tax?: number }>;
   onClose: () => void;
   onApplyItems: (updatedLines: Array<{ id: string; variantId: string | number; name: string; hsn: string; mrp: number; qty: number; price: number; discount: number; tax: number; amount: number }>) => void;
   notify: (msg: string) => void;
 }
 
-export function AddItemModal({ products, currentLines, onClose, onApplyItems, notify }: AddItemModalProps) {
+export function AddItemModal({ products: initialProducts, priceMode = "sales", onProductsChanged, currentLines, onClose, onApplyItems, notify }: AddItemModalProps) {
+  const itemPrice = (product: Product) => priceMode === "purchase" ? product.purchasePrice : product.sellingPrice;
+  const [products, setProducts] = useState(initialProducts);
+  const [creatingItem, setCreatingItem] = useState(false);
+  const [savingItem, setSavingItem] = useState(false);
+  const [itemError, setItemError] = useState("");
+  useEffect(() => setProducts(initialProducts), [initialProducts]);
+  const saveItem = async (input: ItemFormState, reset: boolean): Promise<"reset" | void> => {
+    if (!input.name.trim()) { setItemError("Item name is required"); return; }
+    setSavingItem(true); setItemError("");
+    try {
+      const rows = await api.createProduct({
+        name: input.name.trim(),
+        sku: input.code.trim() || input.name.trim().replace(/\s+/g, "-").toUpperCase(),
+        category: input.category || "General", size: input.size || input.unit,
+        openingStock: Number(input.openingStock || 0), purchasePrice: Number(input.purchasePrice || 0),
+        sellingPrice: Number(input.salesPrice || 0), mrp: Number(input.mrp || input.salesPrice || 0),
+        hsnCode: input.hsn || "6205", taxRate: Number(input.taxRate || 0),
+      });
+      setProducts(rows); onProductsChanged?.(rows);
+      setSearchQuery(""); setSelectedCategory("All"); setShowOnlySelected(false);
+      notify("Item created successfully. Select it to add to the bill.");
+      if (reset) return "reset";
+      setCreatingItem(false);
+    } catch (error) { setItemError(error instanceof Error ? error.message : "Item save failed"); }
+    finally { setSavingItem(false); }
+  };
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [showOnlySelected, setShowOnlySelected] = useState(false);
@@ -3594,8 +3626,8 @@ export function AddItemModal({ products, currentLines, onClose, onApplyItems, no
   const [qtyMap, setQtyMap] = useState<{ [id: string]: number }>(() => {
     const map: { [id: string]: number } = {};
     currentLines.forEach(line => {
-      const prod = products.find(p => String(p.id) === String(line.variantId) || p.name === line.name);
-      if (prod) map[String(prod.id)] = line.qty;
+      const prod = products.find(p => String(p.id) === String(line.variantId ?? line.id));
+      if (prod) map[String(prod.id)] = (map[String(prod.id)] || 0) + line.qty;
     });
     return map;
   });
@@ -3637,7 +3669,8 @@ export function AddItemModal({ products, currentLines, onClose, onApplyItems, no
   const totalSelectedQty = Object.values(qtyMap).reduce((sum, q) => sum + q, 0);
   const totalSelectedAmount = Object.entries(qtyMap).reduce((sum, [id, qty]) => {
     const prod = products.find(p => String(p.id) === id);
-    return sum + (prod ? prod.sellingPrice * qty : 0);
+    const current = currentLines.find(line => String(line.variantId ?? line.id) === id);
+    return sum + (prod ? (current?.price ?? itemPrice(prod)) * qty : 0);
   }, 0);
 
   const handleAddItemsToBill = () => {
@@ -3647,18 +3680,18 @@ export function AddItemModal({ products, currentLines, onClose, onApplyItems, no
       const prod = products.find(p => String(p.id) === id);
       if (prod) {
         const current = currentLines.find(line => String(line.variantId ?? line.id) === id);
-        const price = current?.price ?? prod.sellingPrice;
+        const price = current?.price ?? itemPrice(prod);
         newLines.push({
           id: "L-" + id,
           variantId: prod.id,
           name: prod.name,
-          hsn: prod.hsnCode || "6205",
+          hsn: current?.hsn ?? prod.hsnCode ?? "6205",
           mrp: current?.mrp ?? prod.mrp,
           qty,
           price,
-          discount: 0,
-          tax: 5,
-          amount: price * qty,
+          discount: current?.discount ?? 0,
+          tax: current?.tax ?? prod.taxRate ?? 5,
+          amount: Math.max(0, price * qty - (current?.discount ?? 0)),
         });
       }
     });
@@ -3666,6 +3699,11 @@ export function AddItemModal({ products, currentLines, onClose, onApplyItems, no
     notify(`Added ${selectedCount} item(s) to bill`);
     onClose();
   };
+
+  if (creatingItem) return <div style={{ position: "relative", zIndex: 100000 }}>
+    {itemError && <div role="alert" style={{ position: "fixed", top: 10, left: "25%", right: "25%", zIndex: 100001, background: "#fff0f0", color: "#bd3636", padding: 12 }}>{itemError}</div>}
+    <ItemModal saving={savingItem} onClose={() => { if (!savingItem) { setCreatingItem(false); setItemError(""); } }} onSave={saveItem}/>
+  </div>;
 
   return (
     <div className="modal-backdrop bank-select-backdrop" onClick={onClose} style={{ zIndex: 99999 }}>
@@ -3693,7 +3731,7 @@ export function AddItemModal({ products, currentLines, onClose, onApplyItems, no
             <option value="All">Select Category ▾</option>
             {categories.filter(c => c !== "All").map(cat => <option key={cat} value={cat}>{cat}</option>)}
           </select>
-          <button type="button" className="add-items-create-btn" onClick={() => notify("Item creation modal ready")}>
+          <button type="button" className="add-items-create-btn" onClick={() => { setItemError(""); setCreatingItem(true); }}>
             <Plus size={16} /> Create New Item
           </button>
         </div>
@@ -3707,14 +3745,14 @@ export function AddItemModal({ products, currentLines, onClose, onApplyItems, no
                 <th style={{ textAlign: "left" }}>Item Code</th>
                 <th style={{ textAlign: "left" }}>Stock</th>
                 <th style={{ textAlign: "right" }}>MRP</th>
-                <th style={{ textAlign: "right" }}>Sales Price</th>
+                <th style={{ textAlign: "right" }}>{priceMode === "purchase" ? "Purchase Price" : "Sales Price"}</th>
                 <th style={{ textAlign: "center", width: 160 }}>Quantity</th>
               </tr>
             </thead>
             <tbody>
               {filteredProducts.map(prod => {
                 const qty = qtyMap[String(prod.id)] || 0;
-                const isOutOfStock = prod.stock <= 0;
+                const isOutOfStock = priceMode !== "purchase" && prod.stock <= 0;
                 return (
                   <tr key={prod.id}>
                     <td>
@@ -3724,7 +3762,7 @@ export function AddItemModal({ products, currentLines, onClose, onApplyItems, no
                     <td style={{ color: "#64748b" }}>{prod.sku}</td>
                     <td><span className="add-items-unit-tag">{prod.stock} {prod.unit || "PCS"}</span></td>
                     <td style={{ textAlign: "right", color: "#64748b" }}>₹ {prod.mrp || prod.sellingPrice}</td>
-                    <td style={{ textAlign: "right", fontWeight: 700, color: "#0f172a" }}>₹ {prod.sellingPrice}</td>
+                    <td style={{ textAlign: "right", fontWeight: 700, color: "#0f172a" }}>₹ {itemPrice(prod)}</td>
                     <td style={{ textAlign: "center" }}>
                       {qty === 0 ? (
                         <button type="button" className="add-items-qty-add-btn" onClick={() => setQty(prod.id, 1)}>
@@ -3733,11 +3771,11 @@ export function AddItemModal({ products, currentLines, onClose, onApplyItems, no
                       ) : (
                         <div className="add-items-stepper">
                           <button type="button" className="add-items-stepper-btn" onClick={() => setQty(prod.id, qty - 1)}>-</button>
-                          <input
-                            type="number"
+                          <NumberInput
+                            aria-label={`Selected quantity for ${prod.name}`}
                             className="add-items-stepper-input"
                             value={qty}
-                            onChange={e => setQty(prod.id, Math.max(0, Number(e.target.value)))}
+                            onValueChange={quantity => setQty(prod.id, quantity)}
                           />
                           <button type="button" className="add-items-stepper-btn" onClick={() => setQty(prod.id, qty + 1)}>+</button>
                           <span className="add-items-unit-tag">{prod.unit || "PCS"}</span>

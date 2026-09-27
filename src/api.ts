@@ -101,6 +101,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  async transactions(): Promise<Array<{ id: string; sourceId: string; type: string; number: string; date: string; recordedAt: string; party: string; amount: number }>> { return request("/transactions"); },
+  async nextVoucherNumber(type: string, prefix: string): Promise<string> {
+    const result = await request<{ number: string }>(`/vouchers/next-number?type=${encodeURIComponent(type)}&prefix=${encodeURIComponent(prefix)}`);
+    return result.number;
+  },
   async vouchers(type: string): Promise<VoucherRecord[]> {
     const rows = await request<VoucherRecord[]>(`/vouchers?type=${encodeURIComponent(type)}`);
     return rows.map(row => ({ ...row, date: new Date(row.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) }));

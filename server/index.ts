@@ -11,6 +11,7 @@ import { db } from "./db.js";
 import { createToken, requireAuth, requireBranch, requirePermission } from "./auth.js";
 import fs from "fs";
 import { voucherRouter } from "./vouchers.js";
+import { transactionsRouter } from "./transactions.js";
 import { expenseInput, invoiceInput, invoiceSettingInput, loginInput, parseInput, partyInput, productInput, purchaseStockInput } from "./validation.js";
 
 const app = express();
@@ -71,6 +72,7 @@ app.get("/api/auth/me", async (req, res) => {
   res.json({ ...user, isAdmin: req.session!.permissions.includes("*"), branchIds: req.session!.branchIds });
 });
 app.use("/api/vouchers", voucherRouter);
+app.use("/api/transactions", transactionsRouter);
 
 app.get("/api/branches", async (req, res) => {
   const isOwner = req.session!.permissions.includes("*");
@@ -1326,6 +1328,7 @@ app.get("/api/backup/export", requirePermission("*"), async (req, res) => {
 });
 
 app.post("/api/backup/restore", requirePermission("*"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
   const organizationId = req.session!.organizationId;
   const { backupData, doubleConfirmation, understandingText } = req.body;
 
@@ -1352,7 +1355,7 @@ app.post("/api/backup/restore", requirePermission("*"), async (req, res) => {
         await db.party.upsert({
           where: { id: p.id },
           update: { name: p.name, phone: p.phone, email: p.email, gstin: p.gstin, customBirthday: p.customBirthday, customKovilThiruvila: p.customKovilThiruvila, openingBalance: p.openingBalance },
-          create: { id: p.id, organizationId, type: p.type || "CUSTOMER", name: p.name, phone: p.phone, email: p.email, gstin: p.gstin, customBirthday: p.customBirthday, customKovilThiruvila: p.customKovilThiruvila, openingBalance: p.openingBalance },
+          create: { id: p.id, organizationId, branchId, type: p.type || "CUSTOMER", name: p.name, phone: p.phone, email: p.email, gstin: p.gstin, customBirthday: p.customBirthday, customKovilThiruvila: p.customKovilThiruvila, openingBalance: p.openingBalance },
         });
       }
     }
@@ -1397,7 +1400,7 @@ app.post("/api/admin/reset-transactions", requirePermission("*"), async (req, re
 
     if (clearProducts) {
       await db.stockBalance.deleteMany({ where: { branch: { organizationId } } });
-      await db.productVariant.deleteMany({ where: { product: { organizationId, branchId } } });
+      await db.productVariant.deleteMany({ where: { product: { organizationId } } });
       await db.product.deleteMany({ where: { organizationId } });
     }
 

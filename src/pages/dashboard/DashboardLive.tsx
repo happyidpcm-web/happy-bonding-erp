@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { ChevronDown, IndianRupee as CircleIndianRupee, CreditCard, WalletCards } from "lucide-react";
+import { api } from "../../api";
 import { money } from "../../data";
 import type { Invoice, OwnerBranchSummary, Party, Product } from "../../types";
 import { PageHeading, Metric } from "../../App";
@@ -186,7 +187,7 @@ export function DashboardLive({
   ownerSummary = [],
   onNewSale,
   onSelectInvoice,
-  onSeeAllTransactions,
+  onSeeAllTransactions: _onSeeAllTransactions,
 }: {
   products: Product[];
   parties: Party[];
@@ -201,7 +202,23 @@ export function DashboardLive({
   const toPay = Math.abs(parties.filter(r => r.balance < 0).reduce((a, b) => a + b.balance, 0));
   const cashBalance = invoices.filter(i => i.status === "Paid").reduce((a, b) => a + b.amount, 0);
 
-  const displayList = invoices;
+  const [transactions, setTransactions] = useState<Awaited<ReturnType<typeof api.transactions>>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showAll, setShowAll] = useState(false);
+  const [reload, setReload] = useState(0);
+  const branchId = api.currentBranchId();
+  useEffect(() => {
+    let active = true;
+    setTransactions([]); setLoading(true); setError(""); setShowAll(false);
+    const load = () => api.transactions().then(rows => { if (active) { setTransactions(rows); setError(""); } }).catch(e => { if (active) setError(e.message || "Could not load transactions"); }).finally(() => { if (active) setLoading(false); });
+    void load();
+    const refresh = () => { void load(); };
+    window.addEventListener("focus", refresh);
+    return () => { active = false; window.removeEventListener("focus", refresh); };
+  }, [branchId, reload]);
+  const displayList = showAll ? transactions : transactions.slice(0, 10);
+  const onSeeAllTransactions = () => setShowAll(value => !value);
 
   return (
     <>
@@ -220,7 +237,7 @@ export function DashboardLive({
               <h2>Latest Transactions</h2>
             </div>
             <button className="text-button" style={{ font: "700 13px Manrope", color: "#2563eb" }} onClick={onSeeAllTransactions}>
-              See All Transactions →
+              {showAll ? "Show Latest Transactions" : "See All Transactions →"}
             </button>
           </div>
 
@@ -236,16 +253,18 @@ export function DashboardLive({
                 </tr>
               </thead>
               <tbody>
-                {displayList.slice(0, 5).map(i => (
-                  <tr key={i.id} className="clickable-row" onClick={() => onSelectInvoice(i)}>
-                    <td>{i.date}</td>
-                    <td><span className="pill neutral">Sales Invoices</span></td>
+                {loading && <tr><td colSpan={5}>Loading transactions…</td></tr>}
+                {error && <tr><td colSpan={5} role="alert">{error} <button onClick={() => setReload(value => value + 1)}>Retry</button></td></tr>}
+                {displayList.map(i => (
+                  <tr key={i.id} className="clickable-row" onClick={() => { const invoice = i.type === "Sales Invoice" ? invoices.find(row => String(row.id) === i.sourceId) : undefined; if (invoice) onSelectInvoice(invoice); }}>
+                    <td>{new Date(i.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                    <td><span className="pill neutral">{i.type}</span></td>
                     <td className="mono bold-invoice-num">{i.number}</td>
                     <td><strong>{i.party}</strong></td>
                     <td className="right"><strong>{money(i.amount)}</strong></td>
                   </tr>
                 ))}
-                {!displayList.length && (
+                {!loading && !error && !displayList.length && (
                   <tr>
                     <td colSpan={5} style={{ textAlign: "center", padding: "20px", color: "#64748b" }}>
                       No transactions recorded yet. Click <strong>+ Create Sales Invoice</strong> to add a sale.
@@ -258,7 +277,7 @@ export function DashboardLive({
 
           <div style={{ textAlign: "center", padding: "14px 0" }}>
             <button className="text-button" style={{ font: "700 13px Manrope", color: "#2563eb" }} onClick={onSeeAllTransactions}>
-              See All Transactions →
+              {showAll ? "Show Latest Transactions" : "See All Transactions →"}
             </button>
           </div>
         </article>

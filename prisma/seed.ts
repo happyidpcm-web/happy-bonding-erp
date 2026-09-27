@@ -33,7 +33,7 @@ async function main() {
       ["Premium Polo T-Shirt", "T-Shirts", "6109", "HB-TS-POLO-MRN-L", "L", "Maroon", 330, 699, 899, 24],
     ] as const;
     for (const s of samples) {
-      const product = await db.product.create({ data: { organizationId: organization.id, name: s[0], category: s[1], hsnCode: s[2], taxRateId: tax.id, variants: { create: { sku: s[3], barcode: s[3], size: s[4], color: s[5], purchasePrice: s[6], sellingPrice: s[7], mrp: s[8] } } }, include: { variants: true } });
+      const product = await db.product.create({ data: { organizationId: organization.id, branchId: branch.id, name: s[0], category: s[1], hsnCode: s[2], taxRateId: tax.id, variants: { create: { sku: s[3], barcode: s[3], size: s[4], color: s[5], purchasePrice: s[6], sellingPrice: s[7], mrp: s[8] } } }, include: { variants: true } });
       await db.stockBalance.create({ data: { branchId: branch.id, variantId: product.variants[0].id, quantity: s[9] } });
       await db.stockMovement.create({ data: { branchId: branch.id, variantId: product.variants[0].id, type: "OPENING", quantity: s[9], unitCost: s[6], referenceType: "Seed", referenceId: product.id } });
     }
