@@ -212,29 +212,6 @@ export function DashboardLive({
         <Metric label="🏛️ Total Cash + Bank Balance" value={`₹ ${cashBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`} icon={WalletCards} tone="blue" />
       </div>
 
-      {ownerSummary.length > 0 && (
-        <article className="card" style={{ padding: 16, marginBottom: 16 }}>
-          <div className="card-title"><div><h2>Owner Branch Summary</h2><p>All branch sales, stock and payment totals</p></div></div>
-          <div className="table-scroll">
-            <table>
-              <thead><tr><th>Branch</th><th>Sales</th><th>Payment In</th><th>Payment Out</th><th>Stock Qty</th><th>Invoices</th></tr></thead>
-              <tbody>
-                {ownerSummary.map(row => (
-                  <tr key={row.branchId}>
-                    <td><strong>{row.branchName}</strong><small style={{ display: "block", color: "#64748b" }}>{row.code}</small></td>
-                    <td>{money(row.salesTotal)}</td>
-                    <td>{money(row.paymentIn)}</td>
-                    <td>{money(row.paymentOut)}</td>
-                    <td>{row.stockQty.toLocaleString("en-IN")}</td>
-                    <td>{row.invoiceCount}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </article>
-      )}
-
       <div className="dashboard-grid" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* 1. Latest Transactions Card FIRST */}
         <article className="card transactions" style={{ gridColumn: "1 / -1" }}>
@@ -290,6 +267,30 @@ export function DashboardLive({
         <div className="dashboard-bottom-row">
           <SalesReportChartCard invoices={invoices} />
         </div>
+      {ownerSummary.length > 0 && (
+        <article className="card" style={{ padding: 16, marginBottom: 16 }}>
+          <div className="card-title"><div><h2>Owner Branch Summary</h2><p>All branch sales, stock and payment totals</p></div></div>
+          <div className="table-scroll">
+            <table>
+              <thead><tr><th>Branch</th><th>Sales</th><th>Payment In</th><th>Payment Out</th><th>Stock Qty</th><th>Invoices</th></tr></thead>
+              <tbody>
+                {ownerSummary.map(row => (
+                  <tr key={row.branchId}>
+                    <td><strong>{row.branchName}</strong><small style={{ display: "block", color: "#64748b" }}>{row.code}</small></td>
+                    <td>{money(row.salesTotal)}</td>
+                    <td>{money(row.paymentIn)}</td>
+                    <td>{money(row.paymentOut)}</td>
+                    <td>{row.stockQty.toLocaleString("en-IN")}</td>
+                    <td>{row.invoiceCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      )}
+
+
       </div>
     </>
   );

@@ -42,6 +42,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { api } from "../../api";
+import { PartyCreateForm, partyPayloadFromForm } from "../parties/Parties";
 import { money } from "../../data";
 import type { Invoice, InvoiceSetting, Party, Product, VoucherRecord } from "../../types";
 import { downloadInvoicePdf } from "../../utils/pdf";
@@ -72,6 +73,7 @@ export function CreateQuotationScreen({
   onBack,
   onSave,
   onProductsChanged,
+  onPartyCreated,
   notify,
 }: {
   title: string;
@@ -83,11 +85,33 @@ export function CreateQuotationScreen({
   onBack: () => void;
   onSave: (rec: VoucherRecord) => Promise<void>;
   onProductsChanged?: (rows: Product[]) => void;
+  onPartyCreated?: (party: Party) => void;
   notify: (msg: string) => void;
 }) {
   const [selectedParty, setSelectedParty] = useState<Party | undefined>(undefined);
   const [customPartyName, setCustomPartyName] = useState("");
   const [partyPickerOpen, setPartyPickerOpen] = useState(false);
+  const [supplierModalOpen, setSupplierModalOpen] = useState(false);
+  const [supplierSaving, setSupplierSaving] = useState(false);
+  const [createdSuppliers, setCreatedSuppliers] = useState<Party[]>([]);
+  const createSupplier = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const input = partyPayloadFromForm(new FormData(event.currentTarget));
+    try {
+      setSupplierSaving(true);
+      const supplier = await api.createParty({ ...input, type: "Supplier" });
+      setCreatedSuppliers(rows => [...rows, supplier]);
+      onPartyCreated?.(supplier);
+      setSelectedParty(supplier);
+      setCustomPartyName("");
+      setPartyDropdownOpen(false);
+      setPartyQuery("");
+      setSupplierModalOpen(false);
+      notify("Supplier created and selected");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Supplier save failed");
+    } finally { setSupplierSaving(false); }
+  };
 
   const code = type === "Sales Return" ? "SR" : type === "Credit Note" ? "CN" : type === "Delivery Challan" ? "DC" : type === "Proforma Invoice" ? "PF" : type === "Quotation" ? "QUO" : type.toUpperCase().replace(/\s+/g, "").slice(0, 2);
   const [prefix, setPrefix] = useState(`HB/${code}/26-27/`);
@@ -204,10 +228,12 @@ export function CreateQuotationScreen({
   const [partyQuery, setPartyQuery] = useState("");
 
   const matchedParties = useMemo(() => {
-    if (!partyQuery.trim()) return parties;
+    const rows = [...parties, ...createdSuppliers.filter(supplier => !parties.some(party => party.id === supplier.id))];
+    const eligible = type === "Purchase Invoice" ? rows.filter(party => party.type === "Supplier") : rows;
+    if (!partyQuery.trim()) return eligible;
     const q = partyQuery.toLowerCase();
-    return parties.filter(p => p.name.toLowerCase().includes(q) || (p.phone && p.phone.includes(q)));
-  }, [parties, partyQuery]);
+    return eligible.filter(p => p.name.toLowerCase().includes(q) || (p.phone && p.phone.includes(q)));
+  }, [parties, partyQuery, createdSuppliers, type]);
 
   return (
     <div className="printable-report" style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 20, minHeight: "85vh" }}>
@@ -238,6 +264,12 @@ export function CreateQuotationScreen({
       </div>
 
       {/* Top Split Block: Party Selector (Left) & Quotation Meta Card (Right) */}
+      {type === "Purchase Invoice" && <div style={{ marginBottom: 12 }}>
+        <button type="button" className="secondary" onClick={() => { setPartyDropdownOpen(false); setSupplierModalOpen(true); }}><Plus size={16} /> Create Supplier</button>
+      </div>}
+      {supplierModalOpen && <Modal title="Create Supplier" onClose={() => { if (!supplierSaving) setSupplierModalOpen(false); }} wide>
+        <PartyCreateForm onSubmit={createSupplier} onCancel={() => setSupplierModalOpen(false)} saving={supplierSaving} defaults={{ type: "Supplier", openingBalanceType: "TO_PAY", name: /^\d+$/.test(partyQuery.trim()) ? "" : partyQuery.trim(), phone: /^\d+$/.test(partyQuery.trim()) ? partyQuery.trim() : "" }} />
+      </Modal>}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 20, marginBottom: 20 }}>
         {/* Bill To Container with Fast Live Searchable Dropdown for 10,170 Database Customers */}
         <div style={{ border: "1px dashed #cbd5e1", borderRadius: 12, padding: 14, background: "#fafafa", minHeight: 120, position: "relative" }}>
@@ -859,6 +891,7 @@ export function GenericVoucherPage({
   notify,
   invoiceSetting = defaultInvoiceSetting,
   onProductsChanged,
+  onPartyCreated,
 }: {
   title: string;
   subtitle: string;
@@ -871,6 +904,7 @@ export function GenericVoucherPage({
   notify: (msg: string) => void;
   invoiceSetting?: InvoiceSetting;
   onProductsChanged?: (rows: Product[]) => void;
+  onPartyCreated?: (party: Party) => void;
 }) {
   const [creatingFullVoucher, setCreatingFullVoucher] = useState(false);
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false);
@@ -979,6 +1013,7 @@ export function GenericVoucherPage({
         onBack={() => setCreatingFullVoucher(false)}
         onSave={handleSaveNewRecord}
         onProductsChanged={onProductsChanged}
+        onPartyCreated={onPartyCreated}
         notify={notify}
       />
     );

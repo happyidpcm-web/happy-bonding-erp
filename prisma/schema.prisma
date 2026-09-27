@@ -59,7 +59,7 @@ model Organization {
   taxRates    TaxRate[]
   invoices    SalesInvoice[]
   sequences   DocumentSequence[]
-  invoiceSetting InvoiceSetting?
+  invoiceSetting InvoiceSetting[]
   auditEvents AuditEvent[]
   syncQueue   OfflineSyncQueue[]
   creditNotes CreditNote[]
@@ -73,6 +73,10 @@ model Branch {
   name               String
   address            String?
   phone              String?
+  active             Boolean         @default(true)
+  parties            Party[]
+  products           Product[]
+  settings           InvoiceSetting[]
   allowNegativeStock Boolean         @default(false)
   organization       Organization    @relation(fields: [organizationId], references: [id])
   memberships        UserBranch[]
@@ -128,6 +132,8 @@ model UserBranch {
 model Party {
   id             String         @id @default(cuid())
   organizationId String
+  branchId       String
+  branch         Branch @relation(fields: [branchId], references: [id])
   type           PartyType
   name           String
   phone          String?
@@ -165,6 +171,8 @@ model Party {
 model Product {
   id             String           @id @default(cuid())
   organizationId String
+  branchId       String
+  branch         Branch @relation(fields: [branchId], references: [id])
   name           String
   category       String
   brand          String?
@@ -271,8 +279,8 @@ model SalesInvoice {
   payments       PaymentAllocation[]
   creditNotes    CreditNote[]        @relation("CreditNoteSalesInvoice")
 
-  @@unique([organizationId, invoiceNumber])
-  @@unique([organizationId, idempotencyKey])
+  @@unique([organizationId, branchId, invoiceNumber])
+  @@unique([organizationId, branchId, idempotencyKey])
   @@index([organizationId, branchId, invoiceDate])
 }
 
@@ -344,7 +352,7 @@ model CreditNote {
   salesInvoice   SalesInvoice       @relation(fields: [salesInvoiceId], references: [id], name: "CreditNoteSalesInvoice")
   lines          CreditNoteLine[]
 
-  @@unique([organizationId, creditNoteNumber])
+  @@unique([organizationId, branchId, creditNoteNumber])
   @@index([organizationId, branchId, partyId])
 }
 
@@ -377,7 +385,9 @@ model DocumentSequence {
 
 model InvoiceSetting {
   id               String       @id @default(cuid())
-  organizationId   String       @unique
+  organizationId   String
+  branchId         String
+  branch           Branch @relation(fields: [branchId], references: [id])
   invoicePrefix    String       @default("HB/SL")
   paymentTermsDays Int          @default(30)
   terms            String       @default("NO REFUND ONCE SOLD. EXCHANGE ONLY AS PER STORE POLICY.")
@@ -391,6 +401,7 @@ model InvoiceSetting {
   signatureUrl     String?
   organization     Organization @relation(fields: [organizationId], references: [id])
   updatedAt        DateTime     @updatedAt
+  @@unique([organizationId, branchId])
 }
 
 model AuditEvent {

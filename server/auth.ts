@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import { env } from "./env.js";
+import { db } from "./db.js";
 
 export interface Session {
   userId: string;
@@ -26,7 +27,12 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   if (!token) return res.status(401).json({ error: "Authentication required" });
   try {
     const { payload } = await jwtVerify(token, key);
-    req.session = payload as unknown as Session;
+    const session = payload as unknown as Session;
+    const user = await db.user.findUnique({ where: { id: session.userId }, include: { role: true, branches: { include: { branch: true } } } });
+    if (!user?.active || user.tokenVersion !== session.tokenVersion) return res.status(401).json({ error: "Session expired. Please sign in again." });
+    const owner = user.role.permissions.includes("*");
+    const branches = owner ? await db.branch.findMany({ where: { organizationId: user.organizationId, active: true } }) : user.branches.map(m => m.branch).filter(b => b.active && b.organizationId === user.organizationId);
+    req.session = { userId: user.id, organizationId: user.organizationId, permissions: user.role.permissions, tokenVersion: user.tokenVersion, branchIds: branches.map(b => b.id) };
     next();
   } catch { res.status(401).json({ error: "Invalid or expired session" }); }
 }
@@ -48,8 +54,7 @@ export function requireBranch(req: Request, res: Response) {
     res.status(400).json({ error: "Branch ID header (x-branch-id) is required" });
     return null;
   }
-  const isOwner = req.session?.permissions?.includes("*");
-  const hasBranchAccess = isOwner || req.session?.branchIds?.includes(branchId);
+  const hasBranchAccess = req.session?.branchIds?.includes(branchId);
   if (!hasBranchAccess) {
     res.status(403).json({ error: "Branch access denied" });
     return null;

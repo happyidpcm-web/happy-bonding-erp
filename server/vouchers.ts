@@ -43,7 +43,7 @@ voucherRouter.post('/', async (req, res, next) => {
       const prior = await tx.stockMovement.count({ where: { branchId, referenceType: 'PurchaseInvoice', referenceId: input.number, type: 'PURCHASE' } });
       if (prior) throw new Error('A stock receipt already exists with this purchase number.');
       for (const item of input.items) {
-        const variant = await tx.productVariant.findFirst({ where: { id: item.variantId, product: { organizationId } } });
+        const variant = await tx.productVariant.findFirst({ where: { id: item.variantId, product: { organizationId, branchId } } });
         if (!variant) throw new Error('Purchase item does not belong to this organization');
         await tx.stockBalance.upsert({ where: { branchId_variantId: { branchId, variantId: variant.id } }, create: { branchId, variantId: variant.id, quantity: item.qty }, update: { quantity: { increment: item.qty } } });
         await tx.stockMovement.create({ data: { branchId, variantId: variant.id, type: 'PURCHASE', quantity: item.qty, unitCost: item.price, referenceType: 'PurchaseInvoice', referenceId: input.number, occurredAt: input.date } });

@@ -20,7 +20,7 @@ import { RemindersModule } from "./pages/reminders/RemindersModule";
 import { ExpensesModule } from "./pages/expenses/ExpensesModule";
 import { CashBank } from "./pages/cash-bank/CashBank";
 import { Staff, StaffManagementModal } from "./pages/staff/Staff";
-import { Parties, partyPayloadFromForm } from "./pages/parties/Parties";
+import { Parties, PartyCreateForm, partyPayloadFromForm } from "./pages/parties/Parties";
 import { Items } from "./pages/inventory/Items";
 import { Reports, RateListReportScreen, StockSummaryReportScreen, LowStockSummaryReportScreen, ItemSalesSummaryReportScreen, SalesSummaryReportScreen, DayBookReportScreen, BillWiseProfitReportScreen, EmailExcelReportModal } from "./pages/reports/Reports";
 import { SettingsPage } from "./pages/settings/SettingsPage";
@@ -496,7 +496,7 @@ export default function App() {
         {page === "delivery_challan" && <GenericVoucherPage title="Delivery Challan" subtitle="Track dispatch of goods, transport & delivery notes." action="+ Create Delivery Challan" icon={Boxes} type="Delivery Challan" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
         {page === "proforma_invoice" && <GenericVoucherPage title="Proforma Invoice" subtitle="Draft & send proforma invoices prior to supply." action="+ Create Proforma" icon={FileText} type="Proforma Invoice" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
 
-        {page === "purchases" && <GenericVoucherPage title="Purchase Invoices" subtitle="Supplier purchases, stock entries & payable tracking." action="+ Create Purchase" icon={ShoppingBag} type="Purchase Invoice" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} invoiceSetting={invoiceSetting} onProductsChanged={setProductRows} />}
+        {page === "purchases" && <GenericVoucherPage title="Purchase Invoices" subtitle="Supplier purchases, stock entries & payable tracking." action="+ Create Purchase" icon={ShoppingBag} type="Purchase Invoice" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} invoiceSetting={invoiceSetting} onProductsChanged={setProductRows} onPartyCreated={party => setPartyRows(rows => [...rows, party])} />}
         {page === "payment_out" && <GenericVoucherPage title="Payment Out" subtitle="Record payments made to suppliers & vendors." action="+ Record Payment Out" icon={CreditCard} type="Payment Out" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
         {page === "purchase_return" && <GenericVoucherPage title="Purchase Return" subtitle="Return damaged/excess goods to suppliers & debit balance." action="+ Create Purchase Return" icon={ShoppingBag} type="Purchase Return" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
         {page === "debit_note" && <GenericVoucherPage title="Debit Note" subtitle="Issue debit notes to suppliers for price differences or returns." action="+ Create Debit Note" icon={ClipboardList} type="Debit Note" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
@@ -2552,6 +2552,9 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   );
   return (
     <div className="full-screen-invoice-page">
+      {partyModal && <Modal title="Create Party" onClose={() => { if (!saving) setPartyModal(false); }} wide>
+        <PartyCreateForm onSubmit={createPartyFromInvoice} onCancel={() => setPartyModal(false)} saving={saving} defaults={{ ...newParty, type: "Customer" }} />
+      </Modal>}
       <div className="ref-top-header-bar">
         <div className="top-title-left">
           <button type="button" className="icon-back-btn" onClick={() => { setCreating(false); setEditingInvoice(null); resetInvoiceForm(); }}>

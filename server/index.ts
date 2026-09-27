@@ -20,68 +20,15 @@ app.use(express.json({ limit: "25mb" }));
 
 app.get("/api/health", (_req, res) => res.json({ ok: true, service: "happy-bonding-api" }));
 
-async function ensureAdminUser() {
-  try {
-    const passwordHash = await hash("HappyBonding@2026", 12);
-    const organization = await db.organization.upsert({
-      where: { id: "happy-bonding" }, update: {},
-      create: { id: "happy-bonding", name: "Happy Bonding Men's Wear", phone: "7708030903", gstin: "33CWZPS9715D1ZU", pan: "CWZPS9715D", stateCode: "33" },
-    });
-    const branch = await db.branch.upsert({
-      where: { organizationId_code: { organizationId: organization.id, code: "PAV" } }, update: {},
-      create: { organizationId: organization.id, code: "PAV", name: "Pavoorchatram", address: "No. 10/901, West Bus Stand, Near Railway Gate, Pavoorchatram - 627808" },
-    });
-    const role = await db.role.upsert({
-      where: { organizationId_name: { organizationId: organization.id, name: "Owner" } },
-      update: { permissions: ["*"] }, create: { organizationId: organization.id, name: "Owner", permissions: ["*"] },
-    });
-    const user = await db.user.upsert({
-      where: { email: "admin@happybonding.in" }, update: { passwordHash, roleId: role.id },
-      create: { organizationId: organization.id, roleId: role.id, name: "Saravana", email: "admin@happybonding.in", phone: "7708030903", passwordHash },
-    });
-    const staffRole = await db.role.upsert({
-      where: { organizationId_name: { organizationId: organization.id, name: "Staff" } },
-      update: {},
-      create: { organizationId: organization.id, name: "Staff", permissions: ["parties.write", "products.write", "sales.write", "reports.read"] },
-    });
-    const pcmPasswordHash = await hash("Pcm@123", 12);
-    const pcmUser = await db.user.upsert({
-      where: { email: "pcm@happybonding.in" },
-      update: { passwordHash: pcmPasswordHash, roleId: staffRole.id },
-      create: { organizationId: organization.id, roleId: staffRole.id, name: "Pavoorchatram Staff", email: "pcm@happybonding.in", passwordHash: pcmPasswordHash },
-    });
-    await db.userBranch.upsert({
-      where: { userId_branchId: { userId: pcmUser.id, branchId: branch.id } },
-      update: {},
-      create: { userId: pcmUser.id, branchId: branch.id },
-    });
-
-    const allBranches = await db.branch.findMany({ where: { organizationId: organization.id } });
-    for (const b of allBranches) {
-      await db.userBranch.upsert({
-        where: { userId_branchId: { userId: user.id, branchId: b.id } },
-        update: {},
-        create: { userId: user.id, branchId: b.id },
-      });
-    }
-  } catch (err) {
-    console.error("Auto admin user creation error:", err);
-  }
-}
-
 app.post("/api/auth/login", async (req, res) => {
-  await ensureAdminUser();
   const input = parseInput(loginInput, req.body);
   let user = await db.user.findUnique({ where: { email: input.email.toLowerCase() }, include: { role: true, branches: true } });
-  if (!user) {
-    await ensureAdminUser();
-    user = await db.user.findUnique({ where: { email: input.email.toLowerCase() }, include: { role: true, branches: true } });
-  }
+
   if (!user || !user.active || !(await compare(input.password, user.passwordHash))) return res.status(401).json({ error: "Invalid email or password" });
 
   const isOwner = user.role.permissions.includes("*");
   const allBranches = await db.branch.findMany({
-    where: { organizationId: user.organizationId },
+    where: { organizationId: user.organizationId, active: true },
     include: {
       memberships: {
         include: {
@@ -92,7 +39,7 @@ app.post("/api/auth/login", async (req, res) => {
     orderBy: { name: "asc" },
   });
 
-  const sessionBranchIds = isOwner ? allBranches.map(b => b.id) : user.branches.map(x => x.branchId);
+  const sessionBranchIds = isOwner ? allBranches.map(b => b.id) : user.branches.map(x => x.branchId).filter(id => allBranches.some(b => b.id === id));
 
   const session = {
     userId: user.id,
@@ -114,13 +61,22 @@ app.post("/api/auth/login", async (req, res) => {
 
 
 app.use("/api", requireAuth);
+app.use("/api", (req, res, next) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  req.headers["x-branch-id"] = branchId;
+  next();
+});
+app.get("/api/auth/me", async (req, res) => {
+  const user = await db.user.findUniqueOrThrow({ where: { id: req.session!.userId }, select: { id: true, name: true, email: true } });
+  res.json({ ...user, isAdmin: req.session!.permissions.includes("*"), branchIds: req.session!.branchIds });
+});
 app.use("/api/vouchers", voucherRouter);
 
 app.get("/api/branches", async (req, res) => {
   const isOwner = req.session!.permissions.includes("*");
   const rows = await db.branch.findMany({
     where: {
-      organizationId: req.session!.organizationId,
+      organizationId: req.session!.organizationId, active: true,
       ...(isOwner ? {} : { id: { in: req.session!.branchIds } }),
     },
     include: {
@@ -135,7 +91,7 @@ app.get("/api/branches", async (req, res) => {
   res.json(rows);
 });
 
-app.post("/api/branches", requirePermission("settings.write"), async (req, res) => {
+app.post("/api/branches", requirePermission("*"), async (req, res) => {
   const organizationId = req.session!.organizationId;
   const code = String(req.body?.code ?? "").trim().toUpperCase().slice(0, 12);
   const name = String(req.body?.name ?? "").trim();
@@ -190,7 +146,7 @@ app.post("/api/branches", requirePermission("settings.write"), async (req, res) 
   res.status(201).json(freshRow || row);
 });
 
-app.put("/api/branches/:id", requirePermission("settings.write"), async (req, res) => {
+app.put("/api/branches/:id", requirePermission("*"), async (req, res) => {
   const organizationId = req.session!.organizationId;
   const branchId = String(req.params.id || "");
   const code = String(req.body?.code ?? "").trim().toUpperCase().slice(0, 12);
@@ -297,61 +253,16 @@ app.put("/api/branches/:id", requirePermission("settings.write"), async (req, re
 
 
 
-app.post("/api/branches/switch", async (req, res) => {
-  const organizationId = req.session!.organizationId;
-  const branchId = String(req.body?.branchId ?? "");
-  const email = String(req.body?.email ?? "").trim().toLowerCase();
-  const password = String(req.body?.password ?? "");
-
-  if (!branchId) return res.status(400).json({ error: "Branch ID is required" });
-
-  const branch = await db.branch.findFirst({ where: { id: branchId, organizationId } });
+app.post("/api/branches/switch", requirePermission("*"), async (req, res) => {
+  const branchId = String(req.body?.branchId || "");
+  const branch = await db.branch.findFirst({ where: { id: branchId, organizationId: req.session!.organizationId, active: true } });
   if (!branch) return res.status(404).json({ error: "Branch not found" });
-
-  const isOwner = req.session!.permissions.includes("*");
-
-  if (email && password) {
-    const user = await db.user.findUnique({
-      where: { email },
-      include: { role: true, branches: true },
-    });
-
-    if (!user || !user.active || !(await compare(password, user.passwordHash))) {
-      return res.status(401).json({ error: "Invalid branch username or password" });
-    }
-
-    const hasAccess = user.role.permissions.includes("*") || user.branches.some(b => b.branchId === branchId);
-    if (!hasAccess) {
-      return res.status(403).json({ error: "User does not have access to this branch" });
-    }
-
-    const session = {
-      userId: user.id,
-      organizationId: user.organizationId,
-      branchIds: Array.from(new Set([...user.branches.map(x => x.branchId), branchId])),
-      permissions: user.role.permissions,
-      tokenVersion: user.tokenVersion,
-    };
-    const newToken = await createToken(session);
-    return res.json({ ok: true, token: newToken, branchId, branchName: branch.name });
-  }
-
-  if (isOwner || req.session!.branchIds.includes(branchId)) {
-    const session = {
-      ...req.session!,
-      branchIds: Array.from(new Set([...req.session!.branchIds, branchId])),
-    };
-    const newToken = await createToken(session);
-    return res.json({ ok: true, token: newToken, branchId, branchName: branch.name });
-  }
-
-  return res.status(401).json({ error: "Branch password verification required", requiresAuth: true });
+  res.json({ ok: true, token: await createToken(req.session!), branchId, branchName: branch.name });
 });
 
-
-app.get("/api/owner/summary", requirePermission("reports.read"), async (req, res) => {
+app.get("/api/owner/summary", requirePermission("*"), async (req, res) => {
   const organizationId = req.session!.organizationId;
-  const branches = await db.branch.findMany({ where: { organizationId }, orderBy: { name: "asc" } });
+  const branches = await db.branch.findMany({ where: { organizationId, active: true }, orderBy: { name: "asc" } });
   const summary = await Promise.all(branches.map(async branch => {
     const [salesAgg, paymentInAgg, paymentOutAgg, stockAgg, invoiceCount] = await Promise.all([
       db.salesInvoice.aggregate({ where: { organizationId, branchId: branch.id }, _sum: { grandTotal: true } }),
@@ -374,7 +285,7 @@ app.get("/api/owner/summary", requirePermission("reports.read"), async (req, res
   res.json(summary);
 });
 
-app.get("/api/staff", requirePermission("settings.write"), async (req, res) => {
+app.get("/api/staff", requirePermission("*"), async (req, res) => {
   const rows = await db.user.findMany({
     where: { organizationId: req.session!.organizationId, active: true },
     include: { role: true, branches: { include: { branch: true } } },
@@ -383,7 +294,7 @@ app.get("/api/staff", requirePermission("settings.write"), async (req, res) => {
   res.json(rows.map(user => ({ id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role.name, branches: user.branches.map(x => x.branch) })));
 });
 
-app.post("/api/staff", requirePermission("settings.write"), async (req, res) => {
+app.post("/api/staff", requirePermission("*"), async (req, res) => {
   const organizationId = req.session!.organizationId;
   const name = String(req.body?.name ?? "").trim();
   const email = String(req.body?.email ?? "").trim().toLowerCase();
@@ -433,7 +344,7 @@ app.post("/api/auth/change-password", async (req, res) => {
   res.json({ ok: true, message: "Password updated successfully" });
 });
 
-app.put("/api/staff/:id/password", requirePermission("settings.write"), async (req, res) => {
+app.put("/api/staff/:id/password", requirePermission("*"), async (req, res) => {
   const organizationId = req.session!.organizationId;
   const staffId = String(req.params.id || "");
   const newPassword = String(req.body?.newPassword ?? "");
@@ -479,15 +390,17 @@ app.post("/api/sync/push", async (req, res) => {
 });
 
 app.get("/api/settings/invoice", async (req, res) => {
-  const setting = await getInvoiceSetting(req.session!.organizationId);
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  const setting = await getInvoiceSetting(req.session!.organizationId, requireBranch(req, res)!);
   res.json(setting);
 });
 
-app.put("/api/settings/invoice", requirePermission("settings.write"), async (req, res) => {
+app.put("/api/settings/invoice", requirePermission("*"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
   const input = parseInput(invoiceSettingInput, req.body);
   const row = await db.invoiceSetting.upsert({
-    where: { organizationId: req.session!.organizationId },
-    create: { ...input, organizationId: req.session!.organizationId },
+    where: { organizationId_branchId: { organizationId: req.session!.organizationId, branchId } },
+    create: { ...input, branchId, organizationId: req.session!.organizationId },
     update: input,
   });
   await audit(req, "invoice_setting.updated", "InvoiceSetting", row.id);
@@ -499,7 +412,7 @@ app.get("/api/parties", async (req, res) => {
   const limit = req.query.limit ? Number(req.query.limit) : 50000;
   const organizationId = req.session!.organizationId;
   const branchId = String(req.header("x-branch-id") || "");
-  const rows = await db.party.findMany({ where: { organizationId, active: true, ...(search ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { phone: { contains: search } }] } : {}) }, orderBy: { name: "asc" }, take: limit });
+  const rows = await db.party.findMany({ where: { organizationId, branchId, active: true, ...(search ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { phone: { contains: search } }] } : {}) }, orderBy: { name: "asc" }, take: limit });
   const partyIds = rows.map(row => row.id);
   const invoiceRows = partyIds.length ? await db.salesInvoice.findMany({
     where: { organizationId, ...(branchId ? { branchId } : {}), partyId: { in: partyIds }, status: "POSTED" },
@@ -520,22 +433,24 @@ app.get("/api/parties", async (req, res) => {
 });
 
 app.post("/api/parties", requirePermission("parties.write"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
   const input = parseInput(partyInput, req.body);
   if (input.phone) {
     const norm = normalizePhone(input.phone);
     if (norm) {
-      const existingPhone = await db.party.findFirst({ where: { organizationId: req.session!.organizationId, active: true, phone: norm } });
+      const existingPhone = await db.party.findFirst({ where: { organizationId: req.session!.organizationId, branchId, active: true, phone: norm } });
       if (existingPhone) return res.status(400).json({ error: `Mobile number ${norm} is already registered to customer '${existingPhone.name}'` });
     }
   }
-  const row = await db.party.create({ data: { ...input, organizationId: req.session!.organizationId }, });
+  const row = await db.party.create({ data: { ...input, branchId, organizationId: req.session!.organizationId }, });
   await audit(req, "party.created", "Party", row.id); res.status(201).json(row);
 });
 
 app.put("/api/parties/:id", requirePermission("parties.write"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
   const input = parseInput(partyInput, req.body);
   const partyId = String(req.params.id);
-  const existing = await db.party.findFirst({ where: { id: partyId, organizationId: req.session!.organizationId, active: true } });
+  const existing = await db.party.findFirst({ where: { id: partyId, organizationId: req.session!.organizationId, branchId, active: true } });
   if (!existing) return res.status(404).json({ error: "Party not found" });
   const row = await db.party.update({ where: { id: existing.id }, data: input });
   await audit(req, "party.updated", "Party", row.id);
@@ -546,7 +461,7 @@ app.get("/api/parties/:id/ledger", async (req, res) => {
   const organizationId = req.session!.organizationId;
   const branchId = requireBranch(req, res); if (!branchId) return;
   const partyId = String(req.params.id);
-  const party = await db.party.findFirst({ where: { id: partyId, organizationId, active: true } });
+  const party = await db.party.findFirst({ where: { id: partyId, organizationId, branchId, active: true } });
   if (!party) return res.status(404).json({ error: "Party not found" });
   const invoices = await db.salesInvoice.findMany({
     where: { organizationId, branchId, partyId, status: "POSTED" },
@@ -602,11 +517,12 @@ app.get("/api/parties/:id/ledger", async (req, res) => {
 });
 
 app.post("/api/parties/import", requirePermission("parties.write"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
   const organizationId = req.session!.organizationId;
   const contacts = Array.isArray(req.body?.contacts) ? req.body.contacts : [];
   if (!contacts.length) return res.status(400).json({ error: "No contacts found to import" });
   if (contacts.length > 20000) return res.status(400).json({ error: "Maximum 20,000 contacts allowed per import" });
-  const existing = await db.party.findMany({ where: { organizationId, active: true, phone: { not: null } }, select: { phone: true } });
+  const existing = await db.party.findMany({ where: { organizationId, branchId, active: true, phone: { not: null } }, select: { phone: true } });
   const existingPhones = new Set(existing.map(row => normalizePhone(row.phone)).filter(Boolean));
   const seen = new Set<string>();
   let invalid = 0; let duplicateInFile = 0; let duplicateInDb = 0;
@@ -619,7 +535,7 @@ app.post("/api/parties/import", requirePermission("parties.write"), async (req, 
     seen.add(phone);
     if (existingPhones.has(phone)) { duplicateInDb++; continue; }
     rows.push({
-      organizationId, type: "CUSTOMER", name: name.slice(0, 120), phone,
+      organizationId, branchId, type: "CUSTOMER", name: name.slice(0, 120), phone,
       email: String(raw?.email ?? raw?.Email ?? raw?.["E-mail 1 - Value"] ?? "").trim() || undefined,
       address: String(raw?.address ?? raw?.Address ?? raw?.["Address 1 - Formatted"] ?? "").trim() || undefined,
     });
@@ -633,7 +549,7 @@ app.get("/api/products", async (req, res) => {
   const branchId = requireBranch(req, res); if (!branchId) return;
   const search = String(req.query.search ?? "").trim();
   const limit = req.query.limit ? Number(req.query.limit) : 50000;
-  const rows = await db.productVariant.findMany({ where: { active: true, product: { organizationId: req.session!.organizationId, active: true, ...(search ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { variants: { some: { OR: [{ sku: { contains: search, mode: "insensitive" } }, { barcode: search }] } } }] } : {}) } }, include: { product: { include: { taxRate: true } }, balances: { where: { branchId } } }, take: limit });
+  const rows = await db.productVariant.findMany({ where: { active: true, product: { organizationId: req.session!.organizationId, branchId, active: true, ...(search ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { variants: { some: { OR: [{ sku: { contains: search, mode: "insensitive" } }, { barcode: search }] } } }] } : {}) } }, include: { product: { include: { taxRate: true } }, balances: { where: { branchId } } }, take: limit });
   res.json(rows);
 });
 
@@ -642,7 +558,7 @@ app.post("/api/products", requirePermission("products.write"), async (req, res) 
   const input = parseInput(productInput, req.body);
   const row = await db.$transaction(async tx => {
     const tax = await tx.taxRate.upsert({ where: { organizationId_rate: { organizationId: req.session!.organizationId, rate: new Prisma.Decimal(input.taxRate) } }, create: { organizationId: req.session!.organizationId, name: `GST ${input.taxRate}%`, rate: input.taxRate }, update: {} });
-    const product = await tx.product.create({ data: { organizationId: req.session!.organizationId, name: input.name, category: input.category, brand: input.brand, hsnCode: input.hsnCode, taxRateId: tax.id, variants: { create: { sku: input.sku, barcode: input.barcode, size: input.size, color: input.color, purchasePrice: input.purchasePrice, sellingPrice: input.sellingPrice, mrp: input.mrp } } }, include: { variants: true } });
+    const product = await tx.product.create({ data: { branchId, organizationId: req.session!.organizationId, name: input.name, category: input.category, brand: input.brand, hsnCode: input.hsnCode, taxRateId: tax.id, variants: { create: { sku: input.sku, barcode: input.barcode, size: input.size, color: input.color, purchasePrice: input.purchasePrice, sellingPrice: input.sellingPrice, mrp: input.mrp } } }, include: { variants: true } });
     const variant = product.variants[0];
     if (input.openingStock > 0) { await tx.stockBalance.create({ data: { branchId, variantId: variant.id, quantity: input.openingStock } }); await tx.stockMovement.create({ data: { branchId, variantId: variant.id, type: "OPENING", quantity: input.openingStock, unitCost: input.purchasePrice, referenceType: "Product", referenceId: product.id } }); }
     return product;
@@ -659,7 +575,7 @@ app.put("/api/products/:id", requirePermission("products.write"), async (req, re
   const variant = await db.productVariant.findFirst({
     where: {
       OR: [{ id: targetId }, { productId: targetId }],
-      product: { organizationId },
+      product: { organizationId, branchId },
     },
     include: { product: true },
   });
@@ -713,13 +629,14 @@ app.put("/api/products/:id", requirePermission("products.write"), async (req, re
 });
 
 app.delete("/api/products/:id", requirePermission("products.write"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
   const targetId = String(req.params.id || "");
   const organizationId = req.session!.organizationId;
 
   const variant = await db.productVariant.findFirst({
     where: {
       OR: [{ id: targetId }, { productId: targetId }],
-      product: { organizationId },
+      product: { organizationId, branchId },
     },
   });
 
@@ -740,6 +657,7 @@ app.delete("/api/products/:id", requirePermission("products.write"), async (req,
 });
 
 app.post("/api/products/bulk-delete", requirePermission("products.write"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
   const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : [];
   if (!ids.length) return res.status(400).json({ error: "No product IDs provided" });
   const organizationId = req.session!.organizationId;
@@ -747,7 +665,7 @@ app.post("/api/products/bulk-delete", requirePermission("products.write"), async
   const variants = await db.productVariant.findMany({
     where: {
       OR: [{ id: { in: ids } }, { productId: { in: ids } }],
-      product: { organizationId },
+      product: { organizationId, branchId },
     },
   });
 
@@ -773,7 +691,7 @@ app.post("/api/purchases/stock-receipt", requirePermission("products.write"), as
   const input = parseInput(purchaseStockInput, req.body);
   const organizationId = req.session!.organizationId;
   const variants = await db.productVariant.findMany({
-    where: { id: { in: input.lines.map(x => x.variantId) }, product: { organizationId } },
+    where: { id: { in: input.lines.map(x => x.variantId) }, product: { organizationId, branchId } },
     include: { product: true },
   });
   if (variants.length !== new Set(input.lines.map(x => x.variantId)).size) return res.status(400).json({ error: "One or more purchase items are invalid" });
@@ -843,10 +761,10 @@ app.get("/api/sales/next-number", async (req, res) => {
   const organizationId = req.session!.organizationId;
   const invoiceDate = req.query.invoiceDate ? new Date(String(req.query.invoiceDate)) : new Date();
   const fy = financialYear(invoiceDate);
-  const setting = await getInvoiceSetting(organizationId);
+  const setting = await getInvoiceSetting(organizationId, branchId);
   const prefix = `${setting.invoicePrefix}/${fy}/`;
   const existingInvoices = await db.salesInvoice.findMany({
-    where: { organizationId, invoiceNumber: { startsWith: prefix } },
+    where: { organizationId, branchId, invoiceNumber: { startsWith: prefix } },
     select: { invoiceNumber: true }
   });
   let maxNum = 0;
@@ -874,6 +792,7 @@ app.get("/api/sales/:id", async (req, res) => {
 
 app.get("/api/sales/:id/history", async (req, res) => {
   const branchId = requireBranch(req, res); if (!branchId) return;
+  if (!await db.salesInvoice.findFirst({ where: { id: String(req.params.id), organizationId: req.session!.organizationId, branchId } })) return res.status(404).json({ error: "Invoice not found" });
   const events = await db.auditEvent.findMany({
     where: { entityId: String(req.params.id), entityType: "SALES_INVOICE", organizationId: req.session!.organizationId },
     orderBy: { occurredAt: "desc" },
@@ -884,11 +803,12 @@ app.get("/api/sales/:id/history", async (req, res) => {
 
 app.post("/api/sales", requirePermission("sales.write"), async (req, res) => {
   const branchId = requireBranch(req, res); if (!branchId) return;
-  const input = parseInput(invoiceInput, req.body); const organizationId = req.session!.organizationId;
-  const existing = await db.salesInvoice.findUnique({ where: { organizationId_idempotencyKey: { organizationId, idempotencyKey: input.idempotencyKey } } });
+  const input = parseInput(invoiceInput, req.body);
+  if (input.partyId && !await db.party.findFirst({ where: { id: input.partyId, branchId, organizationId: req.session!.organizationId, active: true } })) return res.status(400).json({ error: "Party does not belong to this branch" }); const organizationId = req.session!.organizationId;
+  const existing = await db.salesInvoice.findUnique({ where: { organizationId_branchId_idempotencyKey: { organizationId, branchId, idempotencyKey: input.idempotencyKey } } });
   if (existing) return res.json(existing);
   const organization = await db.organization.findUniqueOrThrow({ where: { id: organizationId } });
-  const variants = await db.productVariant.findMany({ where: { id: { in: input.lines.map(x => x.variantId) }, product: { organizationId } }, include: { product: { include: { taxRate: true } }, balances: { where: { branchId } } } });
+  const variants = await db.productVariant.findMany({ where: { id: { in: input.lines.map(x => x.variantId) }, product: { organizationId, branchId } }, include: { product: { include: { taxRate: true } }, balances: { where: { branchId } } } });
   if (variants.length !== new Set(input.lines.map(x => x.variantId)).size) return res.status(400).json({ error: "One or more variants are invalid" });
   const isInterState = input.placeOfSupply !== organization.stateCode;
   const lineBaseBeforeInvoiceDiscount = input.lines.reduce((sum, line) => sum + Math.max(0, line.quantity * line.unitPrice - line.discount), 0);
@@ -907,11 +827,11 @@ app.post("/api/sales", requirePermission("sales.write"), async (req, res) => {
   const grandTotal = Math.max(0, round2(calculated.reduce((s, x) => s + x.total, 0) + input.additionalCharges));
   const row = await db.$transaction(async tx => {
     for (const line of calculated) { const stock = Number(line.v.balances[0]?.quantity ?? 0); if (stock < line.input.quantity) throw new Error(`Insufficient stock for ${line.v.sku}`); }
-    const setting = await tx.invoiceSetting.upsert({ where: { organizationId }, create: { organizationId }, update: {} });
+    const setting = await tx.invoiceSetting.upsert({ where: { organizationId_branchId: { organizationId, branchId } }, create: { organizationId, branchId }, update: {} });
     const fy = financialYear(input.invoiceDate);
     const prefix = `${setting.invoicePrefix}/${fy}/`;
     const existingInvoices = await tx.salesInvoice.findMany({
-      where: { organizationId, invoiceNumber: { startsWith: prefix } },
+      where: { organizationId, branchId, invoiceNumber: { startsWith: prefix } },
       select: { invoiceNumber: true }
     });
     let maxNum = 0;
@@ -958,7 +878,7 @@ app.put("/api/sales/:id", requirePermission("sales.write"), async (req, res) => 
   if (oldInvoice.status === "CANCELLED") return res.status(400).json({ error: "Cancelled invoice cannot be edited" });
 
   const organization = await db.organization.findUniqueOrThrow({ where: { id: organizationId } });
-  const variants = await db.productVariant.findMany({ where: { id: { in: input.lines.map(x => x.variantId) }, product: { organizationId } }, include: { product: { include: { taxRate: true } } } });
+  const variants = await db.productVariant.findMany({ where: { id: { in: input.lines.map(x => x.variantId) }, product: { organizationId, branchId } }, include: { product: { include: { taxRate: true } } } });
   if (variants.length !== new Set(input.lines.map(x => x.variantId)).size) return res.status(400).json({ error: "One or more variants are invalid" });
   const isInterState = input.placeOfSupply !== organization.stateCode;
   const lineBaseBeforeInvoiceDiscount = input.lines.reduce((sum, line) => sum + Math.max(0, line.quantity * line.unitPrice - line.discount), 0);
@@ -1231,11 +1151,14 @@ app.post("/api/credit-notes", requirePermission("sales.write"), async (req, res)
   const inv = await db.salesInvoice.findFirst({ where: { id: input.salesInvoiceId, organizationId, branchId }});
   if (!inv) return res.status(404).json({ error: "Original invoice not found" });
 
+  if (input.partyId !== inv.partyId) return res.status(400).json({ error: "Credit note party must match invoice" });
+  const variants = await db.productVariant.count({ where: { id: { in: input.lines.map(l => l.variantId) }, product: { organizationId, branchId } } });
+  if (variants !== new Set(input.lines.map(l => l.variantId)).size) return res.status(400).json({ error: "Invalid branch items" });
   const creditNote = await db.$transaction(async tx => {
     const fy = financialYear(input.date);
     const sequence = await tx.documentSequence.upsert({
-      where: { organizationId_branchId_documentType_financialYear: { organizationId, branchId: "organization", documentType: "CN", financialYear: fy } },
-      create: { organizationId, branchId: "organization", documentType: "CN", financialYear: fy, prefix: `HB/CN/${fy}/`, nextNumber: 2 },
+      where: { organizationId_branchId_documentType_financialYear: { organizationId, branchId, documentType: "CN", financialYear: fy } },
+      create: { organizationId, branchId, documentType: "CN", financialYear: fy, prefix: `HB/CN/${fy}/`, nextNumber: 2 },
       update: { nextNumber: { increment: 1 } },
     });
     const num = `${sequence.prefix}${sequence.nextNumber - 1}`;
@@ -1396,13 +1319,13 @@ async function generateFullBackupData(organizationId: string) {
   };
 }
 
-app.get("/api/backup/export", requirePermission("settings.write"), async (req, res) => {
+app.get("/api/backup/export", requirePermission("*"), async (req, res) => {
   const organizationId = req.session!.organizationId;
   const backup = await generateFullBackupData(organizationId);
   res.json(backup);
 });
 
-app.post("/api/backup/restore", requirePermission("settings.write"), async (req, res) => {
+app.post("/api/backup/restore", requirePermission("*"), async (req, res) => {
   const organizationId = req.session!.organizationId;
   const { backupData, doubleConfirmation, understandingText } = req.body;
 
@@ -1440,7 +1363,7 @@ app.post("/api/backup/restore", requirePermission("settings.write"), async (req,
   }
 });
 
-app.post("/api/admin/reset-transactions", requirePermission("settings.write"), async (req, res) => {
+app.post("/api/admin/reset-transactions", requirePermission("*"), async (req, res) => {
   const organizationId = req.session!.organizationId;
   const { doubleConfirmation, clearProducts, clearParties } = req.body;
 
@@ -1474,7 +1397,7 @@ app.post("/api/admin/reset-transactions", requirePermission("settings.write"), a
 
     if (clearProducts) {
       await db.stockBalance.deleteMany({ where: { branch: { organizationId } } });
-      await db.productVariant.deleteMany({ where: { product: { organizationId } } });
+      await db.productVariant.deleteMany({ where: { product: { organizationId, branchId } } });
       await db.product.deleteMany({ where: { organizationId } });
     }
 
@@ -1527,7 +1450,7 @@ function normalizePhone(value: unknown) {
   return digits.length > 10 ? digits.slice(-10) : digits;
 }
 async function audit(req: express.Request, action: string, entityType: string, entityId: string, metadata?: Prisma.InputJsonValue) { await db.auditEvent.create({ data: { organizationId: req.session!.organizationId, actorId: req.session!.userId, action, entityType, entityId, metadata } }); }
-async function getInvoiceSetting(organizationId: string) { return db.invoiceSetting.upsert({ where: { organizationId }, create: { organizationId }, update: {} }); }
+async function getInvoiceSetting(organizationId: string, branchId: string) { return db.invoiceSetting.upsert({ where: { organizationId_branchId: { organizationId, branchId } }, create: { organizationId, branchId }, update: {} }); }
 
 const distPath = path.join(process.cwd(), "dist");
 app.use(express.static(distPath));
