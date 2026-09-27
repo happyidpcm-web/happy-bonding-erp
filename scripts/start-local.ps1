@@ -3,11 +3,19 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $projectRoot
 $databaseDir = Join-Path $projectRoot '.local\pgdata'
 $pgCtl = Join-Path $projectRoot '.local\pgsql\bin\pg_ctl.exe'
-if (!(Test-Path -LiteralPath $pgCtl) -or !(Test-Path -LiteralPath (Join-Path $databaseDir 'PG_VERSION'))) {
-    throw 'Local PostgreSQL is not initialized in .local.'
+function Test-DatabasePort {
+    $client = New-Object System.Net.Sockets.TcpClient
+    try {
+        $pending = $client.BeginConnect('127.0.0.1', 5432, $null, $null)
+        if (!$pending.AsyncWaitHandle.WaitOne(2000)) { return $false }
+        $client.EndConnect($pending)
+        return $true
+    } catch { return $false } finally { $client.Dispose() }
 }
-& (Join-Path $projectRoot '.local\pgsql\bin\pg_isready.exe') -h 127.0.0.1 -p 5432 *> $null
-if ($LASTEXITCODE -ne 0) {
+if (!(Test-DatabasePort)) {
+    if (!(Test-Path -LiteralPath $pgCtl) -or !(Test-Path -LiteralPath (Join-Path $databaseDir 'PG_VERSION'))) {
+        throw 'PostgreSQL is not running on port 5432 and local PostgreSQL is not initialized in .local.'
+    }
     & $pgCtl -D $databaseDir -l (Join-Path $projectRoot '.local\postgres.log') -w start
     if ($LASTEXITCODE -ne 0) { throw 'PostgreSQL failed to start. See .local\postgres.log.' }
 }
@@ -16,10 +24,15 @@ function Test-Endpoint([string] $Url) {
 }
 $node = (Get-Command node.exe).Source
 if (!(Test-Endpoint 'http://127.0.0.1:4000/api/health')) {
-    Start-Process -FilePath $node -ArgumentList @('"node_modules/tsx/dist/cli.mjs"', '"server/index.ts"') -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput '.local\api.log' -RedirectStandardError '.local\api-error.log'
+    $tsxCli = & $node -p "require.resolve('tsx/cli')"
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot find tsx. Run npm install first.' }
+    Start-Process -FilePath $node -ArgumentList @(('"' + $tsxCli + '"'), '"server/index.ts"') -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput '.local\api.log' -RedirectStandardError '.local\api-error.log'
 }
 if (!(Test-Endpoint 'http://127.0.0.1:5173')) {
-    Start-Process -FilePath $node -ArgumentList @('"node_modules/vite/bin/vite.js"', '--config', 'vite.config.ts', '--host', '127.0.0.1', '--strictPort') -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput '.local\web.log' -RedirectStandardError '.local\web-error.log'
+    $vitePackage = & $node -p "require.resolve('vite/package.json')"
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot find Vite. Run npm install first.' }
+    $viteCli = Join-Path (Split-Path -Parent $vitePackage) 'bin\vite.js'
+    Start-Process -FilePath $node -ArgumentList @(('"' + $viteCli + '"'), '--config', 'vite.config.ts', '--host', '127.0.0.1', '--strictPort') -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput '.local\web.log' -RedirectStandardError '.local\web-error.log'
 }
 for ($attempt = 0; $attempt -lt 20; $attempt++) {
     if ((Test-Endpoint 'http://127.0.0.1:4000/api/health') -and (Test-Endpoint 'http://127.0.0.1:5173')) {

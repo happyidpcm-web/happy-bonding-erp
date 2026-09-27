@@ -121,7 +121,9 @@ export default function App() {
     const branchAtStart = api.currentBranchId();
     setDataLoading(true); setDataError("");
     try {
-      const [nextProducts, nextParties, nextInvoices, nextSetting, nextBranches, nextSummary] = await Promise.all([api.products(), api.parties(), api.sales(), api.invoiceSetting(), api.branches(), api.ownerSummary()]);
+      const session = await api.me();
+      if (sequence !== loadSequence.current || branchAtStart !== api.currentBranchId()) return;
+      const [nextProducts, nextParties, nextInvoices, nextSetting, nextBranches, nextSummary] = await Promise.all([api.products(), api.parties(), api.sales(), api.invoiceSetting(), api.branches(), session.isAdmin ? api.ownerSummary() : Promise.resolve([])]);
       if (sequence !== loadSequence.current || branchAtStart !== api.currentBranchId()) return;
       setProductRows(nextProducts); setPartyRows(nextParties); setInvoiceRows(nextInvoices);
       setInvoiceSetting(nextSetting); setBranchRows(nextBranches); setOwnerSummary(nextSummary);
@@ -3895,4 +3897,4 @@ function IssueCreditNoteModal({ invoice, onClose, onSave, notify }: { invoice: I
       </form>
     </Modal>
   );
-}
+}

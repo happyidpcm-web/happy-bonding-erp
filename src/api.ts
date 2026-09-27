@@ -113,6 +113,7 @@ export const api = {
     await request(`/vouchers/${encodeURIComponent(id)}`, { method: "DELETE" });
   },
   async health() { return request<{ ok: boolean }>("/health"); },
+  async me() { return request<{ id: string; name: string; email: string; isAdmin: boolean; branchIds: string[] }>("/auth/me"); },
   async login(email: string, password: string) { const result = await request<LoginResult>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }); localStorage.setItem(TOKEN_KEY, result.token); localStorage.setItem(BRANCH_KEY, result.branchIds[0]); return result; },
   logout() { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(BRANCH_KEY); },
   hasSession() { return Boolean(localStorage.getItem(TOKEN_KEY) && localStorage.getItem(TOKEN_KEY) !== "mock_local_token_2026"); },
