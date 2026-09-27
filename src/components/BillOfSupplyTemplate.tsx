@@ -89,7 +89,7 @@ export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: 
           </div>
           <div>
             <span>Invoice Date</span>
-            <strong>{invoice.date} 9:29 PM</strong>
+            <strong>{invoice.date}</strong>
           </div>
         </div>
 
