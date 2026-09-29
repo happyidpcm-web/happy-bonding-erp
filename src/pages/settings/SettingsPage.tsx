@@ -12,12 +12,14 @@ export function SettingsPage({
   currentBranchId,
   onSwitchBranch,
   onRefreshData,
+  onStaff,
 }: {
   notify: (msg: string) => void;
   branches?: Branch[];
   currentBranchId?: string;
   onSwitchBranch?: (branchId: string) => void;
   onRefreshData?: () => Promise<void> | void;
+  onStaff: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
@@ -153,9 +155,12 @@ export function SettingsPage({
               key={tab.id}
               type="button"
               className={activeTab === tab.id ? "active" : ""}
+              aria-current={activeTab === tab.id ? "page" : undefined}
               onClick={() => {
                 console.log("Switching settings tab to:", tab.id);
                 setActiveTab(tab.id);
+                if (tab.id === "branches") setBranchModalOpen(true);
+                if (tab.id === "users") onStaff();
               }}
             >
               {tab.label}
@@ -196,7 +201,7 @@ export function SettingsPage({
               </label>
             </div>
             <div className="save-line">
-              <button className="primary" onClick={() => notify("Business profile settings saved successfully!")}>
+              <button className="primary" onClick={() => notify("Business profile saving is not implemented yet")}>
                 Save changes
               </button>
             </div>
@@ -298,7 +303,7 @@ export function SettingsPage({
         )}
 
         {/* Tab 5: Users & Roles */}
-        {activeTab === "users" && (<p>This settings section is not connected to the backend yet.</p>)}
+        {activeTab === "users" && (<article className="card settings-form"><h2>Users & roles</h2><p>View users, create staff logins and assign branch access.</p><button className="primary" onClick={onStaff}>Manage users & roles</button></article>)}
           {false && (
           <article className="card settings-form">
             <h2>Users & Staff Roles</h2>

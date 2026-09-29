@@ -512,7 +512,7 @@ export default function App() {
         {page === "cash" && <CashBank notify={notify}/>} 
         {page === "pos" && <Sales rows={invoiceRows} products={productRows} parties={partyRows} setting={invoiceSetting} setSetting={setInvoiceSetting} setRows={setInvoiceRows} setParties={setPartyRows} setProducts={setProductRows} notify={notify} autoCreateKey={Date.now()} onSelectInvoice={openInvoiceDetail} onNavigateReports={handleNavigateReportsFromSales}/>} 
         {page === "staff" && <Staff/>} 
-        {page === "settings" && <SettingsPage notify={notify} branches={branchRows} currentBranchId={currentBranchId} onSwitchBranch={handleBranchChange} onRefreshData={refreshAppData} />} 
+        {page === "settings" && <SettingsPage notify={notify} branches={branchRows} currentBranchId={currentBranchId} onSwitchBranch={handleBranchChange} onRefreshData={refreshAppData} onStaff={() => setStaffModalOpen(true)} />}
 
       </section>
     </main>

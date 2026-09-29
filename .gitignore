@@ -5,3 +5,6 @@ dist
 .DS_Store
 backups/
 .local/
+happy-bonding-erp/
+*.tsbuildinfo
+test-results/
