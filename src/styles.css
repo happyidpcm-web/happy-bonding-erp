@@ -1916,6 +1916,7 @@ body{background:#fffdf7;color:#140d08}.sidebar{background:linear-gradient(180deg
 
 .discount-row-img5 {
   display: flex !important;
+  flex-wrap: wrap;
   justify-content: space-between !important;
   align-items: center !important;
   gap: 12px !important;
@@ -1935,6 +1936,8 @@ body{background:#fffdf7;color:#140d08}.sidebar{background:linear-gradient(180deg
 
 .disc-inputs-group {
   display: flex !important;
+  flex-shrink: 0;
+  margin-left: auto;
   align-items: center !important;
   gap: 4px !important;
 }
@@ -1955,7 +1958,13 @@ body{background:#fffdf7;color:#140d08}.sidebar{background:linear-gradient(180deg
 .disc-input-box input {
   border: none !important;
   background: transparent !important;
-  width: 40px !important;
+  width: 9ch !important;
+  min-width: 9ch;
+  padding: 5px 4px !important;
+  box-sizing: content-box;
+  appearance: textfield;
+  -moz-appearance: textfield;
+  font-variant-numeric: tabular-nums;
   font-size: 12px !important;
   text-align: right !important;
 }
@@ -4120,6 +4129,53 @@ input:checked + .slider:before {
 .status-pill-green {
   background: #dcfce7;
   color: #15803d;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  display: inline-block;
+}
+
+.inventory-metric-note {
+  display: block;
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.disc-input-box input::-webkit-inner-spin-button,
+.disc-input-box input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.inventory-size-badge {
+  display: inline-block;
+  min-width: 36px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #334155;
+  font-weight: 600;
+  text-align: center;
+}
+
+.inventory-stock-quantity {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.inventory-stock-quantity > span {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.status-pill-amber {
+  background: #fef3c7;
+  color: #92400e;
   font-weight: 700;
   font-size: 11px;
   padding: 3px 10px;

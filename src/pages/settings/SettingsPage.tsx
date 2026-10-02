@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Download, Trash2, Upload } from "lucide-react";
 import { api } from "../../api";
-import type { Branch } from "../../types";
+import type { Branch, InvoiceSetting } from "../../types";
 import { Modal, PageHeading, EditBranchModal, BranchManagementModal } from "../../App";
 
 export type SettingsTab = "profile" | "gst" | "numbering" | "print" | "users" | "branches" | "backup";
@@ -86,6 +86,50 @@ export function SettingsPage({
   const [showBankDetails, setShowBankDetails] = useState(true);
   const [showTerms, setShowTerms] = useState(true);
 
+  const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSetting | null>(null);
+  const [settingsError, setSettingsError] = useState("");
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [canSaveSettings, setCanSaveSettings] = useState(false);
+  const [nextInvoice, setNextInvoice] = useState("");
+  useEffect(() => {
+    let active = true;
+    setInvoiceSettings(null); setSettingsError(""); setCanSaveSettings(false);
+    Promise.all([api.invoiceSetting(), api.me(), api.nextSaleNumber()]).then(([settings, me, next]) => {
+      if (!active) return;
+      setInvoiceSettings(settings); setCanSaveSettings(me.isAdmin); setNextInvoice(next.invoiceNumber);
+    }).catch(error => { if (active) setSettingsError(error.message); });
+    return () => { active = false; };
+  }, [currentBranchId]);
+  const updateInvoiceSettings = (patch: Partial<InvoiceSetting>) => setInvoiceSettings(value => value ? { ...value, ...patch } : value);
+  const saveConnectedSettings = async () => {
+    if (!invoiceSettings || savingSettings || !canSaveSettings) return;
+    setSavingSettings(true); setSettingsError("");
+    try {
+      const saved = await api.saveInvoiceSetting(invoiceSettings);
+      setInvoiceSettings(saved);
+      setNextInvoice((await api.nextSaleNumber()).invoiceNumber);
+      if (onRefreshData) await onRefreshData();
+      notify("Invoice settings saved for this branch");
+    } catch (error) { setSettingsError(error instanceof Error ? error.message : "Could not save settings"); }
+    finally { setSavingSettings(false); }
+  };
+
+  const [business, setBusiness] = useState<Awaited<ReturnType<typeof api.businessSettings>> | null>(null);
+  const [businessError, setBusinessError] = useState("");
+  const [businessSaving, setBusinessSaving] = useState(false);
+  useEffect(() => {
+    let active = true; setBusiness(null); setBusinessError("");
+    api.businessSettings().then(value => { if (active) setBusiness(value); }).catch(error => { if (active) setBusinessError(error.message); });
+    return () => { active = false; };
+  }, [currentBranchId]);
+  const saveBusiness = async () => {
+    if (!business || !canSaveSettings || businessSaving) return;
+    setBusinessSaving(true); setBusinessError("");
+    try { setBusiness(await api.saveBusinessSettings(business)); if (onRefreshData) await onRefreshData(); notify("Business settings saved"); }
+    catch (error) { setBusinessError(error instanceof Error ? error.message : "Save failed"); }
+    finally { setBusinessSaving(false); }
+  };
+
   const settingsTabs: { id: SettingsTab; label: string }[] = [
     { id: "profile", label: "Business profile" },
     { id: "gst", label: "GST & tax" },
@@ -168,139 +212,42 @@ export function SettingsPage({
           ))}
         </div>
 
-        {/* Tab 1: Business Profile */}
-        {activeTab === "profile" && (<p>This settings section is not connected to the backend yet.</p>)}
-          {false && (
-          <article className="card settings-form">
-            <h2>Business profile</h2>
-            <p>These details appear on GST invoices and receipts.</p>
-            <div className="form-grid">
-              <label className="full">Business name
-                <input value={businessName} onChange={e => setBusinessName(e.target.value)} />
-              </label>
-              <label>Phone
-                <input value={phone} onChange={e => setPhone(e.target.value)} />
-              </label>
-              <label>Email
-                <input value={email} onChange={e => setEmail(e.target.value)} placeholder="business@example.com" />
-              </label>
-              <label className="full">Billing address
-                <textarea value={address} onChange={e => setAddress(e.target.value)} rows={2} />
-              </label>
-              <label>State
-                <input value={stateName} onChange={e => setStateName(e.target.value)} />
-              </label>
-              <label>Pincode
-                <input value={pincode} onChange={e => setPincode(e.target.value)} />
-              </label>
-              <label>GSTIN
-                <input value={gstin} onChange={e => setGstin(e.target.value)} />
-              </label>
-              <label>PAN
-                <input value={pan} onChange={e => setPan(e.target.value)} />
-              </label>
-            </div>
-            <div className="save-line">
-              <button className="primary" onClick={() => notify("Business profile saving is not implemented yet")}>
-                Save changes
-              </button>
-            </div>
-          </article>
-        )}
+        {(activeTab === "profile" || activeTab === "gst") && <article className="card settings-form">
+          <h2>{activeTab === "profile" ? "Business profile" : "GST details"}</h2>
+          <p>Company name and GST details are shared across branches. Address and branch phone apply only to the selected branch.</p>
+          {businessError && <p role="alert">{businessError}</p>}
+          {!business ? <p>{businessError ? "Could not load business settings. Reopen this page to retry." : "Loading business settings..."}</p> : <>
+          {!canSaveSettings && <p>Only the owner can save changes.</p>}
+          <fieldset disabled={!canSaveSettings || businessSaving} style={{border:0,padding:0,margin:0}}><div className="form-grid">
+            {(activeTab === "profile" ? [['name','Business name'],['phone','Company phone'],['branchAddress','Branch address'],['branchPhone','Branch phone']] : [['gstin','GSTIN'],['pan','PAN'],['stateCode','Company state code (2 digits)']]).map(([key,label]) => <label key={key}>{label}<input value={business[key as keyof typeof business]} onChange={e => setBusiness({...business,[key]:e.target.value})}/></label>)}
+          </div>
+          {activeTab === "gst" && <p>Invoice item tax stays None until selected. Changing company state affects tax calculations on future invoice saves.</p>}
+          <div className="save-line"><button className="primary" onClick={saveBusiness}>{businessSaving ? "Saving..." : "Save changes"}</button></div></fieldset>
+          </>}
+        </article>}
 
-        {/* Tab 2: GST & tax */}
-        {activeTab === "gst" && (<p>This settings section is not connected to the backend yet.</p>)}
-          {false && (
-          <article className="card settings-form">
-            <h2>GST & Tax Configuration</h2>
-            <p>Configure tax rates, HSN rules, and GSTIN details.</p>
+        {(activeTab === "numbering" || activeTab === "print") && <article className="card settings-form">
+          <h2>{activeTab === "numbering" ? "Sales invoice numbering" : "Invoice print details"}</h2>
+          {settingsError && <p role="alert">{settingsError}</p>}
+          {!invoiceSettings ? <p>Loading invoice settings...</p> : <>
+            <p>Settings for the current branch. Saved details are available to the invoice screen.</p>
+            {!canSaveSettings && <p>Only the owner can save these settings.</p>}
+            <fieldset disabled={!canSaveSettings || savingSettings} style={{ border: 0, padding: 0, margin: 0 }}>
             <div className="form-grid">
-              <label>GST Registration Type
-                <select value={taxType} onChange={e => setTaxType(e.target.value)}>
-                  <option value="Regular GST">Regular GST Registered</option>
-                  <option value="Composition Scheme">Composition Scheme</option>
-                  <option value="Unregistered">Unregistered Business</option>
-                </select>
-              </label>
-              <label>Default Garment Tax Rate
-                <select value={defaultTaxRate} onChange={e => setDefaultTaxRate(e.target.value)}>
-                  <option value="5%">GST 5% (Standard Apparel)</option>
-                  <option value="12%">GST 12% (Higher Value Garments)</option>
-                  <option value="18%">GST 18% (Accessories & Services)</option>
-                </select>
-              </label>
-              <label className="full" style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                <input type="checkbox" checked={enableIgst} onChange={e => setEnableIgst(e.target.checked)} style={{ width: 18, height: 18 }} />
-                <span>Enable automatic IGST calculation for out-of-state customer sales</span>
-              </label>
+              {activeTab === "numbering" ? <>
+                <label>Sales invoice prefix<input maxLength={30} value={invoiceSettings.invoicePrefix} onChange={e => updateInvoiceSettings({invoicePrefix:e.target.value})}/></label>
+                <label>Payment terms (days)<input type="number" min={0} max={365} value={invoiceSettings.paymentTermsDays} onChange={e => updateInvoiceSettings({paymentTermsDays:Number(e.target.value)})}/></label>
+                <p className="full">Financial year and sequence are added automatically. Next invoice: <strong>{nextInvoice}</strong>. Changes apply to future invoices.</p>
+              </> : <>
+                <label className="full">Terms and conditions<textarea maxLength={1000} value={invoiceSettings.terms} onChange={e => updateInvoiceSettings({terms:e.target.value})}/></label>
+                {([['bankName','Bank name'],['accountName','Account holder'],['accountNumber','Account number'],['ifsc','IFSC'],['upiId','UPI ID'],['qrText','Payment QR text'],['signatureText','Signatory name'],['signatureUrl','Signature image URL']] as const).map(([key,label]) => <label key={key}>{label}<input value={invoiceSettings[key] || ""} onChange={e => updateInvoiceSettings({[key]:e.target.value})}/></label>)}
+                <p className="full">Choose A4 or thermal printing from the invoice screen. Default layout preferences are not stored by the current API.</p>
+              </>}
             </div>
-            <div className="save-line">
-              <button className="primary" onClick={() => notify("GST & Tax settings saved!")}>
-                Save changes
-              </button>
-            </div>
-          </article>
-        )}
-
-        {/* Tab 3: Invoice Numbering */}
-        {activeTab === "numbering" && (<p>This settings section is not connected to the backend yet.</p>)}
-          {false && (
-          <article className="card settings-form">
-            <h2>Invoice Numbering & Prefix</h2>
-            <p>Customize automatic invoice numbers for Sales, Quotations, and Purchases.</p>
-            <div className="form-grid">
-              <label>Sales Invoice Prefix
-                <input value={salesPrefix} onChange={e => setSalesPrefix(e.target.value)} />
-              </label>
-              <label>Next Sales Bill Number
-                <input value={seqNo} onChange={e => setSeqNo(e.target.value)} />
-              </label>
-              <label>Quotation Prefix
-                <input value={quotationPrefix} onChange={e => setQuotationPrefix(e.target.value)} />
-              </label>
-              <label>Purchase Prefix
-                <input value={purchasePrefix} onChange={e => setPurchasePrefix(e.target.value)} />
-              </label>
-            </div>
-            <div className="save-line">
-              <button className="primary" onClick={() => notify("Invoice numbering prefix saved!")}>
-                Save changes
-              </button>
-            </div>
-          </article>
-        )}
-
-        {/* Tab 4: Print Templates */}
-        {activeTab === "print" && (<p>This settings section is not connected to the backend yet.</p>)}
-          {false && (
-          <article className="card settings-form">
-            <h2>Print & Receipt Templates</h2>
-            <p>Customize invoice printing and POS slip formats.</p>
-            <div className="form-grid">
-              <label>Default Print Template
-                <select value={printLayout} onChange={e => setPrintLayout(e.target.value)}>
-                  <option value="Standard A4">Standard A4 GST Invoice</option>
-                  <option value="Bill of Supply">Bill of Supply (Composition)</option>
-                  <option value="POS 80mm Roll">POS Thermal Roll (80mm / 3-inch)</option>
-                  <option value="POS 58mm Roll">POS Thermal Roll (58mm / 2-inch)</option>
-                </select>
-              </label>
-              <label className="full" style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                <input type="checkbox" checked={showBankDetails} onChange={e => setShowBankDetails(e.target.checked)} style={{ width: 18, height: 18 }} />
-                <span>Show Bank Account & UPI Details on Invoices</span>
-              </label>
-              <label className="full" style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                <input type="checkbox" checked={showTerms} onChange={e => setShowTerms(e.target.checked)} style={{ width: 18, height: 18 }} />
-                <span>Show Store Exchange Policy & Terms at footer</span>
-              </label>
-            </div>
-            <div className="save-line">
-              <button className="primary" onClick={() => notify("Print template settings saved!")}>
-                Save changes
-              </button>
-            </div>
-          </article>
-        )}
+            <div className="save-line"><button className="primary" type="button" onClick={saveConnectedSettings}>{savingSettings ? "Saving..." : "Save changes"}</button></div>
+            </fieldset>
+          </>}
+        </article>}
 
         {/* Tab 5: Users & Roles */}
         {activeTab === "users" && (<article className="card settings-form"><h2>Users & roles</h2><p>View users, create staff logins and assign branch access.</p><button className="primary" onClick={onStaff}>Manage users & roles</button></article>)}

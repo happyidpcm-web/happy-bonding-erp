@@ -64,6 +64,12 @@ import {
   shareWhatsAppInvoice,
 } from "../../App";
 
+function purchasePaymentStatus(voucher: VoucherRecord): "Unpaid" | "Partially paid" | "Paid" {
+  const paid = Number(voucher.details?.paidAmount ?? (voucher.status === "Paid" ? voucher.amount : 0));
+  if (paid >= Number(voucher.amount)) return "Paid";
+  return paid > 0 ? "Partially paid" : "Unpaid";
+}
+
 export function CreateQuotationScreen({
   title,
   type,
@@ -71,6 +77,7 @@ export function CreateQuotationScreen({
   products = [],
   invoices = [],
   vouchers = [],
+  editingRecord,
   onBack,
   onSave,
   onProductsChanged,
@@ -83,6 +90,7 @@ export function CreateQuotationScreen({
   products?: Product[];
   invoices?: Invoice[];
   vouchers?: VoucherRecord[];
+  editingRecord?: VoucherRecord;
   onBack: () => void;
   onSave: (rec: VoucherRecord) => Promise<void>;
   onProductsChanged?: (rows: Product[]) => void;
@@ -98,6 +106,15 @@ export function CreateQuotationScreen({
   const createSupplier = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const input = partyPayloadFromForm(new FormData(event.currentTarget));
+    const phoneDigits = (value: string) => value.replace(/\D/g, "").slice(-10);
+    const phone = phoneDigits(input.phone || "");
+    if (phone && [...parties, ...createdSuppliers].some(p => phoneDigits(p.phone || "") === phone)) {
+      setSupplierModalOpen(false);
+      setPartyQuery(phone);
+      setPartyDropdownOpen(true);
+      notify("This phone already exists. Select the correct existing party from the list; no duplicate was created.");
+      return;
+    }
     try {
       setSupplierSaving(true);
       const supplier = await api.createParty({ ...input, type: "Supplier" });
@@ -147,6 +164,7 @@ export function CreateQuotationScreen({
   }, []);
 
   useEffect(() => {
+    if (editingRecord) return;
     let active = true;
     {
       api.nextVoucherNumber(type, type === "Quotation" ? "" : prefix).then(next => { if (active) setNumber(next); }).catch(error => {
@@ -163,11 +181,25 @@ export function CreateQuotationScreen({
   const [paymentMode, setPaymentMode] = useState("Cash");
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false);
 
-  const subtotal = useMemo(() => lines.reduce((s, l) => s + l.amount, 0), [lines]);
+  const purchaseLineAmount = (l: {qty: number; price: number; discount: number; tax: number}) => Math.round(Math.max(0, l.qty * l.price - l.discount) * (1 + l.tax / 100) * 100) / 100;
+  const subtotal = useMemo(() => lines.reduce((s, l) => s + (type === "Purchase Invoice" ? purchaseLineAmount(l) : l.amount), 0), [lines, type]);
   const taxableAmount = subtotal;
   const netAmount = Math.max(0, taxableAmount + Number(additionalCharges) - Number(overallDiscount));
   const finalTotal = autoRoundOff ? Math.round(netAmount) : netAmount;
 
+  useEffect(() => {
+    if (!editingRecord) return;
+    const r = editingRecord, d = r.details;
+    setCustomPartyName(r.party); setPrefix(""); setNumber(r.number);
+    setDate(new Date(r.date).toISOString().slice(0, 10));
+    setValidDays(parseInt(r.dueIn || "30", 10) || 0);
+    setLines((r.items || []).map((i, n) => ({...i, id: String(n), variantId: i.variantId || "", mrp: i.mrp ?? i.price, discount: i.discount ?? 0, tax: i.tax ?? 0})));
+    setNotes(r.notes || ""); setShowNotes(Boolean(r.notes));
+    setTerms(d?.terms || ""); setAdditionalCharges(d?.additionalCharges || 0); setShowAdditionalCharges(Boolean(d?.additionalCharges));
+    setOverallDiscount(d?.discount || 0); setShowDiscount(Boolean(d?.discount));
+    setAmountPaid(d?.paidAmount || 0); setPaymentMode(d?.paymentMode || "Cash"); setAutoRoundOff(d?.roundOff ?? false);
+    setSignatureUrl(d?.signatureUrl || ""); setSignatoryName(d?.signatoryName || "");
+  }, [editingRecord]);
   const draftId = useRef(crypto.randomUUID());
   const savingRef = useRef(false);
   const [saving, setSaving] = useState(false);
@@ -184,16 +216,16 @@ export function CreateQuotationScreen({
     }
     const fullNumber = type === "Quotation" ? number : `${prefix}${number}`;
     const newRecord: VoucherRecord = {
-      id: draftId.current,
+      id: editingRecord?.id ?? draftId.current,
       date: new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
-      number: fullNumber,
+      number: editingRecord?.number ?? fullNumber,
       party: partyName,
       dueIn: `${validDays} Days`,
       amount: finalTotal,
       status: "Open",
       details: { paidAmount: markFullyPaid ? finalTotal : amountPaid, paymentMode, terms, additionalCharges, discount: overallDiscount, roundOff: autoRoundOff, dueDate: new Date(Date.parse(date) + validDays * 86400000).toISOString().slice(0, 10), signatureUrl, signatoryName },
       notes: notes || `${type} created in ERP`,
-      items: lines.map(line => ({ variantId: String(line.variantId), name: line.name, hsn: line.hsn, qty: line.qty, price: line.price, amount: line.amount, mrp: line.mrp, discount: line.discount, tax: line.tax })),
+      items: lines.map(line => ({ variantId: String(line.variantId), name: line.name, hsn: line.hsn, qty: line.qty, price: line.price, amount: type === "Purchase Invoice" ? purchaseLineAmount(line) : line.amount, mrp: line.mrp, discount: line.discount, tax: line.tax })),
     };
     savingRef.current = true; setSaving(true);
     try {
@@ -203,8 +235,8 @@ export function CreateQuotationScreen({
       notify(error instanceof Error ? error.message : "Voucher save failed");
       return;
     } finally { savingRef.current = false; setSaving(false); }
-    notify(type === "Purchase Invoice" ? `${type} ${fullNumber} saved and stock added` : `${type} ${fullNumber} created successfully`);
-    if (keepNew) {
+    notify(editingRecord ? "Purchase invoice updated; stock and payment reconciled" : type === "Purchase Invoice" ? `${type} ${fullNumber} saved and stock added` : `${type} ${fullNumber} created successfully`);
+    if (keepNew && !editingRecord) {
       draftId.current = crypto.randomUUID();
       setAmountPaid(0); setMarkFullyPaid(false);
       setLines([]);
@@ -245,10 +277,12 @@ export function CreateQuotationScreen({
 
   const matchedParties = useMemo(() => {
     const rows = [...parties, ...createdSuppliers.filter(supplier => !parties.some(party => party.id === supplier.id))];
-    const eligible = type === "Purchase Invoice" ? rows.filter(party => party.type === "Supplier") : rows;
+    // Existing customers may also supply goods; reuse their record instead of creating a duplicate.
+    const eligible = rows;
     if (!partyQuery.trim()) return eligible;
-    const q = partyQuery.toLowerCase();
-    return eligible.filter(p => p.name.toLowerCase().includes(q) || (p.phone && p.phone.includes(q)));
+    const q = partyQuery.trim().toLowerCase();
+    const digits = q.replace(/\D/g, "");
+    return eligible.filter(p => p.name.toLowerCase().includes(q) || (p.phone && (p.phone.includes(q) || (digits.length > 0 && p.phone.replace(/\D/g, "").includes(digits)))));
   }, [parties, partyQuery, createdSuppliers, type]);
 
   return (
@@ -259,7 +293,7 @@ export function CreateQuotationScreen({
           <button type="button" className="icon-button" onClick={onBack} title="Back to list">
             <ArrowLeft size={18} />
           </button>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a", margin: 0 }}>Create {type}</h1>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a", margin: 0 }}>{editingRecord ? "Edit" : "Create"} {type}</h1>
         </div>
 
         <div style={{ display: "flex", gap: 10 }}>
@@ -270,7 +304,7 @@ export function CreateQuotationScreen({
             <Settings size={15} /> Settings
             <span style={{ position: "absolute", top: 4, right: 6, width: 6, height: 6, borderRadius: "50%", background: "#ef4444" }} />
           </button>
-          <button type="button" className="secondary" disabled={saving} onClick={() => handleSaveQuotation(true)}>
+          <button type="button" className="secondary" disabled={saving || Boolean(editingRecord)} onClick={() => handleSaveQuotation(true)}>
             Save & New
           </button>
           <button type="button" className="primary-purple-btn" style={{ background: "#4f46e5", color: "#fff", border: "none", borderRadius: 8, padding: "8px 24px", font: "600 13px Manrope", cursor: "pointer" }} disabled={saving} onClick={() => handleSaveQuotation(false)}>
@@ -340,13 +374,14 @@ export function CreateQuotationScreen({
                   }}
                 >
                   <div style={{ fontSize: 11, color: "#64748b", padding: "4px 8px", borderBottom: "1px solid #f1f5f9", marginBottom: 4, fontWeight: 600 }}>
-                    PostgreSQL DB ({parties.length.toLocaleString()} Customers)
+                    {type === "Purchase Invoice" ? "Select an existing supplier or customer — no duplicate needed" : "Select an existing party"}
                   </div>
                   {matchedParties.map(p => (
                     <div
                       key={p.id}
                       style={{ padding: "8px 10px", borderRadius: 6, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc", fontSize: 12, marginBottom: 4 }}
                       onClick={() => {
+                        if (type === "Purchase Invoice" && p.type === "Customer" && !window.confirm(`Use existing customer ${p.name} (${p.phone || "No phone"}) for this purchase? This reuses the same record without creating a duplicate or changing their customer details.`)) return;
                         setSelectedParty(p);
                         setPartyDropdownOpen(false);
                         setPartyQuery("");
@@ -354,14 +389,14 @@ export function CreateQuotationScreen({
                     >
                       <div>
                         <strong style={{ color: "#0f172a", display: "block" }}>{p.name}</strong>
-                        <span style={{ fontSize: 11, color: "#64748b" }}>{p.phone || "No phone"}</span>
+                        <span style={{ fontSize: 11, color: "#64748b" }}>{p.phone || "No phone"} · {p.type} · ID: {p.id}</span>
                       </div>
                       <span style={{ fontSize: 11, color: "#2563eb", fontWeight: 600 }}>Select ↵</span>
                     </div>
                   ))}
                   {matchedParties.length === 0 && (
                     <div style={{ padding: 12, fontSize: 12, color: "#64748b", textAlign: "center" }}>
-                      No matching customer found in DB.
+                      No matching party found. Search by name or phone, or create a new supplier.
                     </div>
                   )}
                 </div>
@@ -474,7 +509,7 @@ export function CreateQuotationScreen({
                 <td style={{ padding: "10px 12px", textAlign: "right" }}>{type === "Purchase Invoice" ? <NumberInput aria-label={`Purchase price for ${line.name}`} min={0} step="0.01" value={line.price} onValueChange={price => { setLines(rows => rows.map(row => row.id === line.id ? { ...row, price, amount: row.qty * price - row.discount } : row)); }} style={{ width: 90 }} /> : <>₹ {line.price}</>}</td>
                 <td style={{ padding: "10px 12px", textAlign: "right" }}>₹ {line.discount}</td>
                 <td style={{ padding: "10px 12px", textAlign: "right" }}>{line.tax}%</td>
-                <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700 }}>₹ {line.amount.toLocaleString("en-IN")}</td>
+                <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700 }}>₹ {(type === "Purchase Invoice" ? purchaseLineAmount(line) : line.amount).toLocaleString("en-IN")}</td>
                 <td style={{ padding: "10px 12px", textAlign: "center" }}>
                   <button type="button" className="remove" onClick={() => setLines(lines.filter(l => l.id !== line.id))}><X size={14} /></button>
                 </td>
@@ -918,6 +953,7 @@ export function GenericVoucherPage({
   onProductsChanged?: (rows: Product[]) => void;
   onPartyCreated?: (party: Party) => void;
 }) {
+  const [editingRecord, setEditingRecord] = useState<VoucherRecord | undefined>();
   const [creatingFullVoucher, setCreatingFullVoucher] = useState(false);
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherRecord | null>(null);
@@ -927,7 +963,9 @@ export function GenericVoucherPage({
   const branchId = api.currentBranchId();
   useEffect(() => {
     let alive = true;
+    setEditingRecord(undefined);
     setRecords([]);
+    setEditingRecord(undefined);
     setCreatingFullVoucher(false);
     setSelectedVoucher(null);
     api.vouchers(type).then(rows => {
@@ -944,17 +982,18 @@ export function GenericVoucherPage({
 
   const filtered = useMemo(() => {
     return records.filter(r => {
-      if (statusFilter !== "All" && r.status !== statusFilter) return false;
+      const status = type === "Purchase Invoice" ? purchasePaymentStatus(r) : r.status;
+      if (statusFilter !== "All" && status !== statusFilter) return false;
       if (query.trim()) {
         const q = query.toLowerCase();
         if (!`${r.number} ${r.party} ${r.notes}`.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [records, query, statusFilter, dateFilter]);
+  }, [records, query, statusFilter, dateFilter, type]);
 
   const handleSaveNewRecord = async (record: VoucherRecord) => {
-    const saved = await api.saveVoucher(type, record);
+    const saved = editingRecord ? await api.updatePurchaseVoucher(record) : await api.saveVoucher(type, record);
     setRecords(rows => [saved, ...rows.filter(row => row.id !== saved.id)]);
   };
 
@@ -971,7 +1010,7 @@ export function GenericVoucherPage({
       amount: voucher.amount,
       paidAmount: voucher.details?.paidAmount ?? (voucher.status === "Open" ? 0 : voucher.amount),
       paymentMode: voucher.details?.paymentMode || "Cash",
-      status: voucher.status === "Open" ? "Unpaid" : "Paid",
+      status: purchasePaymentStatus(voucher),
       lines: (voucher.items || []).map(item => ({
         itemName: item.name,
         sku: item.hsn || "",
@@ -1017,13 +1056,14 @@ export function GenericVoucherPage({
   if (creatingFullVoucher) {
     return (
       <CreateQuotationScreen
+        editingRecord={editingRecord}
         title={title}
         type={type}
         parties={parties}
         products={products}
         invoices={invoices}
         vouchers={records}
-        onBack={() => setCreatingFullVoucher(false)}
+        onBack={() => { setCreatingFullVoucher(false); setEditingRecord(undefined); }}
         onSave={handleSaveNewRecord}
         onProductsChanged={onProductsChanged}
         onPartyCreated={onPartyCreated}
@@ -1186,7 +1226,7 @@ export function GenericVoucherPage({
               style={{ height: 38, padding: "0 12px", border: "1px solid #cbd5e1", borderRadius: 8, fontSize: 13, background: "#fff", color: "#334155" }}
             >
               <option value="All">All {type === "Delivery Challan" ? "Challans" : type === "Proforma Invoice" ? "Invoices" : "Vouchers"} ▾</option>
-              <option value="Show Open">Show Open {type === "Delivery Challan" ? "Challans" : type === "Proforma Invoice" ? "Invoices" : "Vouchers"} ▾</option>
+              {type === "Purchase Invoice" ? <><option value="Unpaid">Unpaid</option><option value="Partially paid">Partially paid</option><option value="Paid">Paid</option></> : <option value="Open">Show Open</option>}
             </select>
           </div>
 
@@ -1194,7 +1234,7 @@ export function GenericVoucherPage({
             type="button"
             className="primary-purple-btn"
             style={{ background: "#4f46e5", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", font: "600 13px Manrope", cursor: "pointer" }}
-            onClick={() => setCreatingFullVoucher(true)}
+            onClick={() => { setEditingRecord(undefined); setCreatingFullVoucher(true); }}
           >
             {action}
           </button>
@@ -1211,7 +1251,11 @@ export function GenericVoucherPage({
                 <th style={{ padding: "12px 16px", textAlign: "left" }}>Number</th>
                 <th style={{ padding: "12px 16px", textAlign: "left" }}>Party Name</th>
                 <th style={{ padding: "12px 16px", textAlign: "left" }}>Due In</th>
-                <th style={{ padding: "12px 16px", textAlign: "right" }}>Amount</th>
+                <th style={{ padding: "12px 16px", textAlign: "right" }}>{type === "Purchase Invoice" ? "Invoice Total" : "Amount"}</th>
+                {type === "Purchase Invoice" && <>
+                  <th style={{ padding: "12px 16px", textAlign: "right" }}>Paid Amount</th>
+                  <th style={{ padding: "12px 16px", textAlign: "right" }}>Balance Due</th>
+                </>}
                 <th style={{ padding: "12px 16px", textAlign: "center" }}>Status</th>
                 <th style={{ padding: "12px 16px", textAlign: "center" }}>Actions</th>
               </tr>
@@ -1224,19 +1268,24 @@ export function GenericVoucherPage({
                   <td style={{ padding: "14px 16px" }}><strong>{row.party}</strong></td>
                   <td style={{ padding: "14px 16px", color: "#64748b" }}>{row.dueIn || "30 Days"}</td>
                   <td style={{ padding: "14px 16px", textAlign: "right", fontWeight: 700 }}>₹ {row.amount.toLocaleString("en-IN")}</td>
+                  {type === "Purchase Invoice" && <>
+                    <td style={{ padding: "14px 16px", textAlign: "right", whiteSpace: "nowrap" }}>{money(Number(row.details?.paidAmount ?? (row.status === "Paid" ? row.amount : 0)))}</td>
+                    <td style={{ padding: "14px 16px", textAlign: "right", whiteSpace: "nowrap", fontWeight: 700 }}>{money(Math.max(0, row.amount - Number(row.details?.paidAmount ?? (row.status === "Paid" ? row.amount : 0))))}</td>
+                  </>}
                   <td style={{ padding: "14px 16px", textAlign: "center" }}>
-                    <span className={row.status === "Converted" || row.status === "Completed" ? "status-pill-green" : row.status === "Open" ? "status-pill-blue" : "status-pill-red"}>
-                      {row.status}
+                    <span className={type === "Purchase Invoice" ? (purchasePaymentStatus(row) === "Paid" ? "status-pill-green" : purchasePaymentStatus(row) === "Partially paid" ? "status-pill-amber" : "status-pill-red") : row.status === "Converted" || row.status === "Completed" ? "status-pill-green" : row.status === "Open" ? "status-pill-blue" : "status-pill-red"}>
+                      {type === "Purchase Invoice" ? purchasePaymentStatus(row) : row.status}
                     </span>
                   </td>
                   <td style={{ padding: "14px 16px", textAlign: "center" }}>
                     <button type="button" className="secondary compact" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => setSelectedVoucher(row)}>
                       View
                     </button>
+                    {type === "Purchase Invoice" && <button type="button" className="secondary compact" style={{ marginLeft: 6 }} onClick={() => { setEditingRecord(row); setCreatingFullVoucher(true); }}>Edit</button>}
                     <button type="button" className="icon-pencil-btn" style={{ marginLeft: 6, padding: "4px 6px" }} onClick={() => type === "Purchase Invoice" ? setSelectedVoucher(row) : notify(`${type} ${row.number} sent to print`)} title="Print">
                       <Printer size={14} />
                     </button>
-                    <button type="button" className="icon-pencil-btn" style={{ marginLeft: 6, padding: "4px 6px", color: "#dc2626" }} onClick={() => handleDeleteVoucher(row)} title="Delete">
+                    <button type="button" disabled={type === "Purchase Invoice"} className="icon-pencil-btn" style={{ marginLeft: 6, padding: "4px 6px", color: "#dc2626" }} onClick={() => handleDeleteVoucher(row)} title={type === "Purchase Invoice" ? "Saved purchase protected; use Edit" : "Delete"}>
                       <Trash2 size={14} />
                     </button>
                   </td>
@@ -1244,7 +1293,7 @@ export function GenericVoucherPage({
               ))}
               {!filtered.length && (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: "80px 20px" }}>
+                  <td colSpan={type === "Purchase Invoice" ? 9 : 7} style={{ textAlign: "center", padding: "80px 20px" }}>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
                       <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <FileSpreadsheet size={32} color="#94a3b8" />

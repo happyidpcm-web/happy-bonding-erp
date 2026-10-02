@@ -1397,8 +1397,6 @@ function SalesInvoicesListView({
   onCreateNew,
   onSelectInvoice,
   onEditInvoice,
-  onDeleteInvoice,
-  onCancelInvoice,
   onDuplicateInvoice,
   onShowEditHistory,
   onIssueCreditNote,
@@ -1410,8 +1408,6 @@ function SalesInvoicesListView({
   onCreateNew: () => void;
   onSelectInvoice: (inv: Invoice) => void;
   onEditInvoice: (inv: Invoice) => void;
-  onDeleteInvoice: (inv: Invoice) => void;
-  onCancelInvoice: (inv: Invoice) => void;
   onDuplicateInvoice: (inv: Invoice) => void;
   onShowEditHistory?: (inv: Invoice) => void;
   onIssueCreditNote?: (inv: Invoice) => void;
@@ -1425,6 +1421,25 @@ function SalesInvoicesListView({
   const [reportsDropdownOpen, setReportsDropdownOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
   const [openMenuId, setOpenMenuId] = useState<string | number | null>(null);
+  const openActionsMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (openMenuId === null) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !openActionsMenuRef.current?.contains(event.target)) {
+        setOpenMenuId(null);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpenMenuId(null);
+    };
+    document.addEventListener("pointerdown", closeOutside, true);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside, true);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [openMenuId]);
 
   // 14 Date Options matching reports
   const dateOptions = REPORT_DATE_OPTIONS;
@@ -1730,7 +1745,9 @@ function SalesInvoicesListView({
                 <th>Invoice Number</th>
                 <th>Party Name</th>
                 <th>Due In</th>
-                <th className="right">Amount ⇅</th>
+                <th className="right">Invoice Total ⇅</th>
+                <th className="right">Received</th>
+                <th className="right">Balance Due</th>
                 <th>Status</th>
                 <th style={{ width: 44, textAlign: "center" }}></th>
               </tr>
@@ -1760,16 +1777,23 @@ function SalesInvoicesListView({
                   <td className="right">
                     <strong>₹ {inv.amount.toLocaleString("en-IN")}</strong>
                   </td>
+                  <td className="right">
+                    {money(inv.paidAmount ?? (inv.status === "Paid" ? inv.amount : 0))}
+                  </td>
+                  <td className="right">
+                    {inv.status === "Cancelled" ? "—" : money(Math.max(0, inv.amount - (inv.paidAmount ?? (inv.status === "Paid" ? inv.amount : 0))))}
+                  </td>
                   <td>
-                    <span className={inv.status === "Paid" ? "status-pill-green" : inv.status === "Cancelled" ? "status-pill-gray" : "status-pill-red"}>
+                    <span className={inv.status === "Paid" ? "status-pill-green" : inv.status === "Partially paid" ? "status-pill-amber" : inv.status === "Cancelled" ? "status-pill-gray" : "status-pill-red"}>
                       {inv.status}
                     </span>
                   </td>
                   <td style={{ textAlign: "center" }} onClick={e => e.stopPropagation()}>
-                    <div className="sales-actions-menu-wrap">
+                    <div className="sales-actions-menu-wrap" ref={openMenuId === inv.id ? openActionsMenuRef : null}>
                       <button
                         type="button"
                         className="sales-dots-menu-btn"
+                        aria-expanded={openMenuId === inv.id}
                         onClick={e => {
                           e.stopPropagation();
                           setOpenMenuId(openMenuId === inv.id ? null : inv.id);
@@ -1874,28 +1898,9 @@ function SalesInvoicesListView({
                             <MessageCircle size={14} /> Share WhatsApp
                           </button>
 
-                          {inv.status !== "Cancelled" && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setOpenMenuId(null);
-                                onCancelInvoice(inv);
-                              }}
-                            >
-                              <XCircle size={14} /> Cancel Invoice
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOpenMenuId(null);
-                              onDeleteInvoice(inv);
-                            }}
-                            style={{ color: "#dc2626" }}
-                          >
-                            <Trash2 size={14} /> Delete Invoice
-                          </button>
+                          <p style={{ maxWidth: 240, padding: "8px 12px", margin: 0, fontSize: 12, color: "#64748b" }}>
+                            Saved invoice protected: delete and cancel are disabled. Use Edit for corrections.
+                          </p>
                         </div>
                       )}
                     </div>
@@ -1904,7 +1909,7 @@ function SalesInvoicesListView({
               ))}
               {!filtered.length && (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={10}>
                     <EmptyState
                       icon={ReceiptIndianRupee}
                       title="No sales invoices found"
@@ -2331,7 +2336,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
     return () => { alive = false; };
   }, [creating, rows.length, invoiceDate, editingInvoice]);
   
-  const addLine=(product:Product, taxRate?:number)=>{setLines(current=>{const found=current.find(x=>x.product.id===product.id);return found?current.map(x=>x.product.id===product.id?{...x,qty:x.qty+1}:x):[...current,{product,qty:1,discount:0,taxRate:taxRate??product.taxRate??0}]});setItemSearch("");};
+  const addLine=(product:Product, taxRate?:number)=>{setLines(current=>{const found=current.find(x=>x.product.id===product.id);return found?current.map(x=>x.product.id===product.id?{...x,qty:x.qty+1}:x):[...current,{product,qty:1,discount:0,taxRate:taxRate??0}]});setItemSearch("");};
   const addBatchLines=(items: Array<{ product: Product; qty: number; taxRate: number }>) => {
     setLines(current => {
       let next = [...current];
@@ -2389,28 +2394,6 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
       setRows(next); setProducts(await api.products()); setParties(await api.parties()); setEditingInvoice(null); resetInvoiceForm(); setCreating(keepOpen && !editingInvoice); notify(editingInvoice?`Sales invoice ${editingInvoice.number} updated`:keepOpen?"Sales invoice saved. Ready for next invoice.":"Sales invoice saved");
     }catch(error){notify(error instanceof Error?error.message:"Invoice save failed");}finally{setSaving(false);}
   };
-  const deleteInvoice = async (inv: Invoice) => {
-    if (!window.confirm(`Delete sales invoice ${inv.number}? Stock will be added back.`)) return;
-    try {
-      const next = await api.deleteSale(inv.id);
-      setRows(next.length ? next : rows.filter(row => row.id !== inv.id));
-      setProducts(await api.products());
-      notify(`Sales invoice ${inv.number} deleted`);
-    } catch (error) {
-      notify(error instanceof Error ? error.message : "Sales invoice delete failed");
-    }
-  };
-  const cancelInvoice = async (inv: Invoice) => {
-    if (!window.confirm(`Cancel sales invoice ${inv.number}? Stock will be added back and invoice will stay in records as Cancelled.`)) return;
-    try {
-      const next = await api.cancelSale(inv.id);
-      setRows(next.length ? next : rows.map(row => row.id === inv.id ? { ...row, status: "Cancelled" as const } : row));
-      notify(`Sales invoice ${inv.number} cancelled`);
-    } catch (error) {
-      notify(error instanceof Error ? error.message : "Sales invoice cancel failed");
-    }
-  };
-
   const showEditHistory = async (inv: Invoice) => {
     setHistoryInvoice(inv);
     try {
@@ -2482,8 +2465,6 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
         onCreateNew={()=>setCreating(true)}
         onSelectInvoice={onSelectInvoice}
         onEditInvoice={editInvoice}
-        onDeleteInvoice={deleteInvoice}
-        onCancelInvoice={cancelInvoice}
         onDuplicateInvoice={duplicateInvoice}
         onShowEditHistory={showEditHistory}
         onIssueCreditNote={(inv) => {
@@ -3501,6 +3482,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
       {/* Add Items to Bill Modal */}
       {showAddItemsModal && (
         <AddItemModal
+          defaultTaxRate={0}
           products={products}
           onProductsChanged={setProducts}
           currentLines={lines.map(l => ({
@@ -3524,7 +3506,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
                   product: { ...prod, mrp: ul.mrp, sellingPrice: ul.price },
                   qty: ul.qty,
                   discount: ul.discount || 0,
-                  taxRate: ul.tax ?? prod.taxRate ?? 0
+                  taxRate: ul.tax ?? 0
                 });
               }
             });
@@ -3583,6 +3565,7 @@ export function Modal({title,onClose,children,wide=false}:{title:string;onClose:
 
 
 interface AddItemModalProps {
+  defaultTaxRate?: number;
   products: Product[];
   priceMode?: "sales" | "purchase";
   onProductsChanged?: (rows: Product[]) => void;
@@ -3592,7 +3575,7 @@ interface AddItemModalProps {
   notify: (msg: string) => void;
 }
 
-export function AddItemModal({ products: initialProducts, priceMode = "sales", onProductsChanged, currentLines, onClose, onApplyItems, notify }: AddItemModalProps) {
+export function AddItemModal({ products: initialProducts, priceMode = "sales", defaultTaxRate, onProductsChanged, currentLines, onClose, onApplyItems, notify }: AddItemModalProps) {
   const itemPrice = (product: Product) => priceMode === "purchase" ? product.purchasePrice : product.sellingPrice;
   const [products, setProducts] = useState(initialProducts);
   const [creatingItem, setCreatingItem] = useState(false);
@@ -3690,7 +3673,7 @@ export function AddItemModal({ products: initialProducts, priceMode = "sales", o
           qty,
           price,
           discount: current?.discount ?? 0,
-          tax: current?.tax ?? prod.taxRate ?? 5,
+          tax: current?.tax ?? defaultTaxRate ?? prod.taxRate ?? 0,
           amount: Math.max(0, price * qty - (current?.discount ?? 0)),
         });
       }

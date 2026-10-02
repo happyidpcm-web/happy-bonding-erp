@@ -5,6 +5,26 @@ import { db } from './db.js';
 import { requireBranch, requirePermission } from './auth.js';
 
 export const voucherRouter = Router();
+
+// Purchase date wins; creation time breaks ties. Editing an old bill cannot
+// replace the cost from a newer purchase. Only update this branch's variants.
+async function syncLatestPurchasePrices(tx: Prisma.TransactionClient, organizationId: string, branchId: string, variantIds: string[]) {
+  const pending = new Set(variantIds);
+  const purchases = await tx.voucher.findMany({
+    where: { organizationId, branchId, type: 'Purchase Invoice' },
+    orderBy: [{ date: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+    select: { items: true },
+  });
+  for (const purchase of purchases) {
+    const items = purchase.items as Array<{variantId?: string; price: number}>;
+    for (const item of items) {
+      if (!item.variantId || !pending.has(item.variantId)) continue;
+      await tx.productVariant.updateMany({ where: { id: item.variantId, product: { organizationId, branchId } }, data: { purchasePrice: item.price } });
+      pending.delete(item.variantId);
+    }
+    if (!pending.size) break;
+  }
+}
 const types = z.enum(['Quotation', 'Sales Return', 'Credit Note', 'Delivery Challan', 'Proforma Invoice', 'Purchase Invoice', 'Payment Out', 'Purchase Return', 'Debit Note', 'Purchase Order']);
 const inputSchema = z.object({
   id: z.string().min(1).max(100), type: types,
@@ -69,9 +89,57 @@ voucherRouter.post('/', async (req, res, next) => {
       if (input.details.paidAmount > 0) await tx.payment.create({ data: { organizationId, branchId, direction: 'OUT', mode: input.details.paymentMode, amount: input.details.paidAmount, reference: `Voucher:${row.id}`, paidAt: input.date } });
     }
     await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: 'voucher.created', entityType: 'Voucher', entityId: row.id, metadata: { type: input.type, number: input.number } } });
+    if (input.type === 'Purchase Invoice') await syncLatestPurchasePrices(tx, organizationId, branchId, input.items.map(i => i.variantId!));
     return row;
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   res.status(201).json({ ...result, amount: Number(result.amount) });
+});
+
+voucherRouter.put('/:id', requirePermission('products.write'), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  const organizationId = req.session!.organizationId;
+  const parsed = inputSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Invalid purchase details' });
+  const input = parsed.data;
+  if (input.type !== 'Purchase Invoice' || input.id !== req.params.id || !input.items.length || input.items.some(i => !i.variantId)) return res.status(400).json({ error: 'Valid purchase items are required' });
+  const round = (n: number) => Math.round(n * 100) / 100;
+  const items = input.items.map(i => { const base = Math.max(0, i.qty * i.price - (i.discount || 0)); return { ...i, amount: round(base + base * (i.tax || 0) / 100) }; });
+  const net = Math.max(0, items.reduce((s, i) => s + i.amount, 0) + input.details.additionalCharges - input.details.discount);
+  const amount = input.details.roundOff ? Math.round(net) : round(net);
+  if (Math.abs(amount - input.amount) > 0.01 || input.details.paidAmount > amount) return res.status(400).json({ error: 'Check invoice total and paid amount' });
+  try {
+    const result = await db.$transaction(async tx => {
+      const old = await tx.voucher.findFirst({ where: { id: input.id, organizationId, branchId, type: 'Purchase Invoice' } });
+      if (!old) throw new Error('Purchase invoice not found');
+      if (old.number !== input.number) throw new Error('Invoice number cannot be changed');
+      const movements = await tx.stockMovement.findMany({ where: { branchId, referenceType: { in: ['PurchaseInvoice', 'PurchaseInvoiceEdit'] }, referenceId: old.number } });
+      if (!movements.length) throw new Error('Original stock receipt is missing; review this invoice before editing');
+      const oldQty = new Map<string, number>();
+      const newQty = new Map<string, number>();
+      for (const m of movements) oldQty.set(m.variantId, (oldQty.get(m.variantId) || 0) + Number(m.quantity));
+      for (const i of items) newQty.set(i.variantId!, (newQty.get(i.variantId!) || 0) + i.qty);
+      for (const id of new Set([...oldQty.keys(), ...newQty.keys()])) {
+        const variant = await tx.productVariant.findFirst({ where: { id, product: { organizationId, branchId } } });
+        if (!variant) throw new Error('Item does not belong to this branch');
+        const delta = (newQty.get(id) || 0) - (oldQty.get(id) || 0);
+        if (!delta) continue;
+        if (delta < 0) {
+          const changed = await tx.stockBalance.updateMany({ where: { branchId, variantId: id, quantity: { gte: -delta } }, data: { quantity: { increment: delta } } });
+          if (changed.count !== 1) throw new Error('Not enough stock to reduce this purchase quantity');
+        } else await tx.stockBalance.upsert({ where: { branchId_variantId: { branchId, variantId: id } }, create: { branchId, variantId: id, quantity: delta }, update: { quantity: { increment: delta } } });
+        await tx.stockMovement.create({ data: { branchId, variantId: id, type: delta > 0 ? 'ADJUSTMENT_IN' : 'ADJUSTMENT_OUT', quantity: delta, referenceType: 'PurchaseInvoiceEdit', referenceId: old.number } });
+      }
+      const payments = await tx.payment.findMany({ where: { organizationId, branchId, reference: `Voucher:${old.id}` }, include: { allocations: true } });
+      if (payments.length > 1 || payments.some(p => p.allocations.length)) throw new Error('Linked payments require review before editing');
+      if (payments[0]) await tx.payment.update({ where: { id: payments[0].id }, data: { amount: input.details.paidAmount, mode: input.details.paymentMode, paidAt: input.date } });
+      else if (input.details.paidAmount > 0) await tx.payment.create({ data: { organizationId, branchId, direction: 'OUT', mode: input.details.paymentMode, amount: input.details.paidAmount, reference: `Voucher:${old.id}`, paidAt: input.date } });
+      const updated = await tx.voucher.update({ where: { id: old.id }, data: { date: input.date, party: input.party, amount, status: input.details.paidAmount >= amount ? 'Paid' : 'Open', dueIn: input.dueIn, notes: input.notes, items: items as Prisma.InputJsonValue, details: input.details } });
+      await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: 'purchase.edited', entityType: 'Voucher', entityId: old.id, metadata: { before: JSON.parse(JSON.stringify(old)), after: JSON.parse(JSON.stringify(updated)) } } });
+      await syncLatestPurchasePrices(tx, organizationId, branchId, [...new Set([...oldQty.keys(), ...newQty.keys()])]);
+      return updated;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    res.json({ ...result, amount: Number(result.amount) });
+  } catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : 'Purchase edit failed; reload and try again' }); }
 });
 
 voucherRouter.delete('/:id', async (req, res) => {
@@ -79,6 +147,7 @@ voucherRouter.delete('/:id', async (req, res) => {
   const organizationId = req.session!.organizationId;
   const row = await db.voucher.findFirst({ where: { id: String(req.params.id), organizationId, branchId } });
   if (!row) return res.status(404).json({ error: 'Voucher not found' });
+  if (row.type === 'Purchase Invoice') return res.status(409).json({ error: 'Saved purchases cannot be deleted. Use Edit for corrections.' });
   if (!req.session!.permissions.some(p => p === '*' || p === permission(row.type))) return res.status(403).json({ error: 'Permission denied' });
   await db.$transaction(async tx => {
     if (row.type === 'Purchase Invoice') {

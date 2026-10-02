@@ -1614,10 +1614,11 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
       <div className="items-metrics-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
         <article className="party-metric-box">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>Stock Value ⓘ</span>
+            <span>Stock Selling Value</span>
             <ExternalLink size={14} color="#94a3b8" />
           </div>
           <strong>₹ {totalStockValue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong>
+          <small className="inventory-metric-note">Available quantity × selling price</small>
         </article>
 
         <article className="party-metric-box">
@@ -1626,6 +1627,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
             <ExternalLink size={14} color="#94a3b8" />
           </div>
           <strong style={{ color: lowStockCount > 0 ? "#dc2626" : "#0f172a" }}>{lowStockCount}</strong>
+          <small className="inventory-metric-note">Item variants with fewer than 10 pieces</small>
         </article>
       </div>
 
@@ -1832,7 +1834,8 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
                 </th>
                 <th>Item Name ⇅</th>
                 <th>Item Code</th>
-                <th>Stock QTY ⇅</th>
+                <th>Size</th>
+                <th className="right">Stock Qty</th>
                 <th className="right">Selling Price</th>
                 <th className="right">Purchase Price</th>
                 <th className="right">MRP</th>
@@ -1857,7 +1860,8 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
                   </td>
                   <td><strong>{p.name}</strong></td>
                   <td className="mono">{p.sku}</td>
-                  <td>{p.stock} {p.size || "PCS"}</td>
+                  <td><span className="inventory-size-badge">{!p.size || /^(pieces\s*(\(pcs\))?|pcs|-)$/i.test(p.size.trim()) ? "—" : p.size}</span></td>
+                  <td className="right"><span className="inventory-stock-quantity"><strong>{p.stock.toLocaleString("en-IN")}</strong><span>PCS</span></span></td>
                   <td className="right">₹ {p.sellingPrice}</td>
                   <td className="right">₹ {p.purchasePrice}</td>
                   <td className="right">₹ {p.mrp || p.sellingPrice}</td>

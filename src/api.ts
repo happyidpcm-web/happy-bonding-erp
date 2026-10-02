@@ -114,6 +114,10 @@ export const api = {
     const saved = await request<VoucherRecord>("/vouchers", { method: "POST", body: JSON.stringify({ ...record, type, date: new Date(record.date).toISOString() }) });
     return { ...saved, date: new Date(saved.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) };
   },
+  async updatePurchaseVoucher(record: VoucherRecord): Promise<VoucherRecord> {
+    const saved = await request<VoucherRecord>(`/vouchers/${encodeURIComponent(record.id)}`, { method: "PUT", body: JSON.stringify({ ...record, type: "Purchase Invoice", date: new Date(record.date).toISOString() }) });
+    return { ...saved, date: new Date(saved.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) };
+  },
   async deleteVoucher(id: string): Promise<void> {
     await request(`/vouchers/${encodeURIComponent(id)}`, { method: "DELETE" });
   },
@@ -228,6 +232,12 @@ export const api = {
       const res = await request<InvoiceSetting>("/settings/invoice");
       return res;
 
+  },
+  async businessSettings(): Promise<{name:string;phone:string;gstin:string;pan:string;stateCode:string;branchAddress:string;branchPhone:string}> {
+    return request("/settings/business");
+  },
+  async saveBusinessSettings(input: {name:string;phone:string;gstin:string;pan:string;stateCode:string;branchAddress:string;branchPhone:string}) {
+    return request<typeof input>("/settings/business", {method:"PUT", body:JSON.stringify(input)});
   },
   async saveInvoiceSetting(input: InvoiceSetting): Promise<InvoiceSetting> {
       return await request<InvoiceSetting>("/settings/invoice", { method: "PUT", body: JSON.stringify(input) });

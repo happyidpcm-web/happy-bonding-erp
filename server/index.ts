@@ -984,62 +984,34 @@ app.put("/api/sales/:id", requirePermission("sales.write"), async (req, res) => 
 });
 
 app.delete("/api/sales/:id", requirePermission("sales.write"), async (req, res) => {
-  const branchId = requireBranch(req, res); if (!branchId) return;
-  const organizationId = req.session!.organizationId;
-  const id = String(req.params.id || "");
-  const invoice = await db.salesInvoice.findFirst({
-    where: { id, organizationId, branchId },
-    include: { lines: true, payments: true },
-  });
-  if (!invoice) return res.status(404).json({ error: "Sales invoice not found" });
-  await db.$transaction(async tx => {
-    for (const line of invoice.lines) {
-      const qty = Number(line.quantity);
-      await tx.stockBalance.upsert({
-        where: { branchId_variantId: { branchId, variantId: line.variantId } },
-        update: { quantity: { increment: qty } },
-        create: { branchId, variantId: line.variantId, quantity: qty },
-      });
-      await tx.stockMovement.create({ data: { branchId, variantId: line.variantId, type: "ADJUSTMENT_IN", quantity: qty, referenceType: "SalesInvoiceDelete", referenceId: invoice.id } });
-    }
-    const paymentIds = invoice.payments.map(x => x.paymentId);
-    await tx.paymentAllocation.deleteMany({ where: { salesInvoiceId: invoice.id } });
-    for (const paymentId of paymentIds) {
-      const remaining = await tx.paymentAllocation.count({ where: { paymentId } });
-      if (remaining === 0) await tx.payment.delete({ where: { id: paymentId } });
-    }
-    await tx.stockMovement.deleteMany({ where: { branchId, referenceType: "SalesInvoice", referenceId: invoice.id, type: "SALE" } });
-    await tx.salesInvoice.delete({ where: { id: invoice.id } });
-    await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: "sales.deleted", entityType: "SalesInvoice", entityId: invoice.id, metadata: { invoiceNumber: invoice.invoiceNumber } } });
-  });
-  res.json({ ok: true, id });
+  return res.status(409).json({ error: "Saved sales invoices cannot be deleted. Use Edit for corrections. Record goods actually returned through a verified sales return process." });
 });
 
-app.post("/api/sales/:id/cancel", requirePermission("sales.write"), async (req, res) => {
+app.get("/api/settings/business", async (req, res) => {
   const branchId = requireBranch(req, res); if (!branchId) return;
+  const organization = await db.organization.findUniqueOrThrow({ where: { id: req.session!.organizationId } });
+  const branch = await db.branch.findFirstOrThrow({ where: { id: branchId, organizationId: organization.id } });
+  res.json({ name: organization.name, phone: organization.phone || "", gstin: organization.gstin || "", pan: organization.pan || "", stateCode: organization.stateCode, branchAddress: branch.address || "", branchPhone: branch.phone || "" });
+});
+
+app.put("/api/settings/business", requirePermission("*"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  const schema = z.object({ name: z.string().trim().min(2).max(160), phone: z.string().trim().max(20), gstin: z.string().trim().toUpperCase().refine(v => !v || /^[0-9]{2}[A-Z0-9]{13}$/.test(v), "GSTIN must contain 15 characters"), pan: z.string().trim().toUpperCase().refine(v => !v || /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(v), "Invalid PAN format"), stateCode: z.string().regex(/^\d{2}$/), branchAddress: z.string().trim().max(500), branchPhone: z.string().trim().max(20) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
+  const {branchAddress, branchPhone, ...profile} = parsed.data;
   const organizationId = req.session!.organizationId;
-  const id = String(req.params.id || "");
-  const invoice = await db.salesInvoice.findFirst({
-    where: { id, organizationId, branchId },
-    include: { lines: true, payments: true },
-  });
-  if (!invoice) return res.status(404).json({ error: "Sales invoice not found" });
-  if (invoice.status === "CANCELLED") return res.json(invoice);
   await db.$transaction(async tx => {
-    for (const line of invoice.lines) {
-      const qty = Number(line.quantity);
-      await tx.stockBalance.upsert({
-        where: { branchId_variantId: { branchId, variantId: line.variantId } },
-        update: { quantity: { increment: qty } },
-        create: { branchId, variantId: line.variantId, quantity: qty },
-      });
-      await tx.stockMovement.create({ data: { branchId, variantId: line.variantId, type: "ADJUSTMENT_IN", quantity: qty, referenceType: "SalesInvoiceCancel", referenceId: invoice.id } });
-    }
-    await tx.salesInvoice.update({ where: { id: invoice.id }, data: { status: "CANCELLED" } });
-    await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: "sales.cancelled", entityType: "SalesInvoice", entityId: invoice.id, metadata: { invoiceNumber: invoice.invoiceNumber } } });
+    await tx.organization.update({ where: { id: organizationId }, data: profile });
+    await tx.branch.update({ where: { id: branchId, organizationId }, data: { address: branchAddress, phone: branchPhone } });
+    await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: "business.settings_updated", entityType: "Organization", entityId: organizationId, metadata: { branchId } } });
   });
-  const rows = await db.salesInvoice.findMany({ where: { organizationId, branchId }, include: { party: true, lines: { include: { variant: true } } }, orderBy: { invoiceDate: "desc" }, take: 50000 });
-  res.json(rows);
+  res.json(parsed.data);
+});
+
+
+app.post("/api/sales/:id/cancel", requirePermission("sales.write"), async (req, res) => {
+  return res.status(409).json({ error: "Direct cancellation is disabled for saved sales invoices to prevent incorrect stock restoration. Use Edit for corrections." });
 });
 
 app.get("/api/payments/in", async (req, res) => {
