@@ -21,20 +21,12 @@ export function EmailExcelReportModal({
 }) {
   const [userEmail, setUserEmail] = useState("");
   const [caEmail, setCaEmail] = useState("");
-  const [brevoKey, setBrevoKey] = useState(() => localStorage.getItem("hb_brevo_api_key") || "");
-  const [showBrevoConfig, setShowBrevoConfig] = useState(false);
   const [sending, setSending] = useState(false);
 
   const handleSend = async () => {
     if (!userEmail.trim()) return notify("Please enter your email ID");
     setSending(true);
     try {
-      if (brevoKey.trim()) {
-        localStorage.setItem("hb_brevo_api_key", brevoKey.trim());
-      }
-
-      const activeKey = brevoKey.trim() || localStorage.getItem("hb_brevo_api_key") || (import.meta.env.VITE_BREVO_API_KEY as string) || "";
-
       // Generate real base64 Excel data
       let base64Excel: string | undefined = undefined;
       try {
@@ -62,7 +54,6 @@ export function EmailExcelReportModal({
         reportName,
         userEmail: userEmail.trim(),
         caEmail: caEmail.trim() || undefined,
-        apiKey: activeKey,
         base64Excel,
       });
 
@@ -105,43 +96,7 @@ export function EmailExcelReportModal({
             />
           </label>
 
-          <div style={{ background: brevoKey ? "#f0fdf4" : "#f8fafc", padding: 12, borderRadius: 8, border: brevoKey ? "1px solid #bbf7d0" : "1px solid #e2e8f0" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: brevoKey ? "#15803d" : "#4f46e5", display: "flex", alignItems: "center", gap: 6 }}>
-                {brevoKey ? "✅ Brevo Direct Email Connected (Saved)" : "⚡ Brevo Direct Email Integration"}
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowBrevoConfig(!showBrevoConfig)}
-                style={{ border: "none", background: "transparent", color: "#2563eb", fontSize: 12, cursor: "pointer", fontWeight: 600 }}
-              >
-                {showBrevoConfig ? "Hide Config ▴" : brevoKey ? "Edit Key ▾" : "+ Add Brevo Key"}
-              </button>
-            </div>
-
-            {showBrevoConfig && (
-              <div style={{ marginTop: 10 }}>
-                <label style={{ font: "500 11px Manrope", color: "#64748b", display: "block", marginBottom: 4 }}>
-                  Brevo API Key (xkeysib-...)
-                </label>
-                <input
-                  type="password"
-                  value={brevoKey}
-                  onChange={e => {
-                    setBrevoKey(e.target.value);
-                    if (e.target.value.trim()) {
-                      localStorage.setItem("hb_brevo_api_key", e.target.value.trim());
-                    }
-                  }}
-                  placeholder="Paste your Brevo xkeysib- API key here"
-                  style={{ width: "100%", padding: "6px 10px", borderRadius: 6, border: "1px solid #cbd5e1", fontSize: 12 }}
-                />
-                <small style={{ fontSize: 10, color: "#15803d", display: "block", marginTop: 4 }}>
-                  ✓ Key saved permanently. All future emails will automatically send via Brevo in 1 click!
-                </small>
-              </div>
-            )}
-          </div>
+          <p>Email is sent securely through the server to the addresses entered above.</p>
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 24 }}>

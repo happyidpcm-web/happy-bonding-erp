@@ -11,6 +11,7 @@ import { db } from "./db.js";
 import { createToken, requireAuth, requireBranch, requirePermission } from "./auth.js";
 import fs from "fs";
 import { voucherRouter } from "./vouchers.js";
+import { emailRouter } from "./email.js";
 import { transactionsRouter } from "./transactions.js";
 import { expenseInput, invoiceInput, invoiceSettingInput, loginInput, parseInput, partyInput, productInput, purchaseStockInput } from "./validation.js";
 
@@ -72,6 +73,7 @@ app.get("/api/auth/me", async (req, res) => {
   res.json({ ...user, isAdmin: req.session!.permissions.includes("*"), branchIds: req.session!.branchIds });
 });
 app.use("/api/vouchers", voucherRouter);
+app.use("/api/email", emailRouter);
 app.use("/api/transactions", transactionsRouter);
 
 app.get("/api/branches", async (req, res) => {
@@ -394,7 +396,9 @@ app.post("/api/sync/push", async (req, res) => {
 app.get("/api/settings/invoice", async (req, res) => {
   const branchId = requireBranch(req, res); if (!branchId) return;
   const setting = await getInvoiceSetting(req.session!.organizationId, requireBranch(req, res)!);
-  res.json(setting);
+  const organization = await db.organization.findUniqueOrThrow({ where: { id: req.session!.organizationId } });
+  const branch = await db.branch.findUniqueOrThrow({ where: { id: branchId } });
+  res.json({ ...setting, business: { name: organization.name, phone: branch.phone || organization.phone || "", address: branch.address || "", gstin: organization.gstin || "", pan: organization.pan || "" } });
 });
 
 app.put("/api/settings/invoice", requirePermission("*"), async (req, res) => {

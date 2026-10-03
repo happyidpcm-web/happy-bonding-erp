@@ -29,16 +29,16 @@ export function ThermalReceiptTemplate({
       {/* Store Header */}
       <div style={{ textAlign: "center", marginBottom: 8 }}>
         <strong style={{ fontSize: is58 ? "14px" : "16px", display: "block" }}>
-          HAPPY BONDING
+          {setting?.business?.name || "Business details unavailable"}
         </strong>
         <span style={{ fontSize: "11px", display: "block" }}>Men's Wear</span>
         <span style={{ fontSize: "10px", display: "block" }}>
-          West Bus Stand, Pavoorchatram
+          {setting?.business?.address}
         </span>
-        <span style={{ fontSize: "10px", display: "block" }}>Ph: 7708030903</span>
-        {setting?.bankName && (
+        <span style={{ fontSize: "10px", display: "block" }}>Ph: {setting?.business?.phone}</span>
+        {setting?.business?.gstin && (
           <span style={{ fontSize: "9px", display: "block" }}>
-            GSTIN: 33CWZPS9715D1ZU
+            GSTIN: {setting?.business?.gstin}
           </span>
         )}
       </div>

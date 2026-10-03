@@ -89,6 +89,7 @@ export interface Invoice {
 }
 
 export interface InvoiceSetting {
+  business?: { name: string; phone: string; address: string; gstin: string; pan: string };
   invoicePrefix: string; paymentTermsDays: number; terms: string;
   bankName?: string; accountName?: string; accountNumber?: string; ifsc?: string;
   upiId?: string; qrText?: string; signatureText?: string; signatureUrl?: string;

@@ -62,14 +62,14 @@ export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: 
           <div className="header-left">
             <img src={happyBondingLogo} alt="Happy Bonding" className="doc-logo" />
             <div className="shop-info font-purple">
-              <h1>Happy Bonding Men's Wear</h1>
-              <p className="subtitle">Thanks For Choosing Happy Bonding Men's Wear</p>
+              <h1>{setting.business?.name || "Business details unavailable"}</h1>
+              <p className="subtitle">Thank you for choosing {setting.business?.name || "our store"}</p>
               <p className="meta-line">
-                <span><strong>Pan No</strong> CWZPS9715D</span>
-                <span><strong>GSTIN</strong> 33CWZPS9715D1ZU</span>
+                <span><strong>Pan No</strong> {setting.business?.pan || "?"}</span>
+                <span><strong>GSTIN</strong> {setting.business?.gstin || "?"}</span>
               </p>
-              <p className="phone-line">📞 7708030903</p>
-              <p className="addr-line">📍 No. 10/901,West Bus Stand, Near Railway Gate, Pavoorchatram - 627808 , Tirunelveli, Tamil Nadu, 627808</p>
+              <p className="phone-line">{setting.business?.phone}</p>
+              <p className="addr-line">{setting.business?.address}</p>
               <p className="web-line">happy bonding: <strong>www.happybonding.in</strong></p>
             </div>
           </div>

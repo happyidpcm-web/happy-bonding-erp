@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 
-const neonUrl = "postgresql://neondb_owner:npg_T3FWLuz0kepy@ep-still-morning-b3zsbjwt-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&connect_timeout=30";
+const neonUrl = process.env.CLOUD_DATABASE_URL;
+if (!neonUrl) throw new Error("Set CLOUD_DATABASE_URL explicitly");
 
 const prisma = new PrismaClient({
   datasources: { db: { url: neonUrl } }

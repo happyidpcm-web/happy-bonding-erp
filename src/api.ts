@@ -240,7 +240,8 @@ export const api = {
     return request<typeof input>("/settings/business", {method:"PUT", body:JSON.stringify(input)});
   },
   async saveInvoiceSetting(input: InvoiceSetting): Promise<InvoiceSetting> {
-      return await request<InvoiceSetting>("/settings/invoice", { method: "PUT", body: JSON.stringify(input) });
+      await request<InvoiceSetting>("/settings/invoice", { method: "PUT", body: JSON.stringify(input) });
+      return api.invoiceSetting();
 
   },
   async nextSaleNumber(invoiceDate = new Date()): Promise<{prefix:string;number:number;invoiceNumber:string;financialYear:string}> {
@@ -298,71 +299,8 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
-  async sendBrevoEmail(payload: { reportName: string; userEmail: string; caEmail?: string; apiKey?: string; base64Excel?: string }): Promise<{ ok: boolean; message: string }> {
-    const brevoApiKey = payload.apiKey || (import.meta.env.VITE_BREVO_API_KEY as string) || localStorage.getItem("hb_brevo_api_key") || "";
-    
-    if (!brevoApiKey) {
-      throw new Error("Brevo API Key is missing. Please paste your Brevo API key (xkeysib-...).");
-    }
-
-    const primaryEmail = payload.userEmail.trim() || "sarvan.auto@gmail.com";
-    const secondaryEmail = payload.caEmail?.trim() || "happybondingskm@gmail.com";
-
-    const recipients = [{ email: primaryEmail }];
-    if (secondaryEmail && secondaryEmail !== primaryEmail) {
-      recipients.push({ email: secondaryEmail });
-    }
-
-    const fileName = `${payload.reportName.replace(/\s+/g, "_")}_Report.xlsx`;
-    const senderEmail = "orders@happybonding.co.in"; // Verified domain with DKIM & DMARC
-
-    const bodyData: any = {
-      sender: { name: "Happy Bonding ERP", email: senderEmail },
-      to: recipients,
-      replyTo: { email: "happybondingskm@gmail.com", name: "Happy Bonding ERP" },
-      subject: `Happy Bonding ERP - ${payload.reportName} Excel Report`,
-      htmlContent: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; color: #1e293b; max-width: 600px; border: 1px solid #e2e8f0; border-radius: 8px;">
-          <h2 style="color: #4f46e5; margin: 0 0 12px;">Happy Bonding ERP</h2>
-          <p style="font-size: 14px; color: #475569; margin: 0 0 12px;">Hello,</p>
-          <p style="font-size: 14px; color: #475569; margin: 0 0 16px;">Please find attached your requested <strong>${payload.reportName}</strong> report export in Excel (.xlsx) format.</p>
-          <table style="border-collapse: collapse; width: 100%; max-width: 500px; margin: 16px 0; font-size: 13px;">
-            <tr style="background: #f8fafc;"><td style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold;">Report Name:</td><td style="padding: 10px; border: 1px solid #cbd5e1;">${payload.reportName}</td></tr>
-            <tr><td style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold;">Export Date:</td><td style="padding: 10px; border: 1px solid #cbd5e1;">${new Date().toLocaleDateString("en-IN")}</td></tr>
-            <tr style="background: #f8fafc;"><td style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold;">Sender Email:</td><td style="padding: 10px; border: 1px solid #cbd5e1;">happybondingskm@gmail.com</td></tr>
-            <tr><td style="padding: 10px; border: 1px solid #cbd5e1; font-weight: bold;">Attachment:</td><td style="padding: 10px; border: 1px solid #cbd5e1; color: #2563eb; font-weight: bold;">${fileName}</td></tr>
-          </table>
-          <p style="font-size: 13px; color: #64748b; margin-top: 24px;">Regards,<br><strong>Happy Bonding ERP Team</strong></p>
-        </div>
-      `,
-    };
-
-    if (payload.base64Excel) {
-      bodyData.attachment = [
-        {
-          name: fileName,
-          content: payload.base64Excel,
-        },
-      ];
-    }
-
-    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: {
-        "api-key": brevoApiKey,
-        "content-type": "application/json",
-        "accept": "application/json",
-      },
-      body: JSON.stringify(bodyData),
-    });
-
-    if (res.ok || res.status === 201 || res.status === 200) {
-      return { ok: true, message: `✅ Direct email sent via Brevo to ${primaryEmail} with ${fileName} attached!` };
-    }
-
-    const errJson = await res.json().catch(() => ({}));
-    const errMsg = errJson.message || errJson.code || `Brevo HTTP error ${res.status}`;
-    throw new Error(`Brevo Error: ${errMsg}`);
+  async sendBrevoEmail(payload: { reportName: string; userEmail: string; caEmail?: string; base64Excel?: string }): Promise<{ok:boolean;message:string}> {
+    return request('/email/report', {method:'POST',body:JSON.stringify(payload)});
   },
 
   async getExpenses() {
