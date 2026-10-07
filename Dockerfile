@@ -37,6 +37,7 @@ COPY --from=builder /app/dist ./dist
 
 # Copy backend server code
 COPY server ./server
+COPY scripts/retire-empty-pav.mjs ./scripts/retire-empty-pav.mjs
 
 # Expose application port
 EXPOSE 4000

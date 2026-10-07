@@ -19,8 +19,20 @@ for (const account of [
     await page.getByLabel(/password/i).fill(account.password);
     await page.getByRole("button", { name: /sign in/i }).click();
     await expect(page.locator(".app-shell")).toBeVisible();
+    if (account.owner) {
+      await expect(page.locator('select').filter({ has: page.locator('option', { hasText: 'Pavoorchatram' }) }).first().locator('option:checked')).toHaveText('Pavoorchatram');
+      // An existing session last used in Ambai must also open Pavoorchatram.
+      await page.evaluate(() => {
+        const option = Array.from(document.querySelectorAll('option')).find(o => o.textContent === 'AMBASAMUDRAM');
+        if (!option) throw new Error('Ambai fixture missing');
+        localStorage.setItem('hb_erp_branch', option.value);
+      });
+    }
     await page.reload();
     await expect(page.locator(".app-shell")).toBeVisible();
+    if (account.owner) {
+      await expect(page.locator('select').filter({ has: page.locator('option', { hasText: 'Pavoorchatram' }) }).first().locator('option:checked')).toHaveText('Pavoorchatram');
+    }
     expect(failedRequests).toEqual([]);
     if (account.owner) {
       expect(summaryStatuses.length).toBeGreaterThanOrEqual(2);

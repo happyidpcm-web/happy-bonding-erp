@@ -12,6 +12,8 @@ import { createToken, requireAuth, requireBranch, requirePermission } from "./au
 import fs from "fs";
 import { voucherRouter } from "./vouchers.js";
 import { emailRouter } from "./email.js";
+import { orderBranches } from "./branch-order.js";
+import { salesNumberFloor } from "./sales-numbering.js";
 import { transactionsRouter } from "./transactions.js";
 import { expenseInput, invoiceInput, invoiceSettingInput, loginInput, parseInput, partyInput, productInput, purchaseStockInput } from "./validation.js";
 
@@ -41,7 +43,7 @@ app.post("/api/auth/login", async (req, res) => {
     orderBy: { name: "asc" },
   });
 
-  const sessionBranchIds = isOwner ? allBranches.map(b => b.id) : user.branches.map(x => x.branchId).filter(id => allBranches.some(b => b.id === id));
+  const sessionBranchIds = orderBranches(allBranches.filter(b => isOwner || user.branches.some(m => m.branchId === b.id))).map(b => b.id);
 
   const session = {
     userId: user.id,
@@ -64,6 +66,8 @@ app.post("/api/auth/login", async (req, res) => {
 
 app.use("/api", requireAuth);
 app.use("/api", (req, res, next) => {
+  // These endpoints resolve access independently of a previously selected branch.
+  if (req.method === "GET" && ["/branches", "/auth/me"].includes(req.path)) return next();
   const branchId = requireBranch(req, res); if (!branchId) return;
   req.headers["x-branch-id"] = branchId;
   next();
@@ -782,7 +786,7 @@ app.get("/api/sales/next-number", async (req, res) => {
     }
   }
   const sequence = await db.documentSequence.findUnique({ where: { organizationId_branchId_documentType_financialYear: { organizationId, branchId, documentType: "SALES", financialYear: fy } } });
-  const nextNumber = Math.max(sequence?.nextNumber ?? 1, maxNum + 1);
+  const nextNumber = Math.max(sequence?.nextNumber ?? 1, maxNum + 1, salesNumberFloor(branchId, prefix));
   res.json({ prefix, number: nextNumber, invoiceNumber: `${prefix}${nextNumber}`, financialYear: fy });
 });
 
@@ -848,7 +852,7 @@ app.post("/api/sales", requirePermission("sales.write"), async (req, res) => {
         maxNum = parsed;
       }
     }
-    const nextAvailable = maxNum + 1;
+    const nextAvailable = Math.max(maxNum + 1, salesNumberFloor(branchId, prefix));
     const sequence = await tx.documentSequence.upsert({
       where: { organizationId_branchId_documentType_financialYear: { organizationId, branchId, documentType: "SALES", financialYear: fy } },
       create: { organizationId, branchId, documentType: "SALES", financialYear: fy, prefix, nextNumber: nextAvailable + 1 },

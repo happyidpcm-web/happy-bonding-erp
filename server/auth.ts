@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import { env } from "./env.js";
 import { db } from "./db.js";
+import { orderBranches } from "./branch-order.js";
 
 export interface Session {
   userId: string;
@@ -32,7 +33,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     if (!user?.active || user.tokenVersion !== session.tokenVersion) return res.status(401).json({ error: "Session expired. Please sign in again." });
     const owner = user.role.permissions.includes("*");
     const branches = owner ? await db.branch.findMany({ where: { organizationId: user.organizationId, active: true } }) : user.branches.map(m => m.branch).filter(b => b.active && b.organizationId === user.organizationId);
-    req.session = { userId: user.id, organizationId: user.organizationId, permissions: user.role.permissions, tokenVersion: user.tokenVersion, branchIds: branches.map(b => b.id) };
+    req.session = { userId: user.id, organizationId: user.organizationId, permissions: user.role.permissions, tokenVersion: user.tokenVersion, branchIds: orderBranches(branches).map(b => b.id) };
     next();
   } catch { res.status(401).json({ error: "Invalid or expired session" }); }
 }

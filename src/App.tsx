@@ -108,6 +108,7 @@ export default function App() {
 
   const handleLogout = () => {
     ++loadSequence.current;
+    initializedWorkspace.current = false;
     api.logout();
     setAuthenticated(false);
     notify("Logged out successfully");
@@ -117,11 +118,27 @@ export default function App() {
   const [dataError, setDataError] = useState("");
   const [dataLoading, setDataLoading] = useState(true);
   const loadSequence = useRef(0);
+  const initializedWorkspace = useRef(false);
   const refreshAppData = async () => {
     const sequence = ++loadSequence.current;
     const branchAtStart = api.currentBranchId();
     setDataLoading(true); setDataError("");
     try {
+      // Resolve the default before requesting branch data, including existing sessions.
+      if (!initializedWorkspace.current) {
+        const accessibleBranches = await api.branches();
+        if (sequence !== loadSequence.current || branchAtStart !== api.currentBranchId()) return;
+        const preferred = accessibleBranches.find(b => b.code.trim().toUpperCase() === "PCM")
+          ?? accessibleBranches.find(b => b.name.trim().toLowerCase() === "pavoorchatram")
+          ?? accessibleBranches.find(b => b.id === branchAtStart)
+          ?? accessibleBranches[0];
+        initializedWorkspace.current = true;
+        if (preferred && preferred.id !== branchAtStart) {
+          api.setCurrentBranch(preferred.id);
+          setCurrentBranchId(preferred.id);
+          return;
+        }
+      }
       const session = await api.me();
       if (sequence !== loadSequence.current || branchAtStart !== api.currentBranchId()) return;
       const [nextProducts, nextParties, nextInvoices, nextSetting, nextBranches, nextSummary] = await Promise.all([api.products(), api.parties(), api.sales(), api.invoiceSetting(), api.branches(), session.isAdmin ? api.ownerSummary() : Promise.resolve([])]);
