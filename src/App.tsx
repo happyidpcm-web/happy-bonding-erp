@@ -1,3 +1,6 @@
+import { useDismissibleDropdown } from "./hooks/useDismissibleDropdown";
+import { isInvoiceInDateRange, type CustomDateRange } from "./utils/invoiceDateRange";
+export { isInvoiceInDateRange, type CustomDateRange } from "./utils/invoiceDateRange";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft, BarChart3, Banknote, Boxes, Building2, Calendar, CheckSquare, ChevronDown, ExternalLink, Eye, EyeOff, Gift, IndianRupee as CircleIndianRupee,
@@ -102,7 +105,7 @@ export default function App() {
   const [staffModalOpen, setStaffModalOpen] = useState(false);
   const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false);
   const [toast, setToast] = useState("");
-  const [salesCreateKey, setSalesCreateKey] = useState(0);
+  const [salesView, setSalesView] = useState({ key: 0, create: false });
 
   const [activeInvoiceModal, setActiveInvoiceModal] = useState<Invoice | null>(null);
 
@@ -165,6 +168,7 @@ export default function App() {
 
   const [expandedNav, setExpandedNav] = useState<"sales" | "purchases" | "parties" | null>(null);
   const [createDropdownOpen, setCreateDropdownOpen] = useState(false);
+  const createDropdownRef = useDismissibleDropdown(createDropdownOpen, () => setCreateDropdownOpen(false));
   const [autoOpenShareLedger, setAutoOpenShareLedger] = useState(false);
   const [activeReportSubScreen, setActiveReportSubScreen] = useState<string | null>(null);
 
@@ -178,6 +182,7 @@ export default function App() {
   };
 
   const go = (id: Page) => {
+    if (id === "sales") setSalesView(view => ({ key: view.key + 1, create: false }));
     setPage(id);
     setSidebar(false);
     setCreateDropdownOpen(false);
@@ -191,7 +196,7 @@ export default function App() {
   };
   const openSalesInvoice = () => {
     setPage("sales");
-    setSalesCreateKey(key => key + 1);
+    setSalesView(view => ({ key: view.key + 1, create: true }));
     setSidebar(false);
     setCreateDropdownOpen(false);
   };
@@ -321,7 +326,7 @@ export default function App() {
         <div><strong>Happy Bonding</strong><span>Men's Wear ERP</span></div>
         <button className="icon-button close-menu" onClick={() => setSidebar(false)}><X size={19}/></button>
       </div>
-      <div className="new-sale-split-wrap">
+      <div className="new-sale-split-wrap" ref={createDropdownRef}>
         <button className="new-sale-main-btn" onClick={openSalesInvoice}>
           Create Sales Invoice <span>F2</span>
         </button>
@@ -505,10 +510,10 @@ export default function App() {
         </div>
       </header>
       <section className={page === "pos" ? "page pos-page" : "page"}>
-        {page === "dashboard" && <DashboardLive products={productRows} parties={partyRows} invoices={invoiceRows} ownerSummary={ownerSummary} onNewSale={openSalesInvoice} onSelectInvoice={openInvoiceDetail} onSeeAllTransactions={() => setPage("sales")}/>} 
+        {page === "dashboard" && <DashboardLive products={productRows} parties={partyRows} invoices={invoiceRows} ownerSummary={ownerSummary} onNewSale={openSalesInvoice} onSelectInvoice={openInvoiceDetail} onSeeAllTransactions={() => go("sales")}/>}
         {page === "parties" && <Parties rows={partyRows} setRows={setPartyRows} notify={notify} apiMode={apiMode} onNavigateReport={() => setPage("reports")} autoOpenShareLedger={autoOpenShareLedger} onClearAutoOpenShareLedger={() => setAutoOpenShareLedger(false)} />} 
         {page === "items" && <Items rows={productRows} invoices={invoiceRows} setRows={setProductRows} notify={notify} apiMode={apiMode}/>} 
-        {page === "sales" && <Sales rows={invoiceRows} products={productRows} parties={partyRows} setting={invoiceSetting} setSetting={setInvoiceSetting} setRows={setInvoiceRows} setParties={setPartyRows} setProducts={setProductRows} notify={notify} autoCreateKey={salesCreateKey} onSelectInvoice={openInvoiceDetail} onNavigateReports={handleNavigateReportsFromSales}/>} 
+        {page === "sales" && <Sales rows={invoiceRows} products={productRows} parties={partyRows} setting={invoiceSetting} setSetting={setInvoiceSetting} setRows={setInvoiceRows} setParties={setPartyRows} setProducts={setProductRows} notify={notify} key={salesView.key} initialCreate={salesView.create} onSelectInvoice={openInvoiceDetail} onNavigateReports={handleNavigateReportsFromSales}/>}
         {page === "quotation" && <GenericVoucherPage title="Quotation / Estimate" subtitle="Create and track estimates for customers before final sale." action="+ Create Quotation" icon={FileSpreadsheet} type="Quotation" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
         {page === "payment_in" && <PaymentInModule parties={partyRows} invoices={invoiceRows} notify={notify} onDataChanged={refreshAppData} currentBranchId={currentBranchId} />}
         {page === "sales_return" && <GenericVoucherPage title="Sales Return" subtitle="Track customer garment returns & credit balances." action="+ Create Sales Return" icon={ReceiptIndianRupee} type="Sales Return" parties={partyRows} products={productRows} invoices={invoiceRows} notify={notify} />}
@@ -527,7 +532,7 @@ export default function App() {
 
         {page === "reports" && <Reports products={productRows} invoices={invoiceRows} notify={notify} initialReport={activeReportSubScreen}/>} 
         {page === "cash" && <CashBank notify={notify}/>} 
-        {page === "pos" && <Sales rows={invoiceRows} products={productRows} parties={partyRows} setting={invoiceSetting} setSetting={setInvoiceSetting} setRows={setInvoiceRows} setParties={setPartyRows} setProducts={setProductRows} notify={notify} autoCreateKey={Date.now()} onSelectInvoice={openInvoiceDetail} onNavigateReports={handleNavigateReportsFromSales}/>} 
+        {page === "pos" && <Sales rows={invoiceRows} products={productRows} parties={partyRows} setting={invoiceSetting} setSetting={setInvoiceSetting} setRows={setInvoiceRows} setParties={setPartyRows} setProducts={setProductRows} notify={notify} key="pos" initialCreate={true} onSelectInvoice={openInvoiceDetail} onNavigateReports={handleNavigateReportsFromSales}/>}
         {page === "staff" && <Staff/>} 
         {page === "settings" && <SettingsPage notify={notify} branches={branchRows} currentBranchId={currentBranchId} onSwitchBranch={handleBranchChange} onRefreshData={refreshAppData} onStaff={() => setStaffModalOpen(true)} />}
 
@@ -1222,122 +1227,6 @@ function InvoiceDetailModal({
   );
 }
 
-function parseInvoiceDate(dateStr: string): Date {
-  if (!dateStr) return new Date();
-  const months: Record<string, number> = {
-    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
-    jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
-  };
-  const parts = dateStr.trim().split(/[\s\-\/]+/);
-  if (parts.length === 3) {
-    const day = parseInt(parts[0], 10);
-    const monthStr = parts[1].toLowerCase().slice(0, 3);
-    const year = parseInt(parts[2], 10);
-    if (!isNaN(day) && months[monthStr] !== undefined && !isNaN(year)) {
-      return new Date(year, months[monthStr], day);
-    }
-    if (parts[0].length === 4) {
-      return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-    }
-  }
-  const d = new Date(dateStr);
-  return isNaN(d.getTime()) ? new Date() : d;
-}
-
-export type CustomDateRange = { from: string; to: string };
-
-export function isInvoiceInDateRange(r: { date: string }, filter: string, customRange?: CustomDateRange): boolean {
-  const d = parseInvoiceDate(r.date);
-  const now = new Date();
-
-  const isSameDay = (d1: Date, d2: Date) =>
-    d1.getFullYear() === d2.getFullYear() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getDate() === d2.getDate();
-
-  const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const endOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
-
-  if (filter === "Today") {
-    return isSameDay(d, now);
-  }
-  if (filter === "Yesterday") {
-    const yest = new Date(now);
-    yest.setDate(yest.getDate() - 1);
-    return isSameDay(d, yest);
-  }
-  if (filter === "This Week") {
-    const start = startOfDay(new Date(now));
-    start.setDate(start.getDate() - start.getDay()); // Sunday
-    const end = startOfDay(new Date(start));
-    end.setDate(end.getDate() + 6); // Saturday
-    end.setHours(23, 59, 59, 999);
-    return d >= start && d <= end;
-  }
-  if (filter === "Last Week") {
-    const start = startOfDay(new Date(now));
-    start.setDate(start.getDate() - start.getDay() - 7);
-    const end = startOfDay(new Date(start));
-    end.setDate(end.getDate() + 6);
-    end.setHours(23, 59, 59, 999);
-    return d >= start && d <= end;
-  }
-  if (filter === "Last 7 Days") {
-    const start = startOfDay(new Date(now));
-    start.setDate(start.getDate() - 6);
-    return d >= start && d <= endOfDay(now);
-  }
-  if (filter === "This Month") {
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  }
-  if (filter === "Previous Month") {
-    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    return d.getMonth() === prev.getMonth() && d.getFullYear() === prev.getFullYear();
-  }
-  if (filter === "Last 30 Days") {
-    const start = startOfDay(new Date(now));
-    start.setDate(start.getDate() - 29);
-    return d >= start && d <= endOfDay(now);
-  }
-  if (filter === "This Quarter") {
-    const currentQ = Math.floor(now.getMonth() / 3);
-    const q = Math.floor(d.getMonth() / 3);
-    return q === currentQ && d.getFullYear() === now.getFullYear();
-  }
-  if (filter === "Previous Quarter") {
-    const currentQ = Math.floor(now.getMonth() / 3);
-    const prevQ = currentQ === 0 ? 3 : currentQ - 1;
-    const year = currentQ === 0 ? now.getFullYear() - 1 : now.getFullYear();
-    const q = Math.floor(d.getMonth() / 3);
-    return q === prevQ && d.getFullYear() === year;
-  }
-  if (filter === "Current Fiscal Year") {
-    const year = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
-    const start = new Date(year, 3, 1);
-    const end = new Date(year + 1, 2, 31, 23, 59, 59, 999);
-    return d >= start && d <= end;
-  }
-  if (filter === "Previous Fiscal Year") {
-    const year = now.getMonth() >= 3 ? now.getFullYear() - 1 : now.getFullYear() - 2;
-    const start = new Date(year, 3, 1);
-    const end = new Date(year + 1, 2, 31, 23, 59, 59, 999);
-    return d >= start && d <= end;
-  }
-  if (filter === "Last 365 Days") {
-    const start = startOfDay(new Date(now));
-    start.setDate(start.getDate() - 364);
-    return d >= start && d <= endOfDay(now);
-  }
-  if (filter === "Custom Range") {
-    if (!customRange?.from || !customRange?.to) return true;
-    const start = new Date(customRange.from);
-    const end = new Date(customRange.to);
-    end.setHours(23, 59, 59, 999);
-    return d >= start && d <= end;
-  }
-  return true;
-}
-
 export const REPORT_DATE_OPTIONS = [
   { label: "Today", sub: "" },
   { label: "Yesterday", sub: "" },
@@ -1383,18 +1272,20 @@ export function CustomDateRangePopover({
           <input
             type="date"
             value={draft.to}
+            min={draft.from || undefined}
             onChange={e => setDraft(prev => ({ ...prev, to: e.target.value }))}
             style={{ width: "100%", minWidth: 0, height: 36, border: "1px solid #dbe3ef", borderRadius: 6, padding: "0 8px", color: "#334155", boxSizing: "border-box" }}
           />
         </label>
       </div>
+      {draft.from && draft.to && draft.from > draft.to && <p role="alert">End date must be on or after start date.</p>}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 14, fontSize: 12, fontWeight: 700 }}>
         <button type="button" onClick={onCancel} style={{ border: 0, background: "transparent", color: "#475569", padding: "8px 0" }}>CANCEL</button>
         <button
           type="button"
           onClick={() => onApply(draft)}
-          disabled={!draft.from || !draft.to}
-          style={{ border: 0, background: "transparent", color: draft.from && draft.to ? "#4f46e5" : "#a8b1c2", padding: "8px 0", fontWeight: 800 }}
+          disabled={!draft.from || !draft.to || draft.from > draft.to}
+          style={{ border: 0, background: "transparent", color: draft.from && draft.to && draft.from <= draft.to ? "#4f46e5" : "#a8b1c2", padding: "8px 0", fontWeight: 800 }}
         >
           OK
         </button>
@@ -1405,7 +1296,7 @@ export function CustomDateRangePopover({
 
 export function customRangeLabel(range: CustomDateRange) {
   if (!range.from || !range.to) return "Custom Date Range";
-  const fmt = (value: string) => new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  const fmt = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
   return `${fmt(range.from)} - ${fmt(range.to)}`;
 }
 
@@ -1435,28 +1326,17 @@ function SalesInvoicesListView({
   const [query, setQuery] = useState("");
   const [dateFilter, setDateFilter] = useState("Last 365 Days");
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [customRangeOpen, setCustomRangeOpen] = useState(false);
+  const [customDateRange, setCustomDateRange] = useState<CustomDateRange>({ from: "", to: "" });
   const [reportsDropdownOpen, setReportsDropdownOpen] = useState(false);
+  const reportsDropdownRef = useDismissibleDropdown(reportsDropdownOpen, () => setReportsDropdownOpen(false));
   const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
   const [openMenuId, setOpenMenuId] = useState<string | number | null>(null);
-  const openActionsMenuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (openMenuId === null) return;
-    const closeOutside = (event: PointerEvent) => {
-      if (event.target instanceof Node && !openActionsMenuRef.current?.contains(event.target)) {
-        setOpenMenuId(null);
-      }
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpenMenuId(null);
-    };
-    document.addEventListener("pointerdown", closeOutside, true);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOutside, true);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [openMenuId]);
+  const openActionsMenuRef = useDismissibleDropdown(openMenuId !== null, () => setOpenMenuId(null));
+  const datePickerRef = useDismissibleDropdown(datePickerOpen || customRangeOpen, () => {
+    setDatePickerOpen(false);
+    setCustomRangeOpen(false);
+  });
 
   // 14 Date Options matching reports
   const dateOptions = REPORT_DATE_OPTIONS;
@@ -1470,12 +1350,14 @@ function SalesInvoicesListView({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
 
-    // 1. If search query is present, search across ALL invoices (ignoring date boundaries for search)
+    const dateRows = displayRows.filter(r => isInvoiceInDateRange(r, dateFilter, customDateRange));
+
+    // Search within the selected date range.
     if (q) {
       const qNum = parseInt(q, 10);
       const isNumeric = !isNaN(qNum);
 
-      const matched = displayRows.filter(r => {
+      const matched = dateRows.filter(r => {
         const num = (r.number || "").toLowerCase();
         const party = (r.party || "").toLowerCase();
         const phone = (r.partyPhone || "").toLowerCase();
@@ -1517,8 +1399,8 @@ function SalesInvoicesListView({
     }
 
     // 3. When no search query, apply Date Range filter
-    return displayRows.filter(r => isInvoiceInDateRange(r, dateFilter));
-  }, [displayRows, query, dateFilter]);
+    return dateRows;
+  }, [displayRows, query, dateFilter, customDateRange]);
 
   // Dynamic metrics calculation strictly from backend PostgreSQL filtered invoices
   const totalSalesVal = useMemo(() => {
@@ -1554,7 +1436,7 @@ function SalesInvoicesListView({
         <h1>Sales Invoices</h1>
         <div className="sales-header-tools">
           {/* Reports Dropdown matching Image 1 */}
-          <div style={{ position: "relative" }}>
+          <div ref={reportsDropdownRef} style={{ position: "relative" }}>
             <button
               type="button"
               className="sales-reports-dropdown-btn"
@@ -1692,14 +1574,14 @@ function SalesInvoicesListView({
           </div>
 
           {/* Interactive Date Range Picker matching reference images 1 & 2 */}
-          <div className="sales-date-picker-wrap">
+          <div className="sales-date-picker-wrap" ref={datePickerRef}>
             <button
               type="button"
               className="sales-date-range-btn"
-              onClick={() => setDatePickerOpen(!datePickerOpen)}
+              onClick={() => { setDatePickerOpen(!datePickerOpen); setCustomRangeOpen(false); }}
             >
               <Calendar size={15} color="#64748b" />
-              <span>{dateFilter}</span>
+              <span>{dateFilter === "Custom Range" ? customRangeLabel(customDateRange) : dateFilter}</span>
               <Calendar size={15} color="#64748b" />
             </button>
 
@@ -1711,6 +1593,11 @@ function SalesInvoicesListView({
                     type="button"
                     className={`sales-date-option-row ${dateFilter === opt.label ? "selected" : ""}`}
                     onClick={() => {
+                      if (opt.label === "Custom Range") {
+                        setDatePickerOpen(false);
+                        setCustomRangeOpen(true);
+                        return;
+                      }
                       setDateFilter(opt.label);
                       setDatePickerOpen(false);
                       notify(`Date range changed to ${opt.label}`);
@@ -1721,6 +1608,17 @@ function SalesInvoicesListView({
                   </button>
                 ))}
               </div>
+            )}
+            {customRangeOpen && (
+              <CustomDateRangePopover
+                range={customDateRange}
+                onApply={range => {
+                  setCustomDateRange(range);
+                  setDateFilter("Custom Range");
+                  setCustomRangeOpen(false);
+                }}
+                onCancel={() => setCustomRangeOpen(false)}
+              />
             )}
           </div>
         </div>
@@ -2117,11 +2015,11 @@ function QuickInvoiceSettingsModal({
 }
 
 type InvoiceLineDraft={product:Product;qty:number;discount:number;taxRate:number};
-function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setProducts,notify,autoCreateKey,onSelectInvoice,onNavigateReports}:{rows:Invoice[];products:Product[];parties:Party[];setting:InvoiceSetting;setSetting:(x:InvoiceSetting)=>void;setRows:(x:Invoice[])=>void;setParties:(x:Party[])=>void;setProducts:(x:Product[])=>void;notify:(s:string)=>void;autoCreateKey:number;onSelectInvoice:(inv:Invoice)=>void;onNavigateReports?:(reportName: string)=>void}) {
+function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setProducts,notify,initialCreate,onSelectInvoice,onNavigateReports}:{rows:Invoice[];products:Product[];parties:Party[];setting:InvoiceSetting;setSetting:(x:InvoiceSetting)=>void;setRows:(x:Invoice[])=>void;setParties:(x:Party[])=>void;setProducts:(x:Product[])=>void;notify:(s:string)=>void;initialCreate:boolean;onSelectInvoice:(inv:Invoice)=>void;onNavigateReports?:(reportName: string)=>void}) {
   const [activeReportView, setActiveReportView] = useState<string | null>(null);
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false);
   const [query,setQuery]=useState("");
-  const [creating,setCreating]=useState(false);
+  const [creating,setCreating]=useState(initialCreate);
   const [editingInvoice,setEditingInvoice]=useState<Invoice|null>(null);
   const [detailsInvoice, setDetailsInvoice] = useState<Invoice | null>(null);
   const [detailsDate, setDetailsDate] = useState("");
@@ -2161,10 +2059,13 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   }
   const [partySearch,setPartySearch]=useState("");
   const [partyOpen,setPartyOpen]=useState(false);
+  const partyDropdownRef = useDismissibleDropdown(partyOpen, () => setPartyOpen(false));
   const [selectedParty,setSelectedParty]=useState<Party|undefined>();
   const [newParty,setNewParty]=useState({name:"",phone:"",address:"",gstin:""});
   const [partyModal,setPartyModal]=useState(false);
   const [itemSearch,setItemSearch]=useState("");
+  const [itemSuggestionsOpen, setItemSuggestionsOpen] = useState(false);
+  const itemSuggestionsRef = useDismissibleDropdown(itemSuggestionsOpen, () => setItemSuggestionsOpen(false));
   const [lines,setLines]=useState<InvoiceLineDraft[]>([]);
   const [paid,setPaid]=useState(0);
   const [invoiceDate,setInvoiceDate]=useState(() => new Date().toISOString().slice(0,10));
@@ -2346,7 +2247,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   },0);
   const total=Math.max(0,Math.round((subtotal-discount-invoiceDiscount+tax+additionalCharges)*100)/100);
   const dueDate=new Date(invoiceDate); dueDate.setDate(dueDate.getDate()+Number(paymentTerms||0));
-  useEffect(()=>{if(autoCreateKey)setCreating(true);},[autoCreateKey]);
+
   useEffect(()=>{setPaymentTerms(setting.paymentTermsDays);},[setting.paymentTermsDays]);
   useEffect(()=>{setTerms(setting.terms);},[setting.terms]);
   useEffect(() => {
@@ -2622,7 +2523,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
             </div>
 
             {!selectedParty && (
-              <div className={`add-party-box ${partyOpen ? "has-party" : ""}`} onClick={() => setPartyOpen(true)}>
+              <div ref={partyDropdownRef} className={`add-party-box ${partyOpen ? "has-party" : ""}`} onClick={() => setPartyOpen(true)}>
                 {!partyOpen ? (
                   <button type="button" className="dashed-add-party-btn"><Plus size={16} /> Add Party</button>
                 ) : (
@@ -2795,16 +2696,17 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
           </table>
 
           <div className="item-add-row polished" style={{ display: "grid", gridTemplateColumns: "220px 1fr 200px", gap: 12 }}>
-            <div className="party-picker item-search" style={{ margin: 0, width: "100%" }}>
+            <div ref={itemSuggestionsRef} className="party-picker item-search" style={{ margin: 0, width: "100%" }}>
               <Search size={14} color="#94a3b8" />
               <input
                 ref={itemSearchInputRef}
                 value={itemSearch}
-                onChange={e => setItemSearch(e.target.value)}
+                onFocus={() => setItemSuggestionsOpen(true)}
+                onChange={e => { setItemSearch(e.target.value); setItemSuggestionsOpen(true); }}
                 placeholder="+ Search SKU / Name"
                 style={{ fontSize: 12, height: 38 }}
               />
-              {itemMatches.length > 0 && (
+              {itemSuggestionsOpen && itemMatches.length > 0 && (
                 <div className="search-results">
                   {itemMatches.map(p => (
                     <button key={p.id} type="button" onClick={() => addLine(p)}>

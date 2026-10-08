@@ -1,3 +1,4 @@
+import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft, Boxes, ChevronDown, ClipboardList, FileSpreadsheet, MessageCircle, MessageSquare, MoreVertical, Plus, Search, Settings, Share2, Trash2
@@ -742,7 +743,9 @@ export function Parties({
   const [ledgerParty, setLedgerParty] = useState<Party | null>(null);
   const [saving, setSaving] = useState(false);
   const [reportsDropdownOpen, setReportsDropdownOpen] = useState(false);
+  const reportsRef = useDismissibleDropdown(reportsDropdownOpen, () => setReportsDropdownOpen(false));
   const [bulkActionDropdownOpen, setBulkActionDropdownOpen] = useState(false);
+  const bulkRef = useDismissibleDropdown(bulkActionDropdownOpen, () => setBulkActionDropdownOpen(false));
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [shareLedgerModalOpen, setShareLedgerModalOpen] = useState(false);
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
@@ -836,7 +839,7 @@ export function Parties({
             <Share2 size={15} /> ShareLedger Portal
           </button>
 
-          <div className="parties-reports-dropdown">
+          <div ref={reportsRef} className="parties-reports-dropdown">
             <button
               type="button"
               className="secondary reports-btn"
@@ -908,7 +911,7 @@ export function Parties({
           </div>
 
           <div className="parties-toolbar-right" style={{ position: "relative" }}>
-            <div className="bulk-action-wrap">
+            <div ref={bulkRef} className="bulk-action-wrap">
               <button className="secondary" onClick={() => setBulkActionDropdownOpen(!bulkActionDropdownOpen)}>
                 Bulk Action <ChevronDown size={14} />
               </button>

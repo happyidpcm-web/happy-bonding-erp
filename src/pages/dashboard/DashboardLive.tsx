@@ -1,3 +1,4 @@
+import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import React, { useState, useMemo, useEffect } from "react";
 import { ChevronDown, IndianRupee as CircleIndianRupee, CreditCard, WalletCards } from "lucide-react";
 import { api } from "../../api";
@@ -8,6 +9,7 @@ import { PageHeading, Metric } from "../../App";
 export function SalesReportChartCard({ invoices }: { invoices: Invoice[] }) {
   const [viewMode, setViewMode] = useState<"Daily" | "Weekly">("Daily");
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const reportRef = useDismissibleDropdown(dropdownOpen, () => setDropdownOpen(false));
 
   // Compute real last 7 days data from actual backend invoices (100% Real Data)
   const reportData = useMemo(() => {
@@ -97,7 +99,7 @@ export function SalesReportChartCard({ invoices }: { invoices: Invoice[] }) {
     <article className="card sales-report-card half-width">
       <div className="card-title sales-report-head">
         <h2>Sales Report - {startDateStr} to {endDateStr}</h2>
-        <div className="report-select-wrap">
+        <div ref={reportRef} className="report-select-wrap">
           <button
             type="button"
             className="report-select-btn"

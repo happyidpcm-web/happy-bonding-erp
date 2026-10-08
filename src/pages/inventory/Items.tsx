@@ -1,3 +1,4 @@
+import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, Boxes, ChevronDown, ClipboardList, ExternalLink, FileSpreadsheet, FileText, Mail, PackagePlus, Pencil, Percent, Plus, Printer, QrCode, Search, Settings, Star, Tag, Trash2, Upload, X
@@ -1319,11 +1320,13 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
   const [bulkEditSelectModalOpen, setBulkEditSelectModalOpen] = useState(false);
   const [itemSettingsModalOpen, setItemSettingsModalOpen] = useState(false);
   const [bulkActionsDropdownOpen, setBulkActionsDropdownOpen] = useState(false);
+  const bulkRef = useDismissibleDropdown(bulkActionsDropdownOpen, () => setBulkActionsDropdownOpen(false));
   const [addItemsAccordionOpen, setAddItemsAccordionOpen] = useState(true);
   const [bulkEditAccordionOpen, setBulkEditAccordionOpen] = useState(false);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [createOfferModalOpen, setCreateOfferModalOpen] = useState(false);
   const [reportsDropdownOpen, setReportsDropdownOpen] = useState(false);
+  const reportsRef = useDismissibleDropdown(reportsDropdownOpen, () => setReportsDropdownOpen(false));
   const [bannerOpen, setBannerOpen] = useState(true);
   const [barcodeModalOpen, setBarcodeModalOpen] = useState(false);
 
@@ -1554,7 +1557,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
             <Tag size={15} /> Manage Offer
           </button>
 
-          <div className="parties-reports-dropdown" style={{ position: "relative" }}>
+          <div ref={reportsRef} className="parties-reports-dropdown" style={{ position: "relative" }}>
             <button
               type="button"
               className="secondary reports-btn"
@@ -1661,7 +1664,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
           </div>
 
           <div style={{ display: "flex", gap: 10 }}>
-            <div className="bulk-action-wrap" style={{ position: "relative" }}>
+            <div ref={bulkRef} className="bulk-action-wrap" style={{ position: "relative" }}>
               <button
                 type="button"
                 className="secondary"

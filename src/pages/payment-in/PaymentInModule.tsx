@@ -1,3 +1,4 @@
+import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   ArrowLeft,
@@ -204,31 +205,25 @@ export function PaymentInModule({
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<PaymentInRecord | null>(null);
 
-  useEffect(() => {
-    if (!activeMenuId) return;
-    const handleOutsideClick = () => {
-      setActiveMenuId(null);
-    };
-    window.addEventListener("click", handleOutsideClick);
-    return () => {
-      window.removeEventListener("click", handleOutsideClick);
-    };
-  }, [activeMenuId]);
+  const actionsRef = useDismissibleDropdown<HTMLTableCellElement>(activeMenuId !== null, () => setActiveMenuId(null));
 
   const [records, setRecords] = useState<PaymentInRecord[]>([]);
   const [query, setQuery] = useState("");
   const [dateFilter, setDateFilter] = useState("Last 365 Days");
   const [dateMenuOpen, setDateMenuOpen] = useState(false);
+  const dateRef = useDismissibleDropdown(dateMenuOpen, () => setDateMenuOpen(false));
   const [customDateRange, setCustomDateRange] = useState<CustomDateRange>({ from: "2025-08-16", to: "2026-08-15" });
   const [invoiceQuery, setInvoiceQuery] = useState("");
   const [invoiceDateFilter, setInvoiceDateFilter] = useState("Last 365 Days");
   const [invoiceDateMenuOpen, setInvoiceDateMenuOpen] = useState(false);
+  const invoiceDateRef = useDismissibleDropdown(invoiceDateMenuOpen, () => setInvoiceDateMenuOpen(false));
   const [invoiceCustomDateRange, setInvoiceCustomDateRange] = useState<CustomDateRange>({ from: "2025-08-16", to: "2026-08-15" });
 
   const [editingRecord, setEditingRecord] = useState<PaymentInRecord | null>(null);
   const [partyInput, setPartyInput] = useState("");
   const [partySearch, setPartySearch] = useState("");
   const [partyDropdownOpen, setPartyDropdownOpen] = useState(false);
+  const partyDropdownRef = useDismissibleDropdown(partyDropdownOpen, () => setPartyDropdownOpen(false));
   const [amountInput, setAmountInput] = useState("");
   const [discountInput, setDiscountInput] = useState("0");
   const [dateInput, setDateInput] = useState("2026-08-10");
@@ -408,7 +403,7 @@ export function PaymentInModule({
         <article className="card" style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 16px", marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ position: "relative", width: 220 }}>
+              <div ref={dateRef} style={{ position: "relative", width: 220 }}>
                 <Search size={15} color="#94a3b8" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
                 <input
                   value={query}
@@ -505,7 +500,7 @@ export function PaymentInModule({
                       <td style={{ padding: "14px 16px", textAlign: "right" }}>₹ {row.totalSettled.toLocaleString("en-IN")}</td>
                       <td style={{ padding: "14px 16px", textAlign: "right", fontWeight: 700 }}>₹ {row.amountReceived.toLocaleString("en-IN")}</td>
                       <td style={{ padding: "14px 16px" }}>{row.mode}</td>
-                      <td style={{ padding: "14px 16px", textAlign: "center", position: "relative" }}>
+                      <td ref={activeMenuId === row.id ? actionsRef : null} style={{ padding: "14px 16px", textAlign: "center", position: "relative" }}>
                         <button
                           type="button"
                           className="icon-button"
@@ -722,7 +717,7 @@ export function PaymentInModule({
         <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 16, background: "#fff", display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
             <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b", display: "block", marginBottom: 4 }}>Party Name</label>
-            <div style={{ position: "relative" }}>
+            <div ref={partyDropdownRef} style={{ position: "relative" }}>
               <input
                 value={partySearch}
                 onFocus={() => setPartyDropdownOpen(true)}
@@ -892,7 +887,7 @@ export function PaymentInModule({
                   style={{ width: "100%", paddingLeft: 28, height: 32, border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 12 }}
                 />
               </div>
-              <div style={{ position: "relative", width: 190 }}>
+              <div ref={invoiceDateRef} style={{ position: "relative", width: 190 }}>
                 <button
                   type="button"
                   onClick={() => setInvoiceDateMenuOpen(open => !open)}

@@ -1,3 +1,4 @@
+import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   ArrowLeft,
@@ -273,6 +274,7 @@ export function CreateQuotationScreen({
   const matchedProducts = itemQuery ? products.filter(p => `${p.name} ${p.sku}`.toLowerCase().includes(itemQuery.toLowerCase())) : products.slice(0, 8);
 
   const [partyDropdownOpen, setPartyDropdownOpen] = useState(false);
+  const partyDropdownRef = useDismissibleDropdown(partyDropdownOpen, () => setPartyDropdownOpen(false));
   const [partyQuery, setPartyQuery] = useState("");
 
   const matchedParties = useMemo(() => {
@@ -339,7 +341,7 @@ export function CreateQuotationScreen({
               <button type="button" className="secondary compact" onClick={() => setCustomPartyName("")}>Change</button>
             </div>
           ) : (
-            <div style={{ position: "relative", width: 280 }}>
+            <div ref={partyDropdownRef} style={{ position: "relative", width: 280 }}>
               <div style={{ position: "relative" }}>
                 <Search size={14} color="#94a3b8" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
                 <input
