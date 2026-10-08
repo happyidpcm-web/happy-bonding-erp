@@ -2450,13 +2450,24 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   };
   const editInvoice = async (selected: Invoice) => {
     let inv: Invoice;
-    try { inv = await api.sale(selected.id); } catch (error) { notify(error instanceof Error ? error.message : "Could not load invoice"); return; }
+    let currentProducts: Product[];
+    try {
+      [inv, currentProducts] = await Promise.all([api.sale(selected.id), api.products()]);
+      setProducts(currentProducts);
+    } catch (error) { notify(error instanceof Error ? error.message : "Could not load invoice"); return; }
+    const missingItems: string[] = [];
     const editLines = (inv.lines ?? []).map(line => {
-      const product = products.find(p => p.sku === line.sku);
+      // SKU is an editable snapshot; the variant ID is the invoice's stock identity.
+      const product = currentProducts.find(p => line.variantId
+        ? String(p.id) === String(line.variantId)
+        : Boolean(line.sku) && p.sku === line.sku);
+      if (!product) missingItems.push(`${line.itemName} (${line.sku || "no SKU"})`);
       return product ? { product: { ...product, name: line.itemName, hsnCode: line.hsnCode, sellingPrice: line.unitPrice, mrp: line.mrp ?? product.mrp }, qty: line.quantity, discount: line.discount, taxRate: line.taxRate } : null;
     }).filter(Boolean) as InvoiceLineDraft[];
     if (!editLines.length || editLines.length !== inv.lines?.length) {
-      notify("This invoice items are not available in product master, cannot edit safely.");
+      notify(missingItems.length
+        ? `Cannot edit: these items are missing or inactive in this branch's product master: ${missingItems.join(", ")}. Restore the original items before editing.`
+        : "Cannot edit: this invoice has no item details.");
       return;
     }
     const party = parties.find(p => p.name === inv.party || p.phone === inv.partyPhone);
