@@ -2123,6 +2123,9 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   const [query,setQuery]=useState("");
   const [creating,setCreating]=useState(false);
   const [editingInvoice,setEditingInvoice]=useState<Invoice|null>(null);
+  const [detailsInvoice, setDetailsInvoice] = useState<Invoice | null>(null);
+  const [detailsDate, setDetailsDate] = useState("");
+  const [detailsNotes, setDetailsNotes] = useState("");
   const [historyInvoice, setHistoryInvoice] = useState<Invoice | null>(null);
   const [creditNoteInvoice, setCreditNoteInvoice] = useState<Invoice | null>(null);
   const [auditEvents, setAuditEvents] = useState<any[]>([]);
@@ -2455,19 +2458,17 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
       [inv, currentProducts] = await Promise.all([api.sale(selected.id), api.products()]);
       setProducts(currentProducts);
     } catch (error) { notify(error instanceof Error ? error.message : "Could not load invoice"); return; }
-    const missingItems: string[] = [];
     const editLines = (inv.lines ?? []).map(line => {
       // SKU is an editable snapshot; the variant ID is the invoice's stock identity.
       const product = currentProducts.find(p => line.variantId
         ? String(p.id) === String(line.variantId)
         : Boolean(line.sku) && p.sku === line.sku);
-      if (!product) missingItems.push(`${line.itemName} (${line.sku || "no SKU"})`);
       return product ? { product: { ...product, name: line.itemName, hsnCode: line.hsnCode, sellingPrice: line.unitPrice, mrp: line.mrp ?? product.mrp }, qty: line.quantity, discount: line.discount, taxRate: line.taxRate } : null;
     }).filter(Boolean) as InvoiceLineDraft[];
     if (!editLines.length || editLines.length !== inv.lines?.length) {
-      notify(missingItems.length
-        ? `Cannot edit: these items are missing or inactive in this branch's product master: ${missingItems.join(", ")}. Restore the original items before editing.`
-        : "Cannot edit: this invoice has no item details.");
+      setDetailsInvoice(inv);
+      setDetailsDate(inv.dateISO ?? "");
+      setDetailsNotes(inv.notes ?? "");
       return;
     }
     const party = parties.find(p => p.name === inv.party || p.phone === inv.partyPhone);
@@ -2512,6 +2513,27 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
         onOpenQuickSettings={() => setQuickSettingsOpen(true)}
         notify={notify}
       />
+      {detailsInvoice && (
+        <Modal title={`Edit Invoice ${detailsInvoice.number}`} onClose={() => { if (!saving) setDetailsInvoice(null); }}>
+          <form onSubmit={async e => {
+            e.preventDefault();
+            if (saving) return;
+            try {
+              setSaving(true);
+              const updated = await api.updateSaleDetails(detailsInvoice.id, { invoiceDate: detailsDate, notes: detailsNotes });
+              setRows(rows.map(row => String(row.id) === String(updated.id) ? updated : row));
+              setDetailsInvoice(null);
+              notify(`Sales invoice ${updated.number} updated`);
+            } catch (error) { notify(error instanceof Error ? error.message : "Invoice update failed"); }
+            finally { setSaving(false); }
+          }}>
+            <p>You can update the date and notes. To change items or amounts, restore the original items in the product master.</p>
+            <label>Sales Invoice Date<input type="date" required value={detailsDate} onChange={e => setDetailsDate(e.target.value)} /></label>
+            <label>Notes<textarea value={detailsNotes} onChange={e => setDetailsNotes(e.target.value)} /></label>
+            <button className="primary" type="submit" disabled={saving}>{saving ? "Saving..." : "Update Invoice"}</button>
+          </form>
+        </Modal>
+      )}
       {quickSettingsOpen && (
         <QuickInvoiceSettingsModal
           setting={setting}

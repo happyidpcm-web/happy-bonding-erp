@@ -875,6 +875,30 @@ app.post("/api/sales", requirePermission("sales.write"), async (req, res) => {
   res.status(201).json(row);
 });
 
+app.patch("/api/sales/:id/details", requirePermission("sales.write"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  const input = parseInput(z.object({ invoiceDate: z.coerce.date(), notes: z.string() }).strict(), req.body);
+  const organizationId = req.session!.organizationId;
+  const invoiceId = String(req.params.id);
+  const invoice = await db.$transaction(async tx => {
+    const previous = await tx.salesInvoice.findFirst({ where: { id: invoiceId, organizationId, branchId } });
+    if (!previous) return null;
+    if (previous.status === "CANCELLED") throw new Error("Cancelled invoice cannot be edited");
+    const updated = await tx.salesInvoice.update({
+      where: { id: previous.id },
+      data: { invoiceDate: input.invoiceDate, notes: input.notes },
+      include: { party: true, lines: { include: { variant: true } }, payments: { include: { payment: true } } },
+    });
+    await tx.auditEvent.create({ data: {
+      organizationId, actorId: req.session!.userId, action: "sales.updated", entityType: "SalesInvoice", entityId: previous.id,
+      metadata: { invoiceNumber: previous.invoiceNumber, previousDate: previous.invoiceDate.toISOString(), invoiceDate: input.invoiceDate.toISOString(), previousNotes: previous.notes, notes: input.notes },
+    } });
+    return updated;
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  if (!invoice) return res.status(404).json({ error: "Sales invoice not found" });
+  res.json(invoice);
+});
+
 app.put("/api/sales/:id", requirePermission("sales.write"), async (req, res) => {
   const branchId = requireBranch(req, res); if (!branchId) return;
   const input = parseInput(invoiceInput, { ...req.body, idempotencyKey: String(req.body?.idempotencyKey || `edit-${req.params.id}`) });

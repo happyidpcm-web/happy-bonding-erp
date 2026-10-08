@@ -267,6 +267,9 @@ export const api = {
       return rows.map(saleFromApi);
 
   },
+  async updateSaleDetails(id: string | number, input: { invoiceDate: string; notes: string }): Promise<Invoice> {
+      return saleFromApi(await request<SalesRow>(`/sales/${id}/details`, { method: "PATCH", body: JSON.stringify(input) }));
+  },
   async deleteSale(id: string | number): Promise<Invoice[]> {
       await request(`/sales/${id}`, { method: "DELETE" });
       return await api.sales();
@@ -334,8 +337,8 @@ export const api = {
 
 function partyFromApi(x: PartyRow): Party { return { id:x.id,name:x.name,phone:x.phone??"",type:x.type==="SUPPLIER"?"Supplier":"Customer",balance:Number(x.openingBalance),openingBalanceType:x.openingBalanceType==="TO_PAY"?"TO_PAY":"TO_COLLECT",email:x.email??"",gstin:x.gstin??"",pan:x.pan??"",category:x.category??"",address:x.address??"",shippingAddress:x.shippingAddress??"",sameAsBilling:x.sameAsBilling??true,creditPeriodDays:x.creditPeriodDays??30,creditLimit:Number(x.creditLimit??0),contactPersonName:x.contactPersonName??"",contactPersonDob:x.contactPersonDob??"",bankName:x.bankName??"",bankAccountName:x.bankAccountName??"",bankAccountNumber:x.bankAccountNumber??"",bankIfsc:x.bankIfsc??"",bankBranch:x.bankBranch??"",customBirthday:x.customBirthday??"",customKovilThiruvila:x.customKovilThiruvila??""}; }
 function productFromApi(x: ProductRow): Product { return {id:x.id,name:x.product.name,sku:x.sku,category:x.product.category,size:x.size??"-",stock:Number(x.balances[0]?.quantity??0),purchasePrice:Number(x.purchasePrice),sellingPrice:Number(x.sellingPrice),mrp:Number(x.mrp),hsnCode:x.product.hsnCode,taxRate:Number(x.product.taxRate.rate)}; }
-function saleFromApi(x: SalesRow): Invoice {
-  const d = new Date((x as any).postedAt || (x as any).createdAt || x.invoiceDate);
+export function saleFromApi(x: SalesRow): Invoice {
+  const d = new Date(x.invoiceDate);
   const timeStr = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
   const dateStr = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
   return {
