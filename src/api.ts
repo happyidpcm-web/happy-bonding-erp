@@ -18,6 +18,8 @@ type SalesRow = {
   id: string;
   invoiceNumber: string;
   invoiceDate: string;
+  createdAt?: string;
+  postedAt?: string | null;
   party: { name: string; phone?: string | null; address?: string | null; gstin?: string | null } | null;
   subtotal?: string;
   discountTotal?: string;
@@ -338,14 +340,18 @@ export const api = {
 function partyFromApi(x: PartyRow): Party { return { id:x.id,name:x.name,phone:x.phone??"",type:x.type==="SUPPLIER"?"Supplier":"Customer",balance:Number(x.openingBalance),openingBalanceType:x.openingBalanceType==="TO_PAY"?"TO_PAY":"TO_COLLECT",email:x.email??"",gstin:x.gstin??"",pan:x.pan??"",category:x.category??"",address:x.address??"",shippingAddress:x.shippingAddress??"",sameAsBilling:x.sameAsBilling??true,creditPeriodDays:x.creditPeriodDays??30,creditLimit:Number(x.creditLimit??0),contactPersonName:x.contactPersonName??"",contactPersonDob:x.contactPersonDob??"",bankName:x.bankName??"",bankAccountName:x.bankAccountName??"",bankAccountNumber:x.bankAccountNumber??"",bankIfsc:x.bankIfsc??"",bankBranch:x.bankBranch??"",customBirthday:x.customBirthday??"",customKovilThiruvila:x.customKovilThiruvila??""}; }
 function productFromApi(x: ProductRow): Product { return {id:x.id,name:x.product.name,sku:x.sku,category:x.product.category,size:x.size??"-",stock:Number(x.balances[0]?.quantity??0),purchasePrice:Number(x.purchasePrice),sellingPrice:Number(x.sellingPrice),mrp:Number(x.mrp),hsnCode:x.product.hsnCode,taxRate:Number(x.product.taxRate.rate)}; }
 export function saleFromApi(x: SalesRow): Invoice {
+  // Invoice date is a calendar date; midnight UTC is not the billing time.
   const d = new Date(x.invoiceDate);
-  const timeStr = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
-  const dateStr = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  const dateStr = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
+  const recordedAt = x.createdAt || x.postedAt;
+  const timeStr = recordedAt && Number.isFinite(Date.parse(recordedAt))
+    ? new Date(recordedAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" })
+    : "";
   return {
     id: x.id,
     number: x.invoiceNumber,
     dateISO: x.invoiceDate.slice(0, 10),
-    date: `${dateStr} ${timeStr}`,
+    date: timeStr ? `${dateStr} ${timeStr}` : dateStr,
     party: x.party?.name ?? "Cash Sale",
     partyId: (x as any).partyId,
     partyPhone: x.party?.phone ?? "",
