@@ -20,7 +20,7 @@ const key = new TextEncoder().encode(env.JWT_SECRET);
 
 export async function createToken(session: Session) {
   return new SignJWT(session as unknown as Record<string, unknown>)
-    .setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("8h").sign(key);
+    .setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("7d").sign(key);
 }
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {

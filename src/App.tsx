@@ -2082,6 +2082,9 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   const [showQr,setShowQr]=useState(false);
   const [markPaid,setMarkPaid]=useState(false);
   const [saving,setSaving]=useState(false);
+  const invoiceSaveInFlight = useRef(false);
+  const stockRefreshVersion = useRef(0);
+  useEffect(() => () => { stockRefreshVersion.current += 1; }, []);
   const [nextNumber,setNextNumber]=useState("");
   const [settingsOpen,setSettingsOpen]=useState(false);
   const [showAddItemsModal,setShowAddItemsModal]=useState(false);
@@ -2303,17 +2306,36 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   const createPartyFromInvoice=async(e:React.FormEvent<HTMLFormElement>)=>{e.preventDefault();try{setSaving(true);const saved=await api.createParty(partyPayloadFromForm(new FormData(e.currentTarget)));setParties([...parties,saved]);setSelectedParty(saved);setPartyOpen(false);setPartySearch(`${saved.name} ${saved.phone}`);setPartyModal(false);setNewParty({name:"",phone:"",address:"",gstin:""});notify("Party created and selected");}catch(error){notify(error instanceof Error?error.message:"Party save failed");}finally{setSaving(false);}};
   const resetInvoiceForm=()=>{setLines([]);setPartyOpen(false);setPaid(0);setNotes("");setInvoiceDiscount(0);setAdditionalCharges(0);setShowNotes(false);setShowTerms(false);setShowBank(false);setShowQr(false);setNewParty({name:"",phone:"",address:"",gstin:""});setPartySearch("");setSelectedParty(undefined);setMarkPaid(false);setInvoiceDate(new Date().toISOString().slice(0,10));};
   const saveInvoice=async(keepOpen=false)=>{
+    if (invoiceSaveInFlight.current) return;
     if(!lines.length)return notify("Add at least one item");
     if (!nextNumber) return notify("Invoice number is unavailable. Reopen the form after connecting to the backend.");
+    invoiceSaveInFlight.current = true;
+    const refreshVersion = ++stockRefreshVersion.current;
     try{
-{/* ... */}
       setSaving(true);
       let partyId=selectedParty?.id ? String(selectedParty.id) : undefined;
       const received=markPaid?total:paid;
       const payload={partyId,invoiceDate:new Date(invoiceDate),paidAmount:Math.min(received,total),paymentMode,notes:[notes,showTerms?terms:""].filter(Boolean).join("\n"),invoiceDiscount,additionalCharges,lines:lines.map(x=>({variantId:String(x.product.id),quantity:x.qty,unitPrice:x.product.sellingPrice,mrp:x.product.mrp,discount:x.discount,taxRate:x.taxRate??x.product.taxRate??0}))};
-      const next=editingInvoice?await api.updateSale(editingInvoice.id,payload):await api.createSale(payload);
-      setRows(next); setProducts(await api.products()); setParties(await api.parties()); setEditingInvoice(null); resetInvoiceForm(); setCreating(keepOpen && !editingInvoice); notify(editingInvoice?`Sales invoice ${editingInvoice.number} updated`:keepOpen?"Sales invoice saved. Ready for next invoice.":"Sales invoice saved");
-    }catch(error){notify(error instanceof Error?error.message:"Invoice save failed");}finally{setSaving(false);}
+      const saved=editingInvoice?await api.updateSale(editingInvoice.id,payload):await api.createSale(payload);
+      setRows([saved, ...rows.filter(row => String(row.id) !== String(saved.id))].sort((a, b) => (b.dateISO ?? "").localeCompare(a.dateISO ?? "")));
+      // Apply this bill's stock change immediately; reconcile other tills in the background.
+      const stockChanges = new Map<string, number>();
+      for (const line of editingInvoice?.lines ?? []) {
+        if (line.variantId) stockChanges.set(line.variantId, (stockChanges.get(line.variantId) ?? 0) + line.quantity);
+      }
+      for (const line of saved.lines ?? []) {
+        if (line.variantId) stockChanges.set(line.variantId, (stockChanges.get(line.variantId) ?? 0) - line.quantity);
+      }
+      setProducts(products.map(product => ({ ...product, stock: product.stock + (stockChanges.get(String(product.id)) ?? 0) })));
+      setNextNumber(""); setEditingInvoice(null); resetInvoiceForm(); setCreating(keepOpen && !editingInvoice);
+      notify(editingInvoice?`Sales invoice ${editingInvoice.number} updated`:keepOpen?"Sales invoice saved. Ready for next invoice.":"Sales invoice saved");
+      // A failed refresh must never turn a committed bill into a "save failed" result.
+      void api.products().then(updated => {
+        if (stockRefreshVersion.current === refreshVersion) setProducts(updated);
+      }).catch(() => {
+        if (stockRefreshVersion.current === refreshVersion) notify("Invoice saved. Stock refresh failed; refresh the page to get the latest stock.");
+      });
+    }catch(error){notify(error instanceof Error?error.message:"Invoice save failed");}finally{invoiceSaveInFlight.current = false; setSaving(false);}
   };
   const showEditHistory = async (inv: Invoice) => {
     setHistoryInvoice(inv);
@@ -2532,15 +2554,19 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
                     <input
                       ref={partySearchInputRef}
                       value={partySearch}
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
                       autoFocus
                       onFocus={() => setPartyOpen(true)}
                       onChange={e => {
-                        setPartySearch(e.target.value);
+                        const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+                        setPartySearch(value);
                         setPartyOpen(true);
                         setSelectedParty(undefined);
-                        setNewParty({ ...newParty, phone: /^\d+$/.test(e.target.value.trim()) ? e.target.value.trim() : newParty.phone, name: /^\d+$/.test(e.target.value.trim()) ? newParty.name : e.target.value.trim() });
+                        setNewParty({ ...newParty, phone: value });
                       }}
-                      placeholder="Search party by name or number..."
+                      placeholder="Search party by mobile number..."
                     />
                     {partyOpen && (
                       <div className="search-results party-dropdown">

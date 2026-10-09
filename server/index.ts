@@ -815,7 +815,8 @@ app.post("/api/sales", requirePermission("sales.write"), async (req, res) => {
   const branchId = requireBranch(req, res); if (!branchId) return;
   const input = parseInput(invoiceInput, req.body);
   if (input.partyId && !await db.party.findFirst({ where: { id: input.partyId, branchId, organizationId: req.session!.organizationId, active: true } })) return res.status(400).json({ error: "Party does not belong to this branch" }); const organizationId = req.session!.organizationId;
-  const existing = await db.salesInvoice.findUnique({ where: { organizationId_branchId_idempotencyKey: { organizationId, branchId, idempotencyKey: input.idempotencyKey } } });
+  const savedInvoiceInclude = { party: true, lines: { include: { variant: true } }, payments: { include: { payment: true } } };
+  const existing = await db.salesInvoice.findUnique({ where: { organizationId_branchId_idempotencyKey: { organizationId, branchId, idempotencyKey: input.idempotencyKey } }, include: savedInvoiceInclude });
   if (existing) return res.json(existing);
   const organization = await db.organization.findUniqueOrThrow({ where: { id: organizationId } });
   const variants = await db.productVariant.findMany({ where: { id: { in: input.lines.map(x => x.variantId) }, product: { organizationId, branchId } }, include: { product: { include: { taxRate: true } }, balances: { where: { branchId } } } });
@@ -870,7 +871,8 @@ app.post("/api/sales", requirePermission("sales.write"), async (req, res) => {
     const invoice = await tx.salesInvoice.create({ data: { organizationId, branchId, partyId: input.partyId, invoiceNumber: number, invoiceDate: input.invoiceDate, status: "POSTED", paymentStatus: paymentStatus(input.paidAmount, grandTotal), placeOfSupply: input.placeOfSupply, subtotal: lineSubtotal, discountTotal: round2(lineDiscount + input.invoiceDiscount), invoiceDiscount: input.invoiceDiscount, additionalCharges: input.additionalCharges, taxableTotal: lineTaxable, cgstTotal: calculated.reduce((s,x)=>s+x.cgst,0), sgstTotal: calculated.reduce((s,x)=>s+x.sgst,0), igstTotal: calculated.reduce((s,x)=>s+x.igst,0), grandTotal, paidAmount: Math.min(input.paidAmount, grandTotal), notes: input.notes, idempotencyKey: input.idempotencyKey, postedAt: new Date(), lines: { create: calculated.map(x => ({ variantId: x.v.id, itemName: x.v.product.name, sku: x.v.sku, hsnCode: x.v.product.hsnCode ?? "", quantity: x.input.quantity, unitPrice: x.input.unitPrice, mrp: x.input.mrp ?? x.v.mrp, purchasePriceAtSale: x.v.purchasePrice, totalCostAtSale: Number(x.v.purchasePrice) * x.input.quantity, discount: x.input.discount, taxableAmount: x.taxable, taxRate: x.rate, cgst: x.cgst, sgst: x.sgst, igst: x.igst, total: x.total })) } } });
     for (const x of calculated) { await tx.stockBalance.update({ where: { branchId_variantId: { branchId, variantId: x.v.id } }, data: { quantity: { decrement: x.input.quantity } } }); await tx.stockMovement.create({ data: { branchId, variantId: x.v.id, type: "SALE", quantity: -x.input.quantity, referenceType: "SalesInvoice", referenceId: invoice.id } }); }
     if (input.paidAmount > 0) { const payment = await tx.payment.create({ data: { organizationId, branchId, direction: "IN", mode: input.paymentMode, amount: Math.min(input.paidAmount, grandTotal) } }); await tx.paymentAllocation.create({ data: { paymentId: payment.id, salesInvoiceId: invoice.id, amount: Math.min(input.paidAmount, grandTotal) } }); }
-    await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: "sales.posted", entityType: "SalesInvoice", entityId: invoice.id, metadata: { invoiceNumber: number } } }); return invoice;
+    await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: "sales.posted", entityType: "SalesInvoice", entityId: invoice.id, metadata: { invoiceNumber: number } } });
+    return tx.salesInvoice.findUniqueOrThrow({ where: { id: invoice.id }, include: savedInvoiceInclude });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   res.status(201).json(row);
 });
@@ -932,7 +934,7 @@ app.put("/api/sales/:id", requirePermission("sales.write"), async (req, res) => 
 
   const finalPaidAmount = round2(Math.min(grandTotal, input.paidAmount));
 
-  await db.$transaction(async tx => {
+  const savedInvoice = await db.$transaction(async tx => {
     // Read receipts inside the transaction to protect concurrent payment edits.
     const oldInvoice = await tx.salesInvoice.findFirstOrThrow({
       where: { id: invoiceId, organizationId, branchId },
@@ -1009,8 +1011,10 @@ app.put("/api/sales/:id", requirePermission("sales.write"), async (req, res) => 
       await tx.paymentAllocation.create({ data: { paymentId: payment.id, salesInvoiceId: oldInvoice.id, amount: newlyReceived } });
     }
     await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: "sales.updated", entityType: "SalesInvoice", entityId: oldInvoice.id, metadata: { invoiceNumber: oldInvoice.invoiceNumber, previousTotal: Number(oldInvoice.grandTotal), total: grandTotal, previousPaidAmount: Number(oldInvoice.paidAmount), paidAmount: finalPaidAmount, paymentCorrections, unlinkedPaidCorrection: round2(Math.max(0, existingPaymentTotal - linkedPaid) - Math.max(0, finalPaidAmount - linkedPaid - newlyReceived)) } } });
+    return tx.salesInvoice.findUniqueOrThrow({ where: { id: invoiceId }, include: { party: true, lines: { include: { variant: true } }, payments: { include: { payment: true } } } });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
+  if (req.query.response === "invoice") return res.json(savedInvoice);
   const rows = await db.salesInvoice.findMany({ where: { organizationId, branchId }, include: { party: true, lines: { include: { variant: true } } }, orderBy: { invoiceDate: "desc" }, take: 50000 });
   res.json(rows);
 });
