@@ -155,6 +155,29 @@ test("PUT partial payment and paid-to-unpaid correction avoid stock and retain a
   assert.equal(corrected.audits[0].metadata.paymentCorrections[0].after, 0);
 });
 
+test("PUT fully paid settles the saved total despite browser rounding differences", async () => {
+  const previous = { ...saved(), grandTotal: 200.01, paidAmount: 150 };
+  const result = await runEdit(input({ paidAmount: 200, markFullyPaid: true }), previous);
+  assert.equal(result.data.paidAmount, 200.01);
+  assert.equal(result.data.paymentStatus, PaymentStatus.PAID);
+  assert.equal(result.payments[0].amount, 50.01);
+  assert.equal(result.stockCalls, 0);
+  assert.equal(result.lineDeletes, 0);
+  assert.equal(result.data.grandTotal, undefined);
+
+  const partial = await runEdit(input({ paidAmount: 200 }), previous);
+  assert.equal(partial.data.paidAmount, 200);
+  assert.equal(partial.data.paymentStatus, PaymentStatus.PARTIALLY_PAID);
+});
+
+test("PUT fully paid uses the updated total when charges change", async () => {
+  const result = await runEdit(input({ paidAmount: 200, additionalCharges: 25, markFullyPaid: true }));
+  assert.equal(result.data.grandTotal, 225);
+  assert.equal(result.data.paidAmount, 225);
+  assert.equal(result.data.paymentStatus, PaymentStatus.PAID);
+  assert.equal(result.payments[0].amount, 225);
+});
+
 test("PUT price plus payment changes recalculate totals without stock writes", async () => {
   const result = await runEdit(input({ lines: [{ ...line, unitPrice: 150 }], paidAmount: 300 }));
   assert.equal(result.stockCalls, 0);

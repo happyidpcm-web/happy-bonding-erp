@@ -2330,7 +2330,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
       setSaving(true);
       let partyId=selectedParty?.id ? String(selectedParty.id) : undefined;
       const received=markPaid?total:paid;
-      const payload={partyId,invoiceDate:new Date(invoiceDate),paidAmount:Math.min(received,total),paymentMode,notes:[notes,showTerms?terms:""].filter(Boolean).join("\n"),invoiceDiscount,additionalCharges,lines:lines.map(x=>({variantId:String(x.product.id),quantity:x.qty,unitPrice:x.product.sellingPrice,mrp:x.product.mrp,discount:x.discount,taxRate:x.taxRate??x.product.taxRate??0}))};
+      const payload={partyId,invoiceDate:new Date(invoiceDate),paidAmount:Math.min(received,total),markFullyPaid:markPaid,paymentMode,notes:[notes,showTerms?terms:""].filter(Boolean).join("\n"),invoiceDiscount,additionalCharges,lines:lines.map(x=>({variantId:String(x.product.id),quantity:x.qty,unitPrice:x.product.sellingPrice,mrp:x.product.mrp,discount:x.discount,taxRate:x.taxRate??x.product.taxRate??0}))};
       const saved=editingInvoice?await api.updateSale(editingInvoice.id,payload):await api.createSale(payload);
       setRows([saved, ...rows.filter(row => String(row.id) !== String(saved.id))].sort((a, b) => (b.dateISO ?? "").localeCompare(a.dateISO ?? "")));
       // Apply this bill's stock change immediately; reconcile other tills in the background.

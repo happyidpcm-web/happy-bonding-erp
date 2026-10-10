@@ -12,7 +12,7 @@ const end = source.indexOf('app.patch("/api/sales/:id/details",', start);
 assert.ok(start >= 0 && end > start);
 const code = stripTypeScriptTypes(source.slice(start, end));
 
-async function save({ quantities = [1, 2], available = 10, failAudit = false, existing = false, maximum = 9, sequenceNext = 10 } = {}) {
+async function save({ markFullyPaid = false, quantities = [1, 2], available = 10, failAudit = false, existing = false, maximum = 9, sequenceNext = 10 } = {}) {
   let handler: any;
   let response: any;
   let invoiceData: any;
@@ -67,7 +67,7 @@ async function save({ quantities = [1, 2], available = 10, failAudit = false, ex
   let error: unknown;
   try {
     const res = { status: () => res, json: (data: any) => { response = data; } };
-    await handler({ body: { idempotencyKey: "test-save-1", invoiceDate: "2026-10-10", placeOfSupply: "33", paidAmount: 150, lines: quantities.map(quantity => ({ variantId: "shirt", quantity, unitPrice: 100, discount: 0 })) }, session: { organizationId: "test-org", userId: "tester" } }, res);
+    await handler({ body: { idempotencyKey: "test-save-1", invoiceDate: "2026-10-10", placeOfSupply: "33", paidAmount: 150, markFullyPaid, lines: quantities.map(quantity => ({ variantId: "shirt", quantity, unitPrice: 100, discount: 0 })) }, session: { organizationId: "test-org", userId: "tester" } }, res);
   } catch (e) { error = e; }
   return { response, invoiceData, movements, payments, allocations, stock, stockWrites, bulkWrites, aggregateReads, transactions, sequence, error };
 }
@@ -143,4 +143,13 @@ test("number lookup keeps custom prefixes parameterized and retains rollout floo
   assert.equal(await nextAvailableSalesNumber(client, "org", "branch", prefix), 1);
   client.$queryRaw = async () => [{ maximum: 5 }];
   assert.equal(await nextAvailableSalesNumber(client, "org", "cmti1m17y0001w4zwwin3hmr8", "HB/SL/26-27/"), 1763);
+});
+
+ test("fully paid creation aligns status, receipt and allocation with server total", async () => {
+  const result = await save({ markFullyPaid: true });
+  assert.equal(result.error, undefined);
+  assert.equal(result.response.paymentStatus, "PAID");
+  assert.equal(result.response.paidAmount, 300);
+  assert.equal(result.payments[0].amount, 300);
+  assert.equal(result.allocations[0].amount, 300);
 });

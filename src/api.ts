@@ -259,14 +259,14 @@ export const api = {
     const row = await request<SalesRow>(`/sales/${id}`);
     return saleFromApi(row);
   },
-  async createSale(input: { partyId?: string; invoiceDate?: Date; paidAmount: number; paymentMode: "Cash" | "UPI" | "Card" | "Bank"; notes?: string; invoiceDiscount?: number; additionalCharges?: number; lines: Array<{ variantId: string; quantity: number; unitPrice: number; discount: number; taxRate?: number }> }): Promise<Invoice> {
-      const row = await request<SalesRow>("/sales", { method: "POST", body: JSON.stringify({ idempotencyKey: crypto.randomUUID(), partyId: input.partyId, invoiceDate: (input.invoiceDate ?? new Date()).toISOString(), placeOfSupply: "33", paidAmount: input.paidAmount, paymentMode: input.paymentMode, notes: input.notes, invoiceDiscount: input.invoiceDiscount ?? 0, additionalCharges: input.additionalCharges ?? 0, lines: input.lines }) });
+  async createSale(input: { partyId?: string; invoiceDate?: Date; markFullyPaid?: boolean; paidAmount: number; paymentMode: "Cash" | "UPI" | "Card" | "Bank"; notes?: string; invoiceDiscount?: number; additionalCharges?: number; lines: Array<{ variantId: string; quantity: number; unitPrice: number; discount: number; taxRate?: number }> }): Promise<Invoice> {
+      const row = await request<SalesRow>("/sales", { method: "POST", body: JSON.stringify({ idempotencyKey: crypto.randomUUID(), partyId: input.partyId, invoiceDate: (input.invoiceDate ?? new Date()).toISOString(), placeOfSupply: "33", paidAmount: input.paidAmount, markFullyPaid: input.markFullyPaid, paymentMode: input.paymentMode, notes: input.notes, invoiceDiscount: input.invoiceDiscount ?? 0, additionalCharges: input.additionalCharges ?? 0, lines: input.lines }) });
       return saleFromApi(row);
 
   },
-  async updateSale(id: string | number, input: { partyId?: string; invoiceDate?: Date; paidAmount: number; paymentMode: "Cash" | "UPI" | "Card" | "Bank"; notes?: string; invoiceDiscount?: number; additionalCharges?: number; lines: Array<{ variantId: string; quantity: number; unitPrice: number; discount: number; taxRate?: number }> }): Promise<Invoice> {
+  async updateSale(id: string | number, input: { partyId?: string; invoiceDate?: Date; markFullyPaid?: boolean; paidAmount: number; paymentMode: "Cash" | "UPI" | "Card" | "Bank"; notes?: string; invoiceDiscount?: number; additionalCharges?: number; lines: Array<{ variantId: string; quantity: number; unitPrice: number; discount: number; taxRate?: number }> }): Promise<Invoice> {
       // Allow time for the 30s edit transaction plus authentication and response delivery.
-      const row = await request<SalesRow>(`/sales/${id}?response=invoice`, { method: "PUT", body: JSON.stringify({ idempotencyKey: `edit-${id}-${Date.now()}`, partyId: input.partyId, invoiceDate: (input.invoiceDate ?? new Date()).toISOString(), placeOfSupply: "33", paidAmount: input.paidAmount, paymentMode: input.paymentMode, notes: input.notes, invoiceDiscount: input.invoiceDiscount ?? 0, additionalCharges: input.additionalCharges ?? 0, lines: input.lines }) }, 60000);
+      const row = await request<SalesRow>(`/sales/${id}?response=invoice`, { method: "PUT", body: JSON.stringify({ idempotencyKey: `edit-${id}-${Date.now()}`, partyId: input.partyId, invoiceDate: (input.invoiceDate ?? new Date()).toISOString(), placeOfSupply: "33", paidAmount: input.paidAmount, markFullyPaid: input.markFullyPaid, paymentMode: input.paymentMode, notes: input.notes, invoiceDiscount: input.invoiceDiscount ?? 0, additionalCharges: input.additionalCharges ?? 0, lines: input.lines }) }, 60000);
       return saleFromApi(row);
 
   },

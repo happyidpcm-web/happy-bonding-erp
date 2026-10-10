@@ -17,12 +17,13 @@ test("create and edit return the saved invoice without downloading sales history
     localStorage: { getItem() { return null; } },
     fetch: async (url: string, options: RequestInit) => {
       calls.push({ url, method: options.method });
+      assert.equal(JSON.parse(options.body as string).markFullyPaid, true);
       assert.ok(options.method === "POST" || options.method === "PUT", "Saving must not reload the sales list");
       return new Response(JSON.stringify(row), { headers: { "content-type": "application/json" } });
     },
   });
   try {
-    const input = { paidAmount: 100, paymentMode: "UPI" as const, lines: [{ variantId: "item-1", quantity: 1, unitPrice: 100, discount: 0 }] };
+    const input = { paidAmount: 100, markFullyPaid: true, paymentMode: "UPI" as const, lines: [{ variantId: "item-1", quantity: 1, unitPrice: 100, discount: 0 }] };
     for (const saved of [await api.createSale(input), await api.updateSale("saved-1", input)]) {
       assert.equal(saved.id, "saved-1");
       assert.equal(saved.party, "Customer");
