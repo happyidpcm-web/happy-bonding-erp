@@ -219,7 +219,8 @@ export function DashboardLive({
     window.addEventListener("focus", refresh);
     return () => { active = false; window.removeEventListener("focus", refresh); };
   }, [branchId, reload]);
-  const displayList = showAll ? transactions : transactions.slice(0, 10);
+  const invoiceTransactions = transactions.filter(row => row.type === "Sales Invoice" || row.type === "Purchase Invoice");
+  const displayList = showAll ? invoiceTransactions : invoiceTransactions.slice(0, 10);
   const onSeeAllTransactions = () => setShowAll(value => !value);
 
   return (
@@ -269,7 +270,7 @@ export function DashboardLive({
                 {!loading && !error && !displayList.length && (
                   <tr>
                     <td colSpan={5} style={{ textAlign: "center", padding: "20px", color: "#64748b" }}>
-                      No transactions recorded yet. Click <strong>+ Create Sales Invoice</strong> to add a sale.
+                      No sales or purchase invoices recorded yet. Click <strong>+ Create Sales Invoice</strong> to add a sale.
                     </td>
                   </tr>
                 )}

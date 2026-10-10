@@ -959,6 +959,10 @@ export function GenericVoucherPage({
   const [creatingFullVoucher, setCreatingFullVoucher] = useState(false);
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherRecord | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  useEffect(() => { setSelectedIds(new Set()); setOpenMenuId(null); }, [type]);
   const purchaseDocumentRef = useRef<HTMLDivElement>(null);
   const [purchasePdfDownloading, setPurchasePdfDownloading] = useState(false);
   const [records, setRecords] = useState<VoucherRecord[]>([]);
@@ -1039,21 +1043,26 @@ export function GenericVoucherPage({
     }
   };
 
-  const handleDeleteVoucher = async (voucher: VoucherRecord) => {
-    if (!window.confirm(`Delete ${type} ${voucher.number}?${type === "Purchase Invoice" ? " Stock will be reduced." : ""}`)) return;
+  const deleteVouchers = async (targets: VoucherRecord[]) => {
+    if (deleting || !targets.length) return;
+    if (!window.confirm(`Delete ${targets.length === 1 ? targets[0].number : `${targets.length} invoices`}?${type === "Purchase Invoice" ? " Stock and associated payments will be reversed." : ""} This cannot be undone.`)) return;
+    setDeleting(true); setOpenMenuId(null);
+    const deleted = new Set<string>();
+    const failures: string[] = [];
     try {
-      await api.deleteVoucher(voucher.id);
-      if (type === "Purchase Invoice" && onProductsChanged) onProductsChanged(await api.products());
-    } catch (error) {
-      notify(error instanceof Error ? error.message : `${type} delete failed`);
-      return;
-    }
-    const nextRecords = records.filter(row => row.id !== voucher.id);
-    setRecords(nextRecords);
-    localStorage.setItem(`hb_vouchers_${type}`, JSON.stringify(nextRecords));
-    notify(`${type} ${voucher.number} deleted successfully`);
-    if (selectedVoucher?.id === voucher.id) setSelectedVoucher(null);
+      for (const voucher of targets) {
+        try { await api.deleteVoucher(voucher.id); deleted.add(voucher.id); }
+        catch (error) { failures.push(`${voucher.number}: ${error instanceof Error ? error.message : "Delete failed"}`); }
+      }
+      setRecords(rows => rows.filter(row => !deleted.has(row.id)));
+      setSelectedIds(ids => new Set([...ids].filter(id => !deleted.has(id))));
+      if (selectedVoucher && deleted.has(selectedVoucher.id)) setSelectedVoucher(null);
+      if (deleted.size && type === "Purchase Invoice" && onProductsChanged) onProductsChanged(await api.products());
+      notify(`${deleted.size} invoice(s) deleted.${failures.length ? ` ${failures.length} failed: ${failures.join("; ")}` : ""}`);
+    } catch { notify("Deletion processed. Reload the page to refresh stock."); }
+    finally { setDeleting(false); }
   };
+  const handleDeleteVoucher = (voucher: VoucherRecord) => deleteVouchers([voucher]);
 
   if (creatingFullVoucher) {
     return (
@@ -1243,12 +1252,14 @@ export function GenericVoucherPage({
         </div>
       </article>
 
+      {type === "Purchase Invoice" && <button className="secondary" disabled={deleting || !filtered.some(row => selectedIds.has(row.id))} onClick={() => void deleteVouchers(filtered.filter(row => selectedIds.has(row.id)))} style={{ marginBottom: 12, color: "#dc2626" }}><Trash2 size={15} /> {deleting ? "Deleting..." : `Delete selected (${filtered.filter(row => selectedIds.has(row.id)).length})`}</button>}
       {/* Table Card matching Reference Image */}
       <article className="card table-card" style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
         <div className="table-scroll">
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0", textTransform: "uppercase", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+                {type === "Purchase Invoice" && <th><input aria-label="Select all purchase invoices" type="checkbox" disabled={deleting} checked={filtered.length > 0 && filtered.every(row => selectedIds.has(row.id))} onChange={() => setSelectedIds(filtered.every(row => selectedIds.has(row.id)) ? new Set() : new Set(filtered.map(row => row.id)))} /></th>}
                 <th style={{ padding: "12px 16px", textAlign: "left" }}>Date ⇅</th>
                 <th style={{ padding: "12px 16px", textAlign: "left" }}>Number</th>
                 <th style={{ padding: "12px 16px", textAlign: "left" }}>Party Name</th>
@@ -1265,6 +1276,7 @@ export function GenericVoucherPage({
             <tbody>
               {filtered.map(row => (
                 <tr key={row.id} style={{ borderBottom: "1px solid #f1f5f9", fontSize: 13, color: "#1e293b" }}>
+                  {type === "Purchase Invoice" && <td><input aria-label={`Select ${row.number}`} type="checkbox" disabled={deleting} checked={selectedIds.has(row.id)} onChange={() => setSelectedIds(ids => { const next = new Set(ids); if (next.has(row.id)) next.delete(row.id); else next.add(row.id); return next; })} /></td>}
                   <td style={{ padding: "14px 16px", color: "#64748b" }}>{row.date}</td>
                   <td style={{ padding: "14px 16px" }} className="mono"><strong>{row.number}</strong></td>
                   <td style={{ padding: "14px 16px" }}><strong>{row.party}</strong></td>
@@ -1287,15 +1299,16 @@ export function GenericVoucherPage({
                     <button type="button" className="icon-pencil-btn" style={{ marginLeft: 6, padding: "4px 6px" }} onClick={() => type === "Purchase Invoice" ? setSelectedVoucher(row) : notify(`${type} ${row.number} sent to print`)} title="Print">
                       <Printer size={14} />
                     </button>
-                    <button type="button" disabled={type === "Purchase Invoice"} className="icon-pencil-btn" style={{ marginLeft: 6, padding: "4px 6px", color: "#dc2626" }} onClick={() => handleDeleteVoucher(row)} title={type === "Purchase Invoice" ? "Saved purchase protected; use Edit" : "Delete"}>
-                      <Trash2 size={14} />
-                    </button>
+                    <div style={{ display: "inline-block" }}>
+                      <button type="button" className="icon-button" aria-label={`Actions for ${row.number}`} aria-expanded={openMenuId === row.id} disabled={deleting} onClick={() => setOpenMenuId(openMenuId === row.id ? null : row.id)}><MoreVertical size={16} /></button>
+                      {openMenuId === row.id && <div role="menu"><button type="button" role="menuitem" className="secondary compact" style={{ color: "#dc2626" }} disabled={deleting} onClick={() => void handleDeleteVoucher(row)}><Trash2 size={14} /> Delete</button></div>}
+                    </div>
                   </td>
                 </tr>
               ))}
               {!filtered.length && (
                 <tr>
-                  <td colSpan={type === "Purchase Invoice" ? 9 : 7} style={{ textAlign: "center", padding: "80px 20px" }}>
+                  <td colSpan={type === "Purchase Invoice" ? 10 : 7} style={{ textAlign: "center", padding: "80px 20px" }}>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
                       <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <FileSpreadsheet size={32} color="#94a3b8" />

@@ -147,20 +147,29 @@ voucherRouter.delete('/:id', async (req, res) => {
   const organizationId = req.session!.organizationId;
   const row = await db.voucher.findFirst({ where: { id: String(req.params.id), organizationId, branchId } });
   if (!row) return res.status(404).json({ error: 'Voucher not found' });
-  if (row.type === 'Purchase Invoice') return res.status(409).json({ error: 'Saved purchases cannot be deleted. Use Edit for corrections.' });
   if (!req.session!.permissions.some(p => p === '*' || p === permission(row.type))) return res.status(403).json({ error: 'Permission denied' });
-  await db.$transaction(async tx => {
-    if (row.type === 'Purchase Invoice') {
-      const movements = await tx.stockMovement.findMany({ where: { branchId, referenceType: 'PurchaseInvoice', referenceId: row.number, type: 'PURCHASE' } });
-      for (const move of movements) {
-        const changed = await tx.stockBalance.updateMany({ where: { branchId, variantId: move.variantId, quantity: { gte: move.quantity } }, data: { quantity: { decrement: move.quantity } } });
-        if (changed.count !== 1) throw new Error('Insufficient stock to reverse this purchase.');
-        await tx.stockMovement.create({ data: { branchId, variantId: move.variantId, type: 'ADJUSTMENT_OUT', quantity: move.quantity.negated(), unitCost: move.unitCost, referenceType: 'PurchaseInvoiceDelete', referenceId: row.id } });
+  try {
+    await db.$transaction(async tx => {
+      const current = await tx.voucher.findFirst({ where: { id: row.id, organizationId, branchId } });
+      if (!current) throw new Error('Invoice already deleted. Reload the list.');
+      const quantities = new Map<string, number>();
+      if (current.type === 'Purchase Invoice') {
+        const movements = await tx.stockMovement.findMany({ where: { branchId, referenceType: { in: ['PurchaseInvoice', 'PurchaseInvoiceEdit'] }, referenceId: current.number } });
+        if (!movements.length) throw new Error('Original stock receipt is missing; review this invoice before deleting.');
+        for (const move of movements) quantities.set(move.variantId, (quantities.get(move.variantId) || 0) + Number(move.quantity));
+        for (const [variantId, quantity] of quantities) {
+          if (quantity < 0) throw new Error('Purchase stock history requires review.');
+          if (!quantity) continue;
+          const changed = await tx.stockBalance.updateMany({ where: { branchId, variantId, quantity: { gte: quantity } }, data: { quantity: { decrement: quantity } } });
+          if (changed.count !== 1) throw new Error('Insufficient stock to reverse this purchase.');
+          await tx.stockMovement.create({ data: { branchId, variantId, type: 'ADJUSTMENT_OUT', quantity: -quantity, referenceType: 'PurchaseInvoiceDelete', referenceId: current.id } });
+        }
       }
-    }
-    await tx.voucher.delete({ where: { id: row.id } });
-    await tx.payment.deleteMany({ where: { organizationId, branchId, reference: `Voucher:${row.id}` } });
-    await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: 'voucher.deleted', entityType: 'Voucher', entityId: row.id } });
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      await tx.voucher.delete({ where: { id: current.id } });
+      await tx.payment.deleteMany({ where: { organizationId, branchId, reference: `Voucher:${current.id}` } });
+      if (current.type === 'Purchase Invoice') await syncLatestPurchasePrices(tx, organizationId, branchId, [...quantities.keys()]);
+      await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: 'voucher.deleted', entityType: 'Voucher', entityId: current.id, metadata: { before: JSON.parse(JSON.stringify(current)) } } });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 30000 });
+  } catch (error) { return res.status(409).json({ error: error instanceof Error ? error.message : 'Delete failed; reload and retry.' }); }
   res.json({ ok: true });
 });

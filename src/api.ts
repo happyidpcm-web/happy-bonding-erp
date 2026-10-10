@@ -273,9 +273,8 @@ export const api = {
   async updateSaleDetails(id: string | number, input: { invoiceDate: string; notes: string }): Promise<Invoice> {
       return saleFromApi(await request<SalesRow>(`/sales/${id}/details`, { method: "PATCH", body: JSON.stringify(input) }));
   },
-  async deleteSale(id: string | number): Promise<Invoice[]> {
-      await request(`/sales/${id}`, { method: "DELETE" });
-      return await api.sales();
+  async deleteSale(id: string | number): Promise<void> {
+      await request(`/sales/${id}`, { method: "DELETE" }, 60000);
 
   },
   async cancelSale(id: string | number): Promise<Invoice[]> {

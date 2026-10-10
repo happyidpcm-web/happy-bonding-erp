@@ -1034,7 +1034,27 @@ app.put("/api/sales/:id", requirePermission("sales.write"), async (req, res) => 
 });
 
 app.delete("/api/sales/:id", requirePermission("sales.write"), async (req, res) => {
-  return res.status(409).json({ error: "Saved sales invoices cannot be deleted. Use Edit for corrections. Record goods actually returned through a verified sales return process." });
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  const organizationId = req.session!.organizationId;
+  try {
+    await db.$transaction(async tx => {
+      const invoice = await tx.salesInvoice.findFirst({ where: { id: String(req.params.id), organizationId, branchId }, include: { creditNotes: true, payments: { include: { payment: true } } } });
+      if (!invoice) throw new Error("Invoice not found or already deleted. Reload the list.");
+      if (invoice.creditNotes.length) throw new Error("This invoice has linked credit notes. Resolve those before deleting it.");
+      // Deleting a bill does not represent returned goods; preserve stock and movement history.
+      for (const allocation of invoice.payments) {
+        const payment = allocation.payment;
+        if (payment.organizationId !== organizationId || payment.branchId !== branchId || Number(payment.amount) < Number(allocation.amount)) throw new Error("Payment history requires review before deletion.");
+        await tx.paymentAllocation.delete({ where: { id: allocation.id } });
+        const remaining = Number(payment.amount) - Number(allocation.amount);
+        if (remaining > 0) await tx.payment.update({ where: { id: payment.id }, data: { amount: { decrement: allocation.amount } } });
+        else await tx.payment.delete({ where: { id: payment.id } });
+      }
+      await tx.salesInvoice.delete({ where: { id: invoice.id } });
+      await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: "sales.deleted", entityType: "SalesInvoice", entityId: invoice.id, metadata: { before: JSON.parse(JSON.stringify(invoice)) } } });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 30000 });
+    res.json({ ok: true });
+  } catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : "Invoice deletion failed. Reload and retry." }); }
 });
 
 app.get("/api/settings/business", async (req, res) => {

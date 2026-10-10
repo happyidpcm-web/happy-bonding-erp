@@ -1302,6 +1302,7 @@ export function customRangeLabel(range: CustomDateRange) {
 
 function SalesInvoicesListView({
   rows,
+  onDeleted,
   onCreateNew,
   onSelectInvoice,
   onEditInvoice,
@@ -1313,6 +1314,7 @@ function SalesInvoicesListView({
   notify,
 }: {
   rows: Invoice[];
+  onDeleted: (ids: Set<string | number>) => Promise<void>;
   onCreateNew: () => void;
   onSelectInvoice: (inv: Invoice) => void;
   onEditInvoice: (inv: Invoice) => void;
@@ -1323,6 +1325,26 @@ function SalesInvoicesListView({
   onOpenQuickSettings: () => void;
   notify: (msg: string) => void;
 }) {
+  const [deleting, setDeleting] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const bulkRef = useDismissibleDropdown(bulkOpen, () => setBulkOpen(false));
+  const deleteInvoices = async (targets: Invoice[]) => {
+    if (deleting || !targets.length) return;
+    if (!window.confirm(`Delete ${targets.length === 1 ? targets[0].number : `${targets.length} sales invoices`}? Stock will remain unchanged. Allocated receipts will be reversed. This cannot be undone.`)) return;
+    setDeleting(true); setBulkOpen(false); setOpenMenuId(null);
+    const deleted = new Set<string | number>();
+    const failures: string[] = [];
+    try {
+      for (const invoice of targets) {
+        try { await api.deleteSale(invoice.id); deleted.add(invoice.id); }
+        catch (error) { failures.push(`${invoice.number}: ${error instanceof Error ? error.message : "Delete failed"}`); }
+      }
+      setSelectedIds(ids => new Set([...ids].filter(id => !deleted.has(id))));
+      if (deleted.size) await onDeleted(deleted);
+      notify(`${deleted.size} invoice(s) deleted.${failures.length ? ` ${failures.length} failed: ${failures.join("; ")}` : ""}`);
+    } catch (error) { notify(`Deletion processed; refresh failed. Reload the page. ${error instanceof Error ? error.message : ""}`); }
+    finally { setDeleting(false); }
+  };
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "unpaid" | "cancelled">("all");
   const [dateFilter, setDateFilter] = useState("Last 365 Days");
@@ -1432,7 +1454,7 @@ function SalesInvoicesListView({
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === filtered.length) setSelectedIds(new Set());
+    if (filtered.every(row => selectedIds.has(row.id))) setSelectedIds(new Set());
     else setSelectedIds(new Set(filtered.map(x => x.id)));
   };
 
@@ -1639,14 +1661,18 @@ function SalesInvoicesListView({
         </div>
 
         <div className="sales-toolbar-right-group">
+          <div ref={bulkRef} style={{ position: "relative" }}>
           <button
             type="button"
             className="sales-bulk-actions-btn"
-            onClick={() => notify("Select items for Bulk Actions")}
+            disabled={deleting || !filtered.some(row => selectedIds.has(row.id))}
+            onClick={() => setBulkOpen(!bulkOpen)}
           >
-            <span>Bulk Actions</span>
+            <span>{deleting ? "Deleting..." : `Bulk Actions (${filtered.filter(row => selectedIds.has(row.id)).length})`}</span>
             <ChevronDown size={14} />
           </button>
+          {bulkOpen && <div className="sales-context-menu-popover"><button type="button" onClick={() => void deleteInvoices(filtered.filter(row => selectedIds.has(row.id)))}><Trash2 size={14} /> Delete selected</button></div>}
+          </div>
 
           <button
             type="button"
@@ -1667,7 +1693,7 @@ function SalesInvoicesListView({
                 <th style={{ width: 36, textAlign: "center" }}>
                   <input
                     type="checkbox"
-                    checked={selectedIds.size > 0 && selectedIds.size === filtered.length}
+                    checked={filtered.length > 0 && filtered.every(row => selectedIds.has(row.id))}
                     onChange={toggleSelectAll}
                   />
                 </th>
@@ -1735,6 +1761,7 @@ function SalesInvoicesListView({
 
                       {openMenuId === inv.id && (
                         <div className="sales-context-menu-popover">
+                          <button type="button" disabled={deleting} style={{ color: "#dc2626" }} onClick={() => void deleteInvoices([inv])}><Trash2 size={14} /> Delete</button>
                           <button
                             type="button"
                             onClick={() => {
@@ -2429,6 +2456,11 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
     <>
       <SalesInvoicesListView
         rows={rows}
+        onDeleted={async ids => {
+          setRows(rows.filter(row => !ids.has(row.id)));
+          const [freshProducts, freshParties] = await Promise.all([api.products(), api.parties()]);
+          setProducts(freshProducts); setParties(freshParties);
+        }}
         onCreateNew={()=>setCreating(true)}
         onSelectInvoice={onSelectInvoice}
         onEditInvoice={editInvoice}
