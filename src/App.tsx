@@ -1324,6 +1324,7 @@ function SalesInvoicesListView({
   notify: (msg: string) => void;
 }) {
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "unpaid" | "cancelled">("all");
   const [dateFilter, setDateFilter] = useState("Last 365 Days");
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [customRangeOpen, setCustomRangeOpen] = useState(false);
@@ -1347,7 +1348,7 @@ function SalesInvoicesListView({
   }, [rows]);
 
   // Deep Date Range & Universal Invoice Number Search Filter
-  const filtered = useMemo(() => {
+  const matchingRows = useMemo(() => {
     const q = query.trim().toLowerCase();
 
     const dateRows = displayRows.filter(r => isInvoiceInDateRange(r, dateFilter, customDateRange));
@@ -1404,17 +1405,31 @@ function SalesInvoicesListView({
 
   // Dynamic metrics calculation strictly from backend PostgreSQL filtered invoices
   const totalSalesVal = useMemo(() => {
-    return filtered.filter(r => r.status !== "Cancelled").reduce((sum, r) => sum + r.amount, 0);
-  }, [filtered]);
+    return matchingRows.filter(r => r.status !== "Cancelled").reduce((sum, r) => sum + r.amount, 0);
+  }, [matchingRows]);
 
   const paidSalesVal = useMemo(() => {
-    return filtered.filter(r => r.status !== "Cancelled" && (r.status === "Paid" || r.status === "Partially paid")).reduce((sum, r) => sum + (r.paidAmount ?? r.amount), 0);
-  }, [filtered]);
+    return matchingRows.filter(r => r.status !== "Cancelled" && (r.status === "Paid" || r.status === "Partially paid")).reduce((sum, r) => sum + (r.paidAmount ?? r.amount), 0);
+  }, [matchingRows]);
 
   const unpaidSalesVal = useMemo(() => {
-    return filtered.filter(r => r.status !== "Cancelled").reduce((sum, r) => sum + Math.max(0, r.amount - (r.paidAmount ?? r.amount)), 0);
-  }, [filtered]);
-  const cancelledSalesVal = useMemo(() => filtered.filter(r => r.status === "Cancelled").reduce((sum, r) => sum + r.amount, 0), [filtered]);
+    return matchingRows.filter(r => r.status !== "Cancelled").reduce((sum, r) => sum + Math.max(0, r.amount - (r.paidAmount ?? (r.status === "Paid" ? r.amount : 0))), 0);
+  }, [matchingRows]);
+  const cancelledSalesVal = useMemo(() => matchingRows.filter(r => r.status === "Cancelled").reduce((sum, r) => sum + r.amount, 0), [matchingRows]);
+
+  const filtered = useMemo(() => matchingRows.filter(r => {
+    if (statusFilter === "all") return true;
+    if (statusFilter === "cancelled") return r.status === "Cancelled";
+    if (r.status === "Cancelled") return false;
+    const balance = Math.max(0, r.amount - (r.paidAmount ?? (r.status === "Paid" ? r.amount : 0)));
+    return statusFilter === "paid" ? balance === 0 : balance > 0;
+  }), [matchingRows, statusFilter]);
+
+  const selectStatus = (status: typeof statusFilter) => {
+    setStatusFilter(status);
+    setSelectedIds(new Set());
+    setOpenMenuId(null);
+  };
 
   const toggleSelectAll = () => {
     if (selectedIds.size === filtered.length) setSelectedIds(new Set());
@@ -1515,7 +1530,7 @@ function SalesInvoicesListView({
       {/* Top 4 Summary Cards Grid matching reference image */}
       <div className="sales-summary-cards-grid">
         {/* Card 1: Total Sales (Purple Active Card) */}
-        <div className="sales-summary-card active-purple-card">
+        <button type="button" aria-pressed={statusFilter === "all"} onClick={() => selectStatus("all")} className={`sales-summary-card${statusFilter === "all" ? " active-purple-card" : ""}`}>
           <div className="sales-summary-card-head purple-text">
             <Receipt size={16} color="#4f46e5" />
             <span>Total Sales</span>
@@ -1523,10 +1538,10 @@ function SalesInvoicesListView({
           <h2 className="sales-summary-card-val">
             ₹ {totalSalesVal.toLocaleString("en-IN")}
           </h2>
-        </div>
+        </button>
 
         {/* Card 2: Paid */}
-        <div className="sales-summary-card">
+        <button type="button" aria-pressed={statusFilter === "paid"} onClick={() => selectStatus("paid")} className={`sales-summary-card${statusFilter === "paid" ? " active-purple-card" : ""}`}>
           <div className="sales-summary-card-head green-text">
             <CheckSquare size={16} color="#16a34a" />
             <span>Paid</span>
@@ -1534,10 +1549,10 @@ function SalesInvoicesListView({
           <h2 className="sales-summary-card-val">
             ₹ {paidSalesVal.toLocaleString("en-IN")}
           </h2>
-        </div>
+        </button>
 
         {/* Card 3: Unpaid */}
-        <div className="sales-summary-card">
+        <button type="button" aria-pressed={statusFilter === "unpaid"} onClick={() => selectStatus("unpaid")} className={`sales-summary-card${statusFilter === "unpaid" ? " active-purple-card" : ""}`}>
           <div className="sales-summary-card-head red-text">
             <Calendar size={16} color="#dc2626" />
             <span>Unpaid</span>
@@ -1545,10 +1560,10 @@ function SalesInvoicesListView({
           <h2 className="sales-summary-card-val">
             ₹ {unpaidSalesVal.toLocaleString("en-IN")}
           </h2>
-        </div>
+        </button>
 
         {/* Card 4: Cancelled */}
-        <div className="sales-summary-card">
+        <button type="button" aria-pressed={statusFilter === "cancelled"} onClick={() => selectStatus("cancelled")} className={`sales-summary-card${statusFilter === "cancelled" ? " active-purple-card" : ""}`}>
           <div className="sales-summary-card-head">
             <X size={16} color="#64748b" />
             <span>Cancelled</span>
@@ -1556,7 +1571,7 @@ function SalesInvoicesListView({
           <h2 className="sales-summary-card-val" style={{ color: "#64748b" }}>
             {cancelledSalesVal > 0 ? `₹ ${cancelledSalesVal.toLocaleString("en-IN")}` : "-"}
           </h2>
-        </div>
+        </button>
       </div>
 
       {/* Toolbar Controls Row matching reference image */}

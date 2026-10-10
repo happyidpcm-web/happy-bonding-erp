@@ -13,7 +13,8 @@ import fs from "fs";
 import { voucherRouter } from "./vouchers.js";
 import { emailRouter } from "./email.js";
 import { orderBranches } from "./branch-order.js";
-import { salesNumberFloor } from "./sales-numbering.js";
+import { nextAvailableSalesNumber } from "./sales-numbering.js";
+import { planInvoiceEdit } from "./invoice-edit.js";
 import { transactionsRouter } from "./transactions.js";
 import { expenseInput, invoiceInput, invoiceSettingInput, loginInput, parseInput, partyInput, productInput, purchaseStockInput } from "./validation.js";
 
@@ -773,20 +774,11 @@ app.get("/api/sales/next-number", async (req, res) => {
   const fy = financialYear(invoiceDate);
   const setting = await getInvoiceSetting(organizationId, branchId);
   const prefix = `${setting.invoicePrefix}/${fy}/`;
-  const existingInvoices = await db.salesInvoice.findMany({
-    where: { organizationId, branchId, invoiceNumber: { startsWith: prefix } },
-    select: { invoiceNumber: true }
-  });
-  let maxNum = 0;
-  for (const inv of existingInvoices) {
-    const numPart = inv.invoiceNumber.replace(prefix, "");
-    const parsed = parseInt(numPart, 10);
-    if (!isNaN(parsed) && parsed > maxNum) {
-      maxNum = parsed;
-    }
-  }
-  const sequence = await db.documentSequence.findUnique({ where: { organizationId_branchId_documentType_financialYear: { organizationId, branchId, documentType: "SALES", financialYear: fy } } });
-  const nextNumber = Math.max(sequence?.nextNumber ?? 1, maxNum + 1, salesNumberFloor(branchId, prefix));
+  const [nextAvailable, sequence] = await Promise.all([
+    nextAvailableSalesNumber(db, organizationId, branchId, prefix),
+    db.documentSequence.findUnique({ where: { organizationId_branchId_documentType_financialYear: { organizationId, branchId, documentType: "SALES", financialYear: fy } } }),
+  ]);
+  const nextNumber = Math.max(sequence?.nextNumber ?? 1, nextAvailable);
   res.json({ prefix, number: nextNumber, invoiceNumber: `${prefix}${nextNumber}`, financialYear: fy });
 });
 
@@ -818,8 +810,11 @@ app.post("/api/sales", requirePermission("sales.write"), async (req, res) => {
   const savedInvoiceInclude = { party: true, lines: { include: { variant: true } }, payments: { include: { payment: true } } };
   const existing = await db.salesInvoice.findUnique({ where: { organizationId_branchId_idempotencyKey: { organizationId, branchId, idempotencyKey: input.idempotencyKey } }, include: savedInvoiceInclude });
   if (existing) return res.json(existing);
-  const organization = await db.organization.findUniqueOrThrow({ where: { id: organizationId } });
-  const variants = await db.productVariant.findMany({ where: { id: { in: input.lines.map(x => x.variantId) }, product: { organizationId, branchId } }, include: { product: { include: { taxRate: true } }, balances: { where: { branchId } } } });
+  const [organization, variants, setting] = await Promise.all([
+    db.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { stateCode: true } }),
+    db.productVariant.findMany({ where: { id: { in: input.lines.map(x => x.variantId) }, product: { organizationId, branchId } }, include: { product: { include: { taxRate: true } } } }),
+    getInvoiceSetting(organizationId, branchId),
+  ]);
   if (variants.length !== new Set(input.lines.map(x => x.variantId)).size) return res.status(400).json({ error: "One or more variants are invalid" });
   const isInterState = input.placeOfSupply !== organization.stateCode;
   const lineBaseBeforeInvoiceDiscount = input.lines.reduce((sum, line) => sum + Math.max(0, line.quantity * line.unitPrice - line.discount), 0);
@@ -837,23 +832,20 @@ app.post("/api/sales", requirePermission("sales.write"), async (req, res) => {
   const lineTaxable = round2(calculated.reduce((s, x) => s + x.taxable, 0));
   const grandTotal = Math.max(0, round2(calculated.reduce((s, x) => s + x.total, 0) + input.additionalCharges));
   const row = await db.$transaction(async tx => {
-    for (const line of calculated) { const stock = Number(line.v.balances[0]?.quantity ?? 0); if (stock < line.input.quantity) throw new Error(`Insufficient stock for ${line.v.sku}`); }
-    const setting = await tx.invoiceSetting.upsert({ where: { organizationId_branchId: { organizationId, branchId } }, create: { organizationId, branchId }, update: {} });
+    // Check and decrement once per variant, using current stock in the same
+    // transaction. Duplicate item lines cannot oversell the available balance.
+    const quantities = new Map<string, number>();
+    for (const line of calculated) quantities.set(line.v.id, Math.round(((quantities.get(line.v.id) ?? 0) + line.input.quantity) * 1000) / 1000);
+    for (const [variantId, quantity] of [...quantities].sort(([a], [b]) => a.localeCompare(b))) {
+      const updated = await tx.stockBalance.updateMany({
+        where: { branchId, variantId, quantity: { gte: quantity } },
+        data: { quantity: { decrement: quantity } },
+      });
+      if (updated.count !== 1) throw new Error(`Insufficient stock for ${variants.find(v => v.id === variantId)!.sku}`);
+    }
     const fy = financialYear(input.invoiceDate);
     const prefix = `${setting.invoicePrefix}/${fy}/`;
-    const existingInvoices = await tx.salesInvoice.findMany({
-      where: { organizationId, branchId, invoiceNumber: { startsWith: prefix } },
-      select: { invoiceNumber: true }
-    });
-    let maxNum = 0;
-    for (const inv of existingInvoices) {
-      const numPart = inv.invoiceNumber.replace(prefix, "");
-      const parsed = parseInt(numPart, 10);
-      if (!isNaN(parsed) && parsed > maxNum) {
-        maxNum = parsed;
-      }
-    }
-    const nextAvailable = Math.max(maxNum + 1, salesNumberFloor(branchId, prefix));
+    const nextAvailable = await nextAvailableSalesNumber(tx, organizationId, branchId, prefix);
     const sequence = await tx.documentSequence.upsert({
       where: { organizationId_branchId_documentType_financialYear: { organizationId, branchId, documentType: "SALES", financialYear: fy } },
       create: { organizationId, branchId, documentType: "SALES", financialYear: fy, prefix, nextNumber: nextAvailable + 1 },
@@ -868,8 +860,8 @@ app.post("/api/sales", requirePermission("sales.write"), async (req, res) => {
       });
     }
     const number = `${prefix}${numToUse}`;
-    const invoice = await tx.salesInvoice.create({ data: { organizationId, branchId, partyId: input.partyId, invoiceNumber: number, invoiceDate: input.invoiceDate, status: "POSTED", paymentStatus: paymentStatus(input.paidAmount, grandTotal), placeOfSupply: input.placeOfSupply, subtotal: lineSubtotal, discountTotal: round2(lineDiscount + input.invoiceDiscount), invoiceDiscount: input.invoiceDiscount, additionalCharges: input.additionalCharges, taxableTotal: lineTaxable, cgstTotal: calculated.reduce((s,x)=>s+x.cgst,0), sgstTotal: calculated.reduce((s,x)=>s+x.sgst,0), igstTotal: calculated.reduce((s,x)=>s+x.igst,0), grandTotal, paidAmount: Math.min(input.paidAmount, grandTotal), notes: input.notes, idempotencyKey: input.idempotencyKey, postedAt: new Date(), lines: { create: calculated.map(x => ({ variantId: x.v.id, itemName: x.v.product.name, sku: x.v.sku, hsnCode: x.v.product.hsnCode ?? "", quantity: x.input.quantity, unitPrice: x.input.unitPrice, mrp: x.input.mrp ?? x.v.mrp, purchasePriceAtSale: x.v.purchasePrice, totalCostAtSale: Number(x.v.purchasePrice) * x.input.quantity, discount: x.input.discount, taxableAmount: x.taxable, taxRate: x.rate, cgst: x.cgst, sgst: x.sgst, igst: x.igst, total: x.total })) } } });
-    for (const x of calculated) { await tx.stockBalance.update({ where: { branchId_variantId: { branchId, variantId: x.v.id } }, data: { quantity: { decrement: x.input.quantity } } }); await tx.stockMovement.create({ data: { branchId, variantId: x.v.id, type: "SALE", quantity: -x.input.quantity, referenceType: "SalesInvoice", referenceId: invoice.id } }); }
+    const invoice = await tx.salesInvoice.create({ data: { organizationId, branchId, partyId: input.partyId, invoiceNumber: number, invoiceDate: input.invoiceDate, status: "POSTED", paymentStatus: paymentStatus(input.paidAmount, grandTotal), placeOfSupply: input.placeOfSupply, subtotal: lineSubtotal, discountTotal: round2(lineDiscount + input.invoiceDiscount), invoiceDiscount: input.invoiceDiscount, additionalCharges: input.additionalCharges, taxableTotal: lineTaxable, cgstTotal: calculated.reduce((s,x)=>s+x.cgst,0), sgstTotal: calculated.reduce((s,x)=>s+x.sgst,0), igstTotal: calculated.reduce((s,x)=>s+x.igst,0), grandTotal, paidAmount: Math.min(input.paidAmount, grandTotal), notes: input.notes, idempotencyKey: input.idempotencyKey, postedAt: new Date(), lines: { createMany: { data: calculated.map(x => ({ variantId: x.v.id, itemName: x.v.product.name, sku: x.v.sku, hsnCode: x.v.product.hsnCode ?? "", quantity: x.input.quantity, unitPrice: x.input.unitPrice, mrp: x.input.mrp ?? x.v.mrp, purchasePriceAtSale: x.v.purchasePrice, totalCostAtSale: Number(x.v.purchasePrice) * x.input.quantity, discount: x.input.discount, taxableAmount: x.taxable, taxRate: x.rate, cgst: x.cgst, sgst: x.sgst, igst: x.igst, total: x.total })) } } } });
+    await tx.stockMovement.createMany({ data: calculated.map(x => ({ branchId, variantId: x.v.id, type: "SALE" as const, quantity: -x.input.quantity, referenceType: "SalesInvoice", referenceId: invoice.id })) });
     if (input.paidAmount > 0) { const payment = await tx.payment.create({ data: { organizationId, branchId, direction: "IN", mode: input.paymentMode, amount: Math.min(input.paidAmount, grandTotal) } }); await tx.paymentAllocation.create({ data: { paymentId: payment.id, salesInvoiceId: invoice.id, amount: Math.min(input.paidAmount, grandTotal) } }); }
     await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: "sales.posted", entityType: "SalesInvoice", entityId: invoice.id, metadata: { invoiceNumber: number } } });
     return tx.salesInvoice.findUniqueOrThrow({ where: { id: invoice.id }, include: savedInvoiceInclude });
@@ -932,7 +924,7 @@ app.put("/api/sales/:id", requirePermission("sales.write"), async (req, res) => 
   const lineTaxable = round2(calculated.reduce((s, x) => s + x.taxable, 0));
   const grandTotal = Math.max(0, round2(calculated.reduce((s, x) => s + x.total, 0) + input.additionalCharges));
 
-  const finalPaidAmount = round2(Math.min(grandTotal, input.paidAmount));
+  const calculatedGrandTotal = grandTotal;
 
   const savedInvoice = await db.$transaction(async tx => {
     // Read receipts inside the transaction to protect concurrent payment edits.
@@ -941,6 +933,13 @@ app.put("/api/sales/:id", requirePermission("sales.write"), async (req, res) => 
       include: { lines: true, payments: { include: { payment: true } } },
     });
     if (oldInvoice.status === "CANCELLED") throw new Error("Cancelled invoice cannot be edited");
+    const changes = planInvoiceEdit(oldInvoice, input);
+    // Use the committed invoice total for payment-only edits, preserving
+    // historical totals even if product defaults have since changed.
+    const grandTotal = changes.linesChanged ? calculatedGrandTotal
+      : changes.totalsChanged ? Math.max(0, round2(oldInvoice.lines.reduce((sum, line) => sum + Number(line.total), 0) + input.additionalCharges))
+      : Number(oldInvoice.grandTotal);
+    const finalPaidAmount = round2(Math.min(grandTotal, input.paidAmount));
     const linkedPaid = round2(oldInvoice.payments.reduce((sum, p) => sum + Number(p.amount), 0));
     const existingPaymentTotal = Math.max(Number(oldInvoice.paidAmount), linkedPaid);
     const newlyReceived = round2(Math.max(0, finalPaidAmount - existingPaymentTotal));
@@ -962,24 +961,26 @@ app.put("/api/sales/:id", requirePermission("sales.write"), async (req, res) => 
       paymentCorrections.push({ paymentId: payment.id, allocationId: allocation.id, before, after });
       reduction = round2(reduction - decrease);
     }
-    for (const line of oldInvoice.lines) {
-      const qty = Number(line.quantity);
-      await tx.stockBalance.upsert({
-        where: { branchId_variantId: { branchId, variantId: line.variantId } },
-        update: { quantity: { increment: qty } },
-        create: { branchId, variantId: line.variantId, quantity: qty },
-      });
-    }
+    if (changes.stockChanged) {
+      for (const line of oldInvoice.lines) {
+        const qty = Number(line.quantity);
+        await tx.stockBalance.upsert({
+          where: { branchId_variantId: { branchId, variantId: line.variantId } },
+          update: { quantity: { increment: qty } },
+          create: { branchId, variantId: line.variantId, quantity: qty },
+        });
+      }
 
-    for (const line of calculated) {
-      const balance = await tx.stockBalance.findUnique({ where: { branchId_variantId: { branchId, variantId: line.v.id } } });
-      const stock = Number(balance?.quantity ?? 0);
-      if (stock < line.input.quantity) throw new Error(`Insufficient stock for ${line.v.sku}`);
+      for (const [variantId, quantity] of changes.newQuantities) {
+        const balance = await tx.stockBalance.findUnique({ where: { branchId_variantId: { branchId, variantId } } });
+        const stock = Number(balance?.quantity ?? 0);
+        if (stock < quantity) throw new Error(`Insufficient stock for ${variants.find(v => v.id === variantId)!.sku}`);
+      }
+      await tx.stockMovement.deleteMany({ where: { branchId, referenceType: "SalesInvoice", referenceId: oldInvoice.id, type: "SALE" } });
     }
 
     // Preserve receipt rows; corrections are recorded in the audit event.
-    await tx.salesInvoiceLine.deleteMany({ where: { invoiceId: oldInvoice.id } });
-    await tx.stockMovement.deleteMany({ where: { branchId, referenceType: "SalesInvoice", referenceId: oldInvoice.id, type: "SALE" } });
+    if (changes.linesChanged) await tx.salesInvoiceLine.deleteMany({ where: { invoiceId: oldInvoice.id } });
 
     await tx.salesInvoice.update({
       where: { id: oldInvoice.id },
@@ -988,23 +989,29 @@ app.put("/api/sales/:id", requirePermission("sales.write"), async (req, res) => 
         invoiceDate: input.invoiceDate,
         paymentStatus: paymentStatus(finalPaidAmount, grandTotal),
         placeOfSupply: input.placeOfSupply,
-        subtotal: lineSubtotal,
-        discountTotal: round2(lineDiscount + input.invoiceDiscount),
-        invoiceDiscount: input.invoiceDiscount,
-        additionalCharges: input.additionalCharges,
-        taxableTotal: lineTaxable,
-        cgstTotal: calculated.reduce((s, x) => s + x.cgst, 0),
-        sgstTotal: calculated.reduce((s, x) => s + x.sgst, 0),
-        igstTotal: calculated.reduce((s, x) => s + x.igst, 0),
-        grandTotal,
+        ...(changes.linesChanged ? {
+          subtotal: lineSubtotal,
+          discountTotal: round2(lineDiscount + input.invoiceDiscount),
+          invoiceDiscount: input.invoiceDiscount,
+          taxableTotal: lineTaxable,
+          cgstTotal: calculated.reduce((s, x) => s + x.cgst, 0),
+          sgstTotal: calculated.reduce((s, x) => s + x.sgst, 0),
+          igstTotal: calculated.reduce((s, x) => s + x.igst, 0),
+        } : {}),
+        ...(changes.totalsChanged ? {
+          additionalCharges: input.additionalCharges,
+          grandTotal,
+        } : {}),
         paidAmount: finalPaidAmount,
         notes: input.notes,
-        lines: { create: calculated.map(x => ({ variantId: x.v.id, itemName: x.v.product.name, sku: x.v.sku, hsnCode: x.v.product.hsnCode ?? "", quantity: x.input.quantity, unitPrice: x.input.unitPrice, mrp: x.input.mrp ?? x.v.mrp, purchasePriceAtSale: x.v.purchasePrice, totalCostAtSale: Number(x.v.purchasePrice) * x.input.quantity, discount: x.input.discount, taxableAmount: x.taxable, taxRate: x.rate, cgst: x.cgst, sgst: x.sgst, igst: x.igst, total: x.total })) },
+        lines: changes.linesChanged ? { createMany: { data: calculated.map(x => ({ variantId: x.v.id, itemName: x.v.product.name, sku: x.v.sku, hsnCode: x.v.product.hsnCode ?? "", quantity: x.input.quantity, unitPrice: x.input.unitPrice, mrp: x.input.mrp ?? x.v.mrp, purchasePriceAtSale: x.v.purchasePrice, totalCostAtSale: Number(x.v.purchasePrice) * x.input.quantity, discount: x.input.discount, taxableAmount: x.taxable, taxRate: x.rate, cgst: x.cgst, sgst: x.sgst, igst: x.igst, total: x.total })) } } : undefined,
       },
     });
-    for (const x of calculated) {
-      await tx.stockBalance.update({ where: { branchId_variantId: { branchId, variantId: x.v.id } }, data: { quantity: { decrement: x.input.quantity } } });
-      await tx.stockMovement.create({ data: { branchId, variantId: x.v.id, type: "SALE", quantity: -x.input.quantity, referenceType: "SalesInvoice", referenceId: oldInvoice.id } });
+    if (changes.stockChanged) {
+      for (const x of calculated) {
+        await tx.stockBalance.update({ where: { branchId_variantId: { branchId, variantId: x.v.id } }, data: { quantity: { decrement: x.input.quantity } } });
+      }
+      await tx.stockMovement.createMany({ data: calculated.map(x => ({ branchId, variantId: x.v.id, type: "SALE" as const, quantity: -x.input.quantity, referenceType: "SalesInvoice", referenceId: oldInvoice.id })) });
     }
     if (newlyReceived > 0) {
       const payment = await tx.payment.create({ data: { organizationId, branchId, direction: "IN", mode: input.paymentMode, amount: newlyReceived } });
@@ -1012,7 +1019,12 @@ app.put("/api/sales/:id", requirePermission("sales.write"), async (req, res) => 
     }
     await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: "sales.updated", entityType: "SalesInvoice", entityId: oldInvoice.id, metadata: { invoiceNumber: oldInvoice.invoiceNumber, previousTotal: Number(oldInvoice.grandTotal), total: grandTotal, previousPaidAmount: Number(oldInvoice.paidAmount), paidAmount: finalPaidAmount, paymentCorrections, unlinkedPaidCorrection: round2(Math.max(0, existingPaymentTotal - linkedPaid) - Math.max(0, finalPaidAmount - linkedPaid - newlyReceived)) } } });
     return tx.salesInvoice.findUniqueOrThrow({ where: { id: invoiceId }, include: { party: true, lines: { include: { variant: true } }, payments: { include: { payment: true } } } });
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }, {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    // Editing also reconciles stock and receipts; Prisma's default 5s can
+    // expire before the final read, rolling back an otherwise valid update.
+    timeout: 30_000,
+  });
 
   if (req.query.response === "invoice") return res.json(savedInvoice);
   const rows = await db.salesInvoice.findMany({ where: { organizationId, branchId }, include: { party: true, lines: { include: { variant: true } } }, orderBy: { invoiceDate: "desc" }, take: 50000 });

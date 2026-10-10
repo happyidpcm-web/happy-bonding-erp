@@ -5,6 +5,7 @@ import { api } from "../src/api.ts";
 test("create and edit return the saved invoice without downloading sales history", async () => {
   const originals = { window: globalThis.window, localStorage: globalThis.localStorage, fetch: globalThis.fetch };
   const calls: Array<{ url: string; method?: string }> = [];
+  const requestTimeouts: number[] = [];
   const row = {
     id: "saved-1", invoiceNumber: "TEST/1", invoiceDate: "2026-10-09T00:00:00.000Z",
     party: { name: "Customer", phone: "9876543210" }, grandTotal: "100", paidAmount: "100",
@@ -12,7 +13,7 @@ test("create and edit return the saved invoice without downloading sales history
     lines: [{ variantId: "item-1", itemName: "Shirt", sku: "SHIRT", quantity: 1, unitPrice: "100", discount: "0", taxRate: "0", total: "100" }],
   };
   Object.assign(globalThis, {
-    window: { setTimeout, clearTimeout, dispatchEvent() {} },
+    window: { setTimeout(handler: () => void, delay: number) { requestTimeouts.push(delay); return setTimeout(handler, delay); }, clearTimeout, dispatchEvent() {} },
     localStorage: { getItem() { return null; } },
     fetch: async (url: string, options: RequestInit) => {
       calls.push({ url, method: options.method });
@@ -33,5 +34,6 @@ test("create and edit return the saved invoice without downloading sales history
       { url: "/api/sales", method: "POST" },
       { url: "/api/sales/saved-1?response=invoice", method: "PUT" },
     ]);
+    assert.deepEqual(requestTimeouts, [30000, 60000], "Invoice edits must wait beyond the server's 30-second transaction deadline");
   } finally { Object.assign(globalThis, originals); }
 });
