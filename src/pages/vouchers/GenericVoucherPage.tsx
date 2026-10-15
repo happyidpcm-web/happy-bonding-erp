@@ -1014,6 +1014,12 @@ export function GenericVoucherPage({
       partyAddress: matchedParty?.address,
       partyGstin: matchedParty?.gstin,
       amount: voucher.amount,
+      taxTotal: Math.round((voucher.items || []).reduce((sum, item) => {
+        const base = Math.max(0, item.qty * item.price - (item.discount ?? 0));
+        return sum + Math.round(base * (1 + (item.tax ?? 0) / 100) * 100) / 100 - base;
+      }, 0) * 100) / 100,
+      additionalCharges: voucher.details?.additionalCharges ?? 0,
+      discountTotal: (voucher.items || []).reduce((sum, item) => sum + (item.discount ?? 0), 0) + (voucher.details?.discount ?? 0),
       paidAmount: voucher.details?.paidAmount ?? (voucher.status === "Open" ? 0 : voucher.amount),
       paymentMode: voucher.details?.paymentMode || "Cash",
       status: purchasePaymentStatus(voucher),

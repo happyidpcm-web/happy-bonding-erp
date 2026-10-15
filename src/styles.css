@@ -2977,6 +2977,49 @@ input:checked + .slider:before {
   overflow: visible !important;
 }
 
+.sales-chart-plot {
+  position: relative;
+  min-width: 0;
+}
+
+.sales-chart-day-target {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: crosshair;
+}
+
+.sales-chart-day-target:hover {
+  background: transparent;
+}
+
+.sales-chart-day-target:focus-visible {
+  outline: 2px solid #16a34a;
+  outline-offset: -2px;
+}
+
+.sales-chart-tooltip {
+  position: absolute;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  border: 1px solid #dcfce7;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 4px 12px #0f172a1a;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .chart-x-axis {
   display: flex !important;
   justify-content: space-between !important;

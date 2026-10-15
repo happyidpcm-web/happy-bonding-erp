@@ -47,6 +47,7 @@ export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: 
     const subtotal = invoice.subtotal ?? lines.reduce((s, l) => s + l.unitPrice * l.quantity, 0);
     const discount = invoice.discountTotal ?? lines.reduce((s, l) => s + l.discount, 0);
     const gst = (invoice.cgstTotal ?? 0) + (invoice.sgstTotal ?? 0) + (invoice.igstTotal ?? 0);
+    const tax = invoice.taxTotal ?? gst;
     const additionalCharges = invoice.additionalCharges ?? 0;
     const total = invoice.amount;
     const paid = invoice.paidAmount ?? total;
@@ -175,7 +176,7 @@ export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: 
 
           <div className="summary-right">
             <p><span>Sub Total</span><span>₹ {amountText(subtotal)}</span></p>
-            {gst > 0 && <p><span>GST</span><span>₹ {amountText(gst)}</span></p>}
+            {tax > 0 && <p><span>{invoice.taxTotal !== undefined ? "Tax Amount" : "GST"}</span><span>₹ {amountText(tax)}</span></p>}
             {additionalCharges > 0 && <p><span>Additional Charges</span><span>₹ {amountText(additionalCharges)}</span></p>}
             <p><span>Discount</span><span>- ₹ {amountText(discount)}</span></p>
             <h3 className="grand-total-row"><span>Total Amount</span><span>₹ {amountText(total)}</span></h3>

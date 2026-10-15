@@ -9,6 +9,7 @@ import { PageHeading, Metric } from "../../App";
 export function SalesReportChartCard({ invoices }: { invoices: Invoice[] }) {
   const [viewMode, setViewMode] = useState<"Daily" | "Weekly">("Daily");
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [activeDay, setActiveDay] = useState<number | null>(null);
   const reportRef = useDismissibleDropdown(dropdownOpen, () => setDropdownOpen(false));
 
   // Compute real last 7 days data from actual backend invoices (100% Real Data)
@@ -140,6 +141,7 @@ export function SalesReportChartCard({ invoices }: { invoices: Invoice[] }) {
 
           {/* Dynamic SVG Area Chart */}
           <div className="chart-svg-container">
+            <div className="sales-chart-plot" onMouseLeave={() => setActiveDay(null)}>
             <svg viewBox="0 0 700 220" preserveAspectRatio="none" className="chart-svg">
               <defs>
                 <linearGradient id="salesGreenGradientReal" x1="0" y1="0" x2="0" y2="1">
@@ -162,7 +164,34 @@ export function SalesReportChartCard({ invoices }: { invoices: Invoice[] }) {
 
               {/* Smooth Dynamic Line Path */}
               <path d={pathD} fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" />
+              {activeDay !== null && (
+                <g pointerEvents="none">
+                  <line x1={points[activeDay].x} y1="10" x2={points[activeDay].x} y2="208" stroke="#16a34a" strokeDasharray="4 4" />
+                  <circle cx={points[activeDay].x} cy={points[activeDay].y} r="5" fill="#16a34a" stroke="white" strokeWidth="2" />
+                </g>
+              )}
             </svg>
+            {days.map((day, index) => (
+              <button
+                key={day.dateStr}
+                type="button"
+                className="sales-chart-day-target"
+                style={{ left: `${Math.max(0, (index - 0.5) / (days.length - 1) * 100)}%`, width: `${(index === 0 || index === days.length - 1 ? 0.5 : 1) / (days.length - 1) * 100}%` }}
+                aria-label={`${day.formattedDate}: Sales ${money(day.sales)}`}
+                onMouseEnter={() => setActiveDay(index)}
+                onFocus={() => setActiveDay(index)}
+                onBlur={() => setActiveDay(null)}
+                onClick={() => setActiveDay(index)}
+                onKeyDown={event => { if (event.key === "Escape") setActiveDay(null); }}
+              />
+            ))}
+            {activeDay !== null && (
+              <div className="sales-chart-tooltip" role="status" style={{ left: `${activeDay / (days.length - 1) * 100}%`, transform: `translateX(${activeDay === 0 ? "0" : activeDay === days.length - 1 ? "-100%" : "-50%"})` }}>
+                <span>{days[activeDay].formattedDate}</span>
+                <strong>Sales: {money(days[activeDay].sales)}</strong>
+              </div>
+            )}
+            </div>
 
             {/* Dynamic X-Axis Day Labels */}
             <div className="chart-x-axis">
