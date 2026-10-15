@@ -5,6 +5,7 @@ import { stripTypeScriptTypes } from "node:module";
 import { Prisma } from "@prisma/client";
 import { invoiceInput, parseInput } from "../server/validation.ts";
 import { nextAvailableSalesNumber } from "../server/sales-numbering.ts";
+import { runSalesTransaction } from "../server/sales-transaction.ts";
 
 const source = readFileSync(new URL("../server/index.ts", import.meta.url), "utf8");
 const start = source.indexOf('app.post("/api/sales",');
@@ -12,7 +13,7 @@ const end = source.indexOf('app.patch("/api/sales/:id/details",', start);
 assert.ok(start >= 0 && end > start);
 const code = stripTypeScriptTypes(source.slice(start, end));
 
-async function save({ markFullyPaid = false, quantities = [1, 2], available = 10, failAudit = false, existing = false, maximum = 9, sequenceNext = 10 } = {}) {
+async function save({ markFullyPaid = false, quantities = [1, 2], available = 10, failAudit = false, existing = false, maximum = 9, sequenceNext = 10, partyId = undefined as string | undefined, validParty = true, committedAfterFailure = false } = {}) {
   let handler: any;
   let response: any;
   let invoiceData: any;
@@ -25,7 +26,14 @@ async function save({ markFullyPaid = false, quantities = [1, 2], available = 10
   let aggregateReads = 0;
   let transactions = 0;
   let sequence = sequenceNext;
+  let partyReadPending = false;
+  let overlappedReads = false;
+  let finishPartyRead: (() => void) | undefined;
   const db: any = {
+    party: { findFirst: () => {
+      partyReadPending = true;
+      return new Promise(resolve => { finishPartyRead = () => resolve(validParty ? { id: partyId } : null); });
+    } },
     organization: { findUniqueOrThrow: async () => ({ stateCode: "33" }) },
     productVariant: { findMany: async () => [{ id: "shirt", sku: "SHIRT", mrp: 100, purchasePrice: 50, product: { name: "Shirt", taxRate: { rate: 0 } } }] },
     stockBalance: { updateMany: async ({ where, data }: any) => {
@@ -36,7 +44,11 @@ async function save({ markFullyPaid = false, quantities = [1, 2], available = 10
       return { count: 1 };
     } },
     salesInvoice: {
-      findUnique: async () => existing ? { id: "existing" } : null,
+      findUnique: async () => {
+        overlappedReads = partyReadPending;
+        finishPartyRead?.();
+        return existing || (committedAfterFailure && transactions > 0) ? { id: "existing" } : null;
+      },
       create: async ({ data }: any) => { invoiceData = data; assert.ok(data.lines.createMany); return { id: "saved" }; },
       findUniqueOrThrow: async () => ({ id: "saved", ...invoiceData }),
     },
@@ -58,7 +70,7 @@ async function save({ markFullyPaid = false, quantities = [1, 2], available = 10
   const dependencies = {
     app: { post: (_path: string, _auth: unknown, fn: any) => { handler = fn; } },
     requirePermission: () => null, requireBranch: () => "test-branch", db, Prisma,
-    invoiceInput, parseInput, nextAvailableSalesNumber,
+    invoiceInput, parseInput, nextAvailableSalesNumber, runSalesTransaction,
     getInvoiceSetting: async () => ({ invoicePrefix: "HB/SL" }),
     financialYear: () => "26-27", round2: (n: number) => Math.round(n * 100) / 100,
     paymentStatus: (paid: number, total: number) => paid <= 0 ? "UNPAID" : paid >= total ? "PAID" : "PARTIALLY_PAID",
@@ -67,10 +79,21 @@ async function save({ markFullyPaid = false, quantities = [1, 2], available = 10
   let error: unknown;
   try {
     const res = { status: () => res, json: (data: any) => { response = data; } };
-    await handler({ body: { idempotencyKey: "test-save-1", invoiceDate: "2026-10-10", placeOfSupply: "33", paidAmount: 150, markFullyPaid, lines: quantities.map(quantity => ({ variantId: "shirt", quantity, unitPrice: 100, discount: 0 })) }, session: { organizationId: "test-org", userId: "tester" } }, res);
+    await handler({ body: { partyId, idempotencyKey: "test-save-1", invoiceDate: "2026-10-10", placeOfSupply: "33", paidAmount: 150, markFullyPaid, lines: quantities.map(quantity => ({ variantId: "shirt", quantity, unitPrice: 100, discount: 0 })) }, session: { organizationId: "test-org", userId: "tester" } }, res);
   } catch (e) { error = e; }
-  return { response, invoiceData, movements, payments, allocations, stock, stockWrites, bulkWrites, aggregateReads, transactions, sequence, error };
+  return { response, invoiceData, movements, payments, allocations, stock, stockWrites, bulkWrites, aggregateReads, transactions, sequence, error, overlappedReads };
 }
+
+test("customer validation overlaps duplicate lookup and still rejects invalid customers", async () => {
+  const valid = await save({ partyId: "customer" });
+  assert.equal(valid.error, undefined);
+  assert.equal(valid.overlappedReads, true);
+  assert.equal(valid.response.id, "saved");
+  const invalid = await save({ partyId: "customer", validParty: false });
+  assert.equal(invalid.response.error, "Party does not belong to this branch");
+  assert.equal(invalid.transactions, 0);
+  assert.equal(invalid.stockWrites, 0);
+});
 
 test("save batches lines/movements and deducts combined stock once per variant", async () => {
   const result = await save();
@@ -123,6 +146,14 @@ test("repeated idempotency key returns existing invoice without another transact
   assert.equal(result.response.id, "existing");
   assert.equal(result.transactions, 0);
   assert.equal(result.stockWrites, 0);
+});
+
+test("a failed overlapping request recovers the bill committed under the same key", async () => {
+  const result = await save({ failAudit: true, committedAfterFailure: true });
+  assert.equal(result.error, undefined);
+  assert.equal(result.response.id, "existing");
+  assert.equal(result.transactions, 1);
+  assert.equal(result.stock, 10, "The failing attempt must roll back its stock changes");
 });
 
 test("invoice numbering respects imported numbers and an already higher sequence", async () => {

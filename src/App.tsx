@@ -2125,6 +2125,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   const [markPaid,setMarkPaid]=useState(false);
   const [saving,setSaving]=useState(false);
   const invoiceSaveInFlight = useRef(false);
+  const invoiceSaveKey = useRef<string | null>(null);
   const stockRefreshVersion = useRef(0);
   useEffect(() => () => { stockRefreshVersion.current += 1; }, []);
   const [nextNumber,setNextNumber]=useState("");
@@ -2346,7 +2347,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
     }
   };
   const createPartyFromInvoice=async(e:React.FormEvent<HTMLFormElement>)=>{e.preventDefault();try{setSaving(true);const saved=await api.createParty(partyPayloadFromForm(new FormData(e.currentTarget)));setParties([...parties,saved]);setSelectedParty(saved);setPartyOpen(false);setPartySearch(`${saved.name} ${saved.phone}`);setPartyModal(false);setNewParty({name:"",phone:"",address:"",gstin:""});notify("Party created and selected");}catch(error){notify(error instanceof Error?error.message:"Party save failed");}finally{setSaving(false);}};
-  const resetInvoiceForm=()=>{setLines([]);setPartyOpen(false);setPaid(0);setNotes("");setInvoiceDiscount(0);setAdditionalCharges(0);setShowNotes(false);setShowTerms(false);setShowBank(false);setShowQr(false);setNewParty({name:"",phone:"",address:"",gstin:""});setPartySearch("");setSelectedParty(undefined);setMarkPaid(false);setInvoiceDate(new Date().toISOString().slice(0,10));};
+  const resetInvoiceForm=()=>{invoiceSaveKey.current = null;setLines([]);setPartyOpen(false);setPaid(0);setNotes("");setInvoiceDiscount(0);setAdditionalCharges(0);setShowNotes(false);setShowTerms(false);setShowBank(false);setShowQr(false);setNewParty({name:"",phone:"",address:"",gstin:""});setPartySearch("");setSelectedParty(undefined);setMarkPaid(false);setInvoiceDate(new Date().toISOString().slice(0,10));};
   const saveInvoice=async(keepOpen=false)=>{
     if (invoiceSaveInFlight.current) return;
     if(!lines.length)return notify("Add at least one item");
@@ -2358,7 +2359,8 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
       let partyId=selectedParty?.id ? String(selectedParty.id) : undefined;
       const received=markPaid?total:paid;
       const payload={partyId,invoiceDate:new Date(invoiceDate),paidAmount:Math.min(received,total),markFullyPaid:markPaid,paymentMode,notes:[notes,showTerms?terms:""].filter(Boolean).join("\n"),invoiceDiscount,additionalCharges,lines:lines.map(x=>({variantId:String(x.product.id),quantity:x.qty,unitPrice:x.product.sellingPrice,mrp:x.product.mrp,discount:x.discount,taxRate:x.taxRate??x.product.taxRate??0}))};
-      const saved=editingInvoice?await api.updateSale(editingInvoice.id,payload):await api.createSale(payload);
+      if (!editingInvoice) invoiceSaveKey.current ??= crypto.randomUUID();
+      const saved=editingInvoice?await api.updateSale(editingInvoice.id,payload):await api.createSale({...payload,idempotencyKey:invoiceSaveKey.current!});
       setRows([saved, ...rows.filter(row => String(row.id) !== String(saved.id))].sort((a, b) => (b.dateISO ?? "").localeCompare(a.dateISO ?? "")));
       // Apply this bill's stock change immediately; reconcile other tills in the background.
       const stockChanges = new Map<string, number>();

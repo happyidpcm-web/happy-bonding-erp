@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-for (const keepOpen of [false, true]) {
-  test(`save${keepOpen ? " and new" : ""} completes without waiting for stock refresh`, async ({ page }) => {
+for (const { keepOpen, failFirst } of [{ keepOpen: false, failFirst: false }, { keepOpen: true, failFirst: false }, { keepOpen: true, failFirst: true }]) {
+  test(`save${keepOpen ? " and new" : ""}${failFirst ? " after a failed response" : ""} completes without waiting for stock refresh`, async ({ page }) => {
     let saves = 0;
+    const saveKeys: string[] = [];
     let salesReads = 0;
     let partyReads = 0;
     let stockRefreshStarted = false;
@@ -20,7 +21,7 @@ for (const keepOpen of [false, true]) {
       if (path === "/api/auth/me") json = { id: "tester", name: "Tester", isAdmin: false, branchIds: ["test-branch"] };
       if (path === "/api/branches") json = [{ id: "test-branch", name: "Test Branch", code: "TEST" }];
       if (path === "/api/settings/invoice") json = { invoicePrefix: "TEST", paymentTermsDays: 30, terms: "" };
-      if (path === "/api/sales/next-number") json = { invoiceNumber: `TEST/${saves + 1}`, number: saves + 1 };
+      if (path === "/api/sales/next-number") json = { invoiceNumber: `TEST/${saves ? 2 : 1}`, number: saves ? 2 : 1 };
       if (path === "/api/parties") partyReads++;
       if (path === "/api/products") {
         if (saves) {
@@ -35,7 +36,12 @@ for (const keepOpen of [false, true]) {
         if (route.request().method() === "POST") {
           saves++;
           const payload = route.request().postDataJSON();
+          saveKeys.push(payload.idempotencyKey);
           await saveGate;
+          if (failFirst && saves === 1) {
+            await route.fulfill({ status: 503, json: { error: "Temporary save failure" } });
+            return;
+          }
           json = { id: "saved-1", invoiceNumber: "TEST/1", invoiceDate: payload.invoiceDate, party: null, grandTotal: "100", paidAmount: "0", paymentStatus: "UNPAID", lines: [{ variantId: "item-1", itemName: "Test shirt", sku: "SHIRT", quantity: 1, unitPrice: "100", discount: "0", taxRate: "0", total: "100" }] };
         } else salesReads++;
       }
@@ -54,6 +60,15 @@ for (const keepOpen of [false, true]) {
       // Shortcut handlers must also respect an already pending save.
       await page.keyboard.press("Alt+Enter");
       releaseSave();
+      if (failFirst) {
+        await expect(page.getByText("Temporary save failure", { exact: true }).first()).toBeVisible();
+        // Alt also opens the shortcut drawer; dismiss it before clicking again.
+        await page.keyboard.press("Escape");
+        await page.getByRole("button", { name: "Save & New", exact: true }).first().click();
+        await expect.poll(() => saves).toBe(2);
+        expect(saveKeys[0]).toBeTruthy();
+        expect(saveKeys[1]).toBe(saveKeys[0]);
+      }
       await expect.poll(() => stockRefreshStarted).toBe(true);
       if (keepOpen) {
         await expect(page.getByText("No items added", { exact: true })).toBeVisible();
@@ -64,12 +79,12 @@ for (const keepOpen of [false, true]) {
         await expect(page.getByRole("heading", { name: "Sales Invoices", exact: true })).toBeVisible();
         await expect(page.getByText("TEST/1", { exact: true }).first()).toBeVisible();
       }
-      expect(saves).toBe(1);
+      expect(saves).toBe(failFirst ? 2 : 1);
       expect(salesReads).toBe(initialSalesReads);
       expect(partyReads).toBe(initialPartyReads);
       releaseStock();
       await expect(page.getByText("Invoice saved. Stock refresh failed; refresh the page to get the latest stock.", { exact: true })).toBeVisible();
-      expect(saves).toBe(1);
+      expect(saves).toBe(failFirst ? 2 : 1);
     } finally {
       releaseSave();
       releaseStock();

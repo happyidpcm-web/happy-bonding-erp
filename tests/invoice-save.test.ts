@@ -35,6 +35,6 @@ test("create and edit return the saved invoice without downloading sales history
       { url: "/api/sales", method: "POST" },
       { url: "/api/sales/saved-1?response=invoice", method: "PUT" },
     ]);
-    assert.deepEqual(requestTimeouts, [30000, 60000], "Invoice edits must wait beyond the server's 30-second transaction deadline");
+    assert.deepEqual(requestTimeouts, [60000, 60000], "Invoice requests must allow time for the transaction and bounded conflict retry");
   } finally { Object.assign(globalThis, originals); }
 });

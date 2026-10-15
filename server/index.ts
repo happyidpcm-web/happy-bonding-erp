@@ -14,6 +14,7 @@ import { voucherRouter } from "./vouchers.js";
 import { emailRouter } from "./email.js";
 import { orderBranches } from "./branch-order.js";
 import { nextAvailableSalesNumber } from "./sales-numbering.js";
+import { runSalesTransaction } from "./sales-transaction.js";
 import { planInvoiceEdit } from "./invoice-edit.js";
 import { transactionsRouter } from "./transactions.js";
 import { expenseInput, invoiceInput, invoiceSettingInput, loginInput, parseInput, partyInput, productInput, purchaseStockInput } from "./validation.js";
@@ -806,9 +807,14 @@ app.get("/api/sales/:id/history", async (req, res) => {
 app.post("/api/sales", requirePermission("sales.write"), async (req, res) => {
   const branchId = requireBranch(req, res); if (!branchId) return;
   const input = parseInput(invoiceInput, req.body);
-  if (input.partyId && !await db.party.findFirst({ where: { id: input.partyId, branchId, organizationId: req.session!.organizationId, active: true } })) return res.status(400).json({ error: "Party does not belong to this branch" }); const organizationId = req.session!.organizationId;
+  const organizationId = req.session!.organizationId;
   const savedInvoiceInclude = { party: true, lines: { include: { variant: true } }, payments: { include: { payment: true } } };
-  const existing = await db.salesInvoice.findUnique({ where: { organizationId_branchId_idempotencyKey: { organizationId, branchId, idempotencyKey: input.idempotencyKey } }, include: savedInvoiceInclude });
+  // These independent reads can share one wait for a remote database.
+  const [party, existing] = await Promise.all([
+    input.partyId ? db.party.findFirst({ where: { id: input.partyId, branchId, organizationId, active: true }, select: { id: true } }) : Promise.resolve(null),
+    db.salesInvoice.findUnique({ where: { organizationId_branchId_idempotencyKey: { organizationId, branchId, idempotencyKey: input.idempotencyKey } }, include: savedInvoiceInclude }),
+  ]);
+  if (input.partyId && !party) return res.status(400).json({ error: "Party does not belong to this branch" });
   if (existing) return res.json(existing);
   const [organization, variants, setting] = await Promise.all([
     db.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { stateCode: true } }),
@@ -816,10 +822,11 @@ app.post("/api/sales", requirePermission("sales.write"), async (req, res) => {
     getInvoiceSetting(organizationId, branchId),
   ]);
   if (variants.length !== new Set(input.lines.map(x => x.variantId)).size) return res.status(400).json({ error: "One or more variants are invalid" });
+  const variantsById = new Map(variants.map(variant => [variant.id, variant]));
   const isInterState = input.placeOfSupply !== organization.stateCode;
   const lineBaseBeforeInvoiceDiscount = input.lines.reduce((sum, line) => sum + Math.max(0, line.quantity * line.unitPrice - line.discount), 0);
   const calculated = input.lines.map(line => {
-    const v = variants.find(x => x.id === line.variantId)!;
+    const v = variantsById.get(line.variantId)!;
     const baseTaxable = round2(Math.max(0, line.quantity * line.unitPrice - line.discount));
     const invoiceDiscountShare = lineBaseBeforeInvoiceDiscount > 0 ? input.invoiceDiscount * (baseTaxable / lineBaseBeforeInvoiceDiscount) : 0;
     const taxable = round2(Math.max(0, baseTaxable - invoiceDiscountShare));
@@ -832,7 +839,7 @@ app.post("/api/sales", requirePermission("sales.write"), async (req, res) => {
   const lineTaxable = round2(calculated.reduce((s, x) => s + x.taxable, 0));
   const grandTotal = Math.max(0, round2(calculated.reduce((s, x) => s + x.total, 0) + input.additionalCharges));
   const finalPaidAmount = input.markFullyPaid ? grandTotal : round2(Math.min(input.paidAmount, grandTotal));
-  const row = await db.$transaction(async tx => {
+  const row = await runSalesTransaction(options => db.$transaction(async tx => {
     // Check and decrement once per variant, using current stock in the same
     // transaction. Duplicate item lines cannot oversell the available balance.
     const quantities = new Map<string, number>();
@@ -842,7 +849,7 @@ app.post("/api/sales", requirePermission("sales.write"), async (req, res) => {
         where: { branchId, variantId, quantity: { gte: quantity } },
         data: { quantity: { decrement: quantity } },
       });
-      if (updated.count !== 1) throw new Error(`Insufficient stock for ${variants.find(v => v.id === variantId)!.sku}`);
+      if (updated.count !== 1) throw new Error(`Insufficient stock for ${variantsById.get(variantId)!.sku}`);
     }
     const fy = financialYear(input.invoiceDate);
     const prefix = `${setting.invoicePrefix}/${fy}/`;
@@ -866,7 +873,13 @@ app.post("/api/sales", requirePermission("sales.write"), async (req, res) => {
     if (finalPaidAmount > 0) { const payment = await tx.payment.create({ data: { organizationId, branchId, direction: "IN", mode: input.paymentMode, amount: finalPaidAmount } }); await tx.paymentAllocation.create({ data: { paymentId: payment.id, salesInvoiceId: invoice.id, amount: finalPaidAmount } }); }
     await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: "sales.posted", entityType: "SalesInvoice", entityId: invoice.id, metadata: { invoiceNumber: number } } });
     return tx.salesInvoice.findUniqueOrThrow({ where: { id: invoice.id }, include: savedInvoiceInclude });
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }, options)).catch(async error => {
+    // A concurrent retry may encounter a duplicate key or depleted stock after
+    // the first request commits. A lost commit response is also recoverable.
+    const committed = await db.salesInvoice.findUnique({ where: { organizationId_branchId_idempotencyKey: { organizationId, branchId, idempotencyKey: input.idempotencyKey } }, include: savedInvoiceInclude }).catch(() => null);
+    if (committed) return committed;
+    throw error;
+  });
   res.status(201).json(row);
 });
 
