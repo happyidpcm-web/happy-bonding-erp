@@ -17,6 +17,7 @@ import * as XLSX from "xlsx";
 import happyBondingLogo from "./assets/happy-bonding-logo-white.png";
 import { BillOfSupplyTemplate } from "./components/BillOfSupplyTemplate";
 import { downloadInvoicePdf } from "./utils/pdf";
+import { InvoicePdfShare } from "./components/InvoicePdfShare";
 import { GARMENT_HSN_CODES } from "./data/hsnCodes";
 import { ThermalReceiptTemplate } from "./components/ThermalReceiptTemplate";
 import { BarcodeGeneratorModal } from "./components/BarcodeGeneratorModal";
@@ -1043,6 +1044,7 @@ function InvoiceDetailModal({
 }) {
   const documentRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
+  const [pdfShareOpen, setPdfShareOpen] = useState(false);
   const [savingPayment, setSavingPayment] = useState(false);
   const [profitOpen, setProfitOpen] = useState(false);
 
@@ -1055,20 +1057,13 @@ function InvoiceDetailModal({
       await downloadInvoicePdf(documentRef.current, `Invoice_${invoice.number.replace(/[/\\?%*:|"<>]/g, "_")}`);
     } catch (err) {
       console.error(err);
+      notify("Could not create the invoice PDF. Please try again.");
     } finally {
       setDownloading(false);
     }
   };
 
-  const handleShare = () => {
-    shareWhatsAppInvoice({
-      phone: invoice.partyPhone,
-      partyName: invoice.party,
-      number: invoice.number,
-      amount: invoice.amount,
-      paidAmount: invoice.paidAmount,
-    });
-  };
+  const handleShare = () => setPdfShareOpen(true);
 
   const total = invoice.amount;
   const paid = invoice.paidAmount ?? 0;
@@ -1131,7 +1126,7 @@ function InvoiceDetailModal({
               <Printer size={15} /> Print PDF
             </button>
             <button className="whatsapp-btn" onClick={handleShare}>
-              <MessageCircle size={15} /> Share
+              <MessageCircle size={15} /> Share PDF
             </button>
             {balance > 0 && (
               <button className="primary" onClick={handleReceiveBalance} disabled={savingPayment}>
@@ -1144,6 +1139,7 @@ function InvoiceDetailModal({
           </div>
         </div>
 
+        {pdfShareOpen && documentRef.current && <InvoicePdfShare invoice={invoice} businessName={setting.business?.name || "Happy Bonding"} element={documentRef.current} onClose={() => setPdfShareOpen(false)} />}
         <div className="full-invoice-content-grid">
           <div className="bill-document-preview-wrapper">
             <BillOfSupplyTemplate ref={documentRef} invoice={invoice} setting={setting} />

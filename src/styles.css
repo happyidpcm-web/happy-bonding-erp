@@ -657,6 +657,23 @@ body{background:#fffdf7;color:#140d08}.sidebar{background:linear-gradient(180deg
 }
 
 /* Full Invoice View Modal (Matching Image 2) */
+.invoice-pdf-share {
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
+  border: 1px solid #e4d293;
+  border-radius: 14px;
+  padding: 24px;
+  color: #172033;
+  background: white;
+  box-shadow: 0 24px 80px #0003;
+}
+.invoice-pdf-share::backdrop { background: #10182799; }
+.invoice-pdf-share p { line-height: 1.6; font-size: 14px; margin: 16px 0; }
+.invoice-pdf-share .pdf-share-filename { overflow-wrap: anywhere; background: #f7f8fa; border-radius: 6px; padding: 10px; }
+.invoice-pdf-share .pdf-share-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+.invoice-pdf-share a { text-decoration: none; }
+.invoice-pdf-share [role="alert"] { color: #b42318; }
 .full-screen-modal-backdrop {
   z-index: 90 !important;
   background: rgba(17, 24, 39, 0.75) !important;
