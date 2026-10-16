@@ -20,7 +20,13 @@ import { transactionsRouter } from "./transactions.js";
 import { expenseInput, invoiceInput, invoiceSettingInput, loginInput, parseInput, partyInput, productInput, purchaseStockInput } from "./validation.js";
 
 const app = express();
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      upgradeInsecureRequests: null,
+    },
+  },
+}));
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "25mb" }));
 
