@@ -32,4 +32,4 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
           rsync -az --exclude='.git/' --exclude='.env' --exclude='.env.*' --exclude='node_modules/' --exclude='dist/' --exclude='backups/' ./ "root@$DEPLOY_HOST:/var/www/happybonding/erp/"
-          ssh "root@$DEPLOY_HOST" 'set -e; cd /var/www/happybonding/erp; npm ci; npm run build; pm2 restart happybonding-erp; pm2 save; curl --fail --silent http://127.0.0.1:4000/api/health'
+          ssh "root@$DEPLOY_HOST" 'set -e; cd /var/www/happybonding/erp; npm ci; npm run build; pm2 restart happybonding-erp; pm2 save; for attempt in $(seq 1 20); do curl --fail --silent http://127.0.0.1:4000/api/health && exit 0; sleep 2; done; exit 1'
