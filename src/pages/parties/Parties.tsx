@@ -8,6 +8,7 @@ import { money } from "../../data";
 import { api } from "../../api";
 import type { Invoice, Party } from "../../types";
 import { Modal } from "../../App";
+import { parseContactsJson } from "./contactJson";
 
 export function PartyLedgerModal({ party, onClose }: { party: Party; onClose: () => void }) {
   const [ledger, setLedger] = useState<any>(null);
@@ -152,7 +153,9 @@ export function parseContactsCsv(text: string) {
 
 export async function parseContactsFile(file: File) {
   let list: Array<{ name: string; phone: string; email?: string; address?: string }> = [];
-  if (/\.(xlsx|xls)$/i.test(file.name)) {
+  if (/\.json$/i.test(file.name)) {
+    list = parseContactsJson(await file.text());
+  } else if (/\.(xlsx|xls)$/i.test(file.name)) {
     const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
@@ -534,13 +537,13 @@ export function BulkAddPartiesModal({
             <ArrowLeft size={18} />
           </button>
           <h2>Bulk Add Parties</h2>
-          <button type="button" className="text-button" style={{ color: "#2563eb", font: "600 12px Manrope" }} onClick={() => setResult("Enter contacts manually or upload Excel/CSV. Review and click Save Parties. Existing mobile numbers are skipped.")}>
+          <button type="button" className="text-button" style={{ color: "#2563eb", font: "600 12px Manrope" }} onClick={() => setResult("Enter contacts manually or upload Excel/CSV/JSON. Review and click Save Parties. Existing mobile numbers are skipped.")}>
             ⓘ How to Use
           </button>
         </div>
 
         <div className="bulk-add-actions">
-          <input ref={fileInput} type="file" accept=".csv,.xlsx,.xls" hidden onChange={e => { const file = e.target.files?.[0]; e.target.value = ""; if (file) void upload(file); }} />
+          <input ref={fileInput} type="file" accept=".csv,.xlsx,.xls,.json" hidden onChange={e => { const file = e.target.files?.[0]; e.target.value = ""; if (file) void upload(file); }} />
           <button type="button" className="secondary" disabled={saving} onClick={() => fileInput.current?.click()}>Upload Contacts</button>
           <button type="button" className="secondary" disabled={saving} onClick={() => setRows(current => [...current, ...initialRows.map(r => ({ ...r, id: crypto.randomUUID() }))])}>Add Rows</button>
           <button type="button" className="secondary" onClick={handleReset} disabled={saving}>
@@ -556,7 +559,7 @@ export function BulkAddPartiesModal({
       </div>
 
       <div className="bulk-add-warning-banner">
-        <span>Upload Excel/CSV with Party Name and Mobile Number columns. Only contact details are imported; opening balances start at zero. Duplicate mobile numbers are skipped.</span>
+        <span>Upload Excel/CSV contacts or an ERP backup JSON file. Only name, mobile, email and address are imported; opening balances start at zero. Duplicate mobile numbers are skipped. Review the contacts before clicking Save Parties.</span>
       </div>
 
       <div role="status" style={{ padding: 16 }}>{result}</div>
