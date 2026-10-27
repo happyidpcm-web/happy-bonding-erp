@@ -23,6 +23,16 @@ export const productInput = z.object({
   barcode: z.string().optional(), size: z.string().optional(), color: z.string().optional(),
   purchasePrice: z.number().nonnegative(), sellingPrice: z.number().nonnegative(), mrp: z.number().nonnegative(), openingStock: z.number().nonnegative().default(0),
 });
+export const bulkProductInput = z.object({
+  items: z.array(productInput).min(1).max(4000).superRefine((items, ctx) => {
+    const codes = new Set<string>();
+    items.forEach((item, index) => {
+      const code = item.sku.toLowerCase();
+      if (codes.has(code)) ctx.addIssue({ code: "custom", path: [index, "sku"], message: "Duplicate item code in this batch" });
+      codes.add(code);
+    });
+  }),
+});
 export const invoiceInput = z.object({
   idempotencyKey: z.string().min(8).max(100), partyId: z.string().optional(), invoiceDate: z.coerce.date(),
   markFullyPaid: z.boolean().default(false),

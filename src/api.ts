@@ -201,6 +201,13 @@ export const api = {
       return rows.map(productFromApi);
 
   },
+  async bulkCreateProducts(items: Product[]): Promise<void> {
+    await request("/products/bulk", { method: "POST", body: JSON.stringify({ items: items.map(item => ({
+      name: item.name, sku: item.sku, category: item.category, size: item.size,
+      openingStock: item.stock, purchasePrice: item.purchasePrice, sellingPrice: item.sellingPrice,
+      mrp: item.mrp ?? item.sellingPrice, hsnCode: item.hsnCode || "6205", taxRate: item.taxRate ?? 5,
+    })) }) }, 90000);
+  },
   async createProduct(input: { name: string; sku: string; category: string; size: string; openingStock: number; purchasePrice: number; sellingPrice: number; mrp: number; hsnCode?: string; taxRate?: number }): Promise<Product[]> {
       await request("/products", { method: "POST", body: JSON.stringify({ ...input, hsnCode: input.hsnCode || "6205", taxRate: input.taxRate ?? 5 }) });
       return await api.products();

@@ -17,7 +17,7 @@ import { nextAvailableSalesNumber } from "./sales-numbering.js";
 import { runSalesTransaction } from "./sales-transaction.js";
 import { planInvoiceEdit } from "./invoice-edit.js";
 import { transactionsRouter } from "./transactions.js";
-import { expenseInput, invoiceInput, invoiceSettingInput, loginInput, parseInput, partyInput, productInput, purchaseStockInput } from "./validation.js";
+import { bulkProductInput, expenseInput, invoiceInput, invoiceSettingInput, loginInput, parseInput, partyInput, productInput, purchaseStockInput } from "./validation.js";
 
 const app = express();
 app.use(helmet({
@@ -617,6 +617,35 @@ app.post("/api/products", requirePermission("products.write"), async (req, res) 
     return product;
   });
   await audit(req, "product.created", "Product", row.id); res.status(201).json(row);
+});
+
+app.post("/api/products/bulk", requirePermission("products.write"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  const { items } = parseInput(bulkProductInput, req.body);
+  const organizationId = req.session!.organizationId;
+  await db.$transaction(async tx => {
+    const existing = await tx.productVariant.findMany({ where: { active: true, product: { organizationId, branchId, active: true } }, select: { sku: true } });
+    const codes = new Set(existing.map(row => row.sku.toLowerCase()));
+    const duplicate = items.find(item => codes.has(item.sku.toLowerCase()));
+    if (duplicate) throw new Error("Item code already exists: " + duplicate.sku);
+    const taxIds = new Map<number, string>();
+    for (const rate of new Set(items.map(item => item.taxRate))) {
+      const tax = await tx.taxRate.upsert({ where: { organizationId_rate: { organizationId, rate: new Prisma.Decimal(rate) } }, create: { organizationId, name: "GST " + rate + "%", rate }, update: {} });
+      taxIds.set(rate, tax.id);
+    }
+    for (let offset = 0; offset < items.length; offset += 500) {
+      const batch = items.slice(offset, offset + 500).map(item => ({ ...item, productId: randomUUID(), variantId: randomUUID() }));
+      await tx.product.createMany({ data: batch.map(item => ({ id: item.productId, organizationId, branchId, name: item.name, category: item.category, brand: item.brand, hsnCode: item.hsnCode, taxRateId: taxIds.get(item.taxRate)! })) });
+      await tx.productVariant.createMany({ data: batch.map(item => ({ id: item.variantId, productId: item.productId, sku: item.sku, barcode: item.barcode, size: item.size, color: item.color, purchasePrice: item.purchasePrice, sellingPrice: item.sellingPrice, mrp: item.mrp })) });
+      const stocked = batch.filter(item => item.openingStock > 0);
+      if (stocked.length) {
+        await tx.stockBalance.createMany({ data: stocked.map(item => ({ branchId, variantId: item.variantId, quantity: item.openingStock })) });
+        await tx.stockMovement.createMany({ data: stocked.map(item => ({ branchId, variantId: item.variantId, type: "OPENING", quantity: item.openingStock, unitCost: item.purchasePrice, referenceType: "Product", referenceId: item.productId })) });
+      }
+    }
+    await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: "products.bulk_created", entityType: "Product", entityId: branchId, metadata: { count: items.length } } });
+  }, { timeout: 60000 });
+  res.status(201).json({ count: items.length });
 });
 
 app.put("/api/products/:id", requirePermission("products.write"), async (req, res) => {

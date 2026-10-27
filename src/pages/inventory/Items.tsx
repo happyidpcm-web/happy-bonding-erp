@@ -941,12 +941,13 @@ export function BulkAddItemsSpreadsheetModal({
   notify,
 }: {
   existingProducts: Product[];
-  onSaveProducts: (newProducts: Product[]) => void;
+  onSaveProducts: (newProducts: Product[]) => Promise<void>;
   onClose: () => void;
   notify: (msg: string) => void;
 }) {
+  const [saving, setSaving] = useState(false);
   const [rows, setRows] = useState<BulkItemRow[]>(() => {
-    const initial = [...defaultBulkItemRows];
+    const initial: BulkItemRow[] = [];
     while (initial.length < 20) {
       initial.push({
         name: "", description: "", category: "", unit: "PIECES", alternateUnit: "", conversionRate: "",
@@ -967,8 +968,7 @@ export function BulkAddItemsSpreadsheetModal({
   };
 
   const handleReset = () => {
-    setRows(defaultBulkItemRows.map(r => ({ ...r })));
-    notify("Spreadsheet reset to sample items");
+    handleClearAll();
   };
 
   const handleClearAll = () => {
@@ -981,7 +981,8 @@ export function BulkAddItemsSpreadsheetModal({
     notify("Cleared all items in spreadsheet");
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (saving) return;
     const validRows = rows.filter(r => r.name.trim());
     if (!validRows.length) return notify("Please enter at least one Item Name");
 
@@ -999,16 +1000,21 @@ export function BulkAddItemsSpreadsheetModal({
       taxRate: Number(r.gstRate || 0),
     }));
 
-    onSaveProducts(newItems);
-    notify(`Successfully added ${newItems.length} items to inventory!`);
-    onClose();
+    setSaving(true);
+    try {
+      await onSaveProducts(newItems);
+      notify(`Successfully added ${newItems.length} items to inventory!`);
+      onClose();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Could not save items. Please retry.");
+    } finally { setSaving(false); }
   };
 
   return (
     <div className="bulk-add-parties-fullscreen">
       <div className="bulk-add-header">
         <div className="bulk-add-title">
-          <button type="button" className="icon-button" onClick={onClose} title="Back to Items">
+          <button type="button" className="icon-button" disabled={saving} onClick={onClose} title="Back to Items">
             <ArrowLeft size={18} />
           </button>
           <h2>Bulk Add Items</h2>
@@ -1018,14 +1024,14 @@ export function BulkAddItemsSpreadsheetModal({
         </div>
 
         <div className="bulk-add-actions">
-          <button type="button" className="secondary" onClick={handleReset}>
+          <button type="button" className="secondary" disabled={saving} onClick={handleReset}>
             Reset
           </button>
-          <button type="button" className="secondary" onClick={handleClearAll}>
+          <button type="button" className="secondary" disabled={saving} onClick={handleClearAll}>
             Clear All Items
           </button>
-          <button type="button" className="primary" onClick={handleSave} style={{ background: "#4f46e5", borderColor: "#4f46e5" }}>
-            Save Items
+          <button type="button" className="primary" disabled={saving} onClick={handleSave} style={{ background: "#4f46e5", borderColor: "#4f46e5" }}>
+            {saving ? "Saving..." : "Save Items"}
           </button>
         </div>
       </div>
@@ -1035,7 +1041,7 @@ export function BulkAddItemsSpreadsheetModal({
       </div>
 
       <div className="table-scroll spreadsheet-container" style={{ flex: 1, padding: 12 }}>
-        <table className="bulk-spreadsheet-table">
+        <fieldset disabled={saving} style={{ border: 0, margin: 0, padding: 0 }}><table className="bulk-spreadsheet-table">
           <thead>
             <tr>
               <th className="row-num">#</th>
@@ -1114,7 +1120,7 @@ export function BulkAddItemsSpreadsheetModal({
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></fieldset>
       </div>
     </div>
   );
@@ -1349,8 +1355,10 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
     });
   }, [rows, query, categoryFilter, lowStockOnly]);
 
-  const handleBulkAddSave = (newProducts: Product[]) => {
-    setRows([...rows, ...newProducts]);
+  const handleBulkAddSave = async (newProducts: Product[]) => {
+    await api.bulkCreateProducts(newProducts);
+    try { setRows(await api.products()); }
+    catch { notify("Items saved, but inventory refresh failed. Reload the page to view them."); }
   };
 
   const handleDeleteProduct = async (p: Product) => {
@@ -1700,7 +1708,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
                           className="bulk-sub-item-btn"
                           onClick={() => {
                             setBulkActionsDropdownOpen(false);
-                            notify("This bulk/offer feature is not connected to the backend yet.");
+                            setActiveSubScreen("bulk_add_items");
                           }}
                           style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", border: "none", background: "transparent", cursor: "pointer", width: "100%", textAlign: "left", fontSize: 13, color: "#334155" }}
                         >
