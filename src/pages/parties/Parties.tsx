@@ -422,11 +422,13 @@ interface BulkPartyRow {
 export function BulkAddPartiesModal({
   existingParties,
   onSaveParties,
+  onRemoveParties,
   onClose,
   notify,
 }: {
   existingParties: Party[];
   onSaveParties: (newParties: Party[]) => void;
+  onRemoveParties: (ids: string[]) => void;
   onClose: () => void;
   notify: (msg: string) => void;
 }) {
@@ -477,6 +479,23 @@ export function BulkAddPartiesModal({
   }, [selectedBatch, existingParties]);
   const normalizeMobile = (phone: string) => phone.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "");
   const existingMobiles = useMemo(() => new Set(existingParties.map(p => normalizeMobile(p.phone || "")).filter(Boolean)), [existingParties]);
+  const matchingContacts = useMemo(() => {
+    const keys = new Set(uploadedContacts.map(c => `${c.name.trim().toLowerCase()}|${normalizeMobile(c.phone)}`));
+    return existingParties.filter(p => keys.has(`${p.name.trim().toLowerCase()}|${normalizeMobile(p.phone || "")}`));
+  }, [uploadedContacts, existingParties]);
+  const [deleteCandidates, setDeleteCandidates] = useState<Party[]>([]);
+  const removeContacts = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true; setSaving(true);
+    try {
+      const response = await api.removeSelectedParties(deleteCandidates.map(p => String(p.id)));
+      onRemoveParties(response.deletedIds);
+      setDeleteCandidates([]);
+      setResult(`${response.deletedIds.length} contacts removed. ${response.protectedCount} linked or unavailable contacts skipped.`);
+      await loadHistory();
+    } catch (error) { setResult(error instanceof Error ? error.message : "Unable to remove contacts"); }
+    finally { savingRef.current = false; setSaving(false); }
+  };
   const upload = async (file: File) => {
     if (savingRef.current) return;
     savingRef.current = true;
@@ -595,6 +614,8 @@ export function BulkAddPartiesModal({
       {fileName && uploadedContacts.length > 0 && <section style={{ padding: "0 16px 16px" }}>
         <h3>Uploaded file: {fileName} ({uploadedContacts.length} contacts)</h3>
         <p>File preview. Contacts already in All Parties are skipped when saving.</p>
+        <p>For older uploads without history, matching uses both name and mobile. These matches do not prove which upload originally created a contact.</p>
+        <button type="button" className="secondary" disabled={saving || !matchingContacts.length} onClick={() => setDeleteCandidates(matchingContacts)}>Review matching contacts for deletion ({matchingContacts.length})</button>
         <div className="table-scroll" style={{ maxHeight: 300, overflow: "auto" }}>
           <table><thead><tr><th>Name</th><th>Mobile</th><th>Status</th></tr></thead>
             <tbody>{uploadedContacts.slice(0, 100).map((contact, index) => <tr key={index}>
@@ -616,6 +637,7 @@ export function BulkAddPartiesModal({
         </div>
         {selectedBatch && <div style={{ marginTop: 16 }}>
           <h3>{selectedBatch.fileName} — Saved Contacts ({importedContacts.length})</h3>
+          <button type="button" className="secondary" disabled={saving || !importedContacts.length} onClick={() => setDeleteCandidates(importedContacts)}>Delete imported contacts</button>
           <div className="table-scroll"><table><thead><tr><th>Name</th><th>Mobile</th><th>Email</th><th>Address</th></tr></thead>
           <tbody>{importedContacts.slice(historyPage * 100, (historyPage + 1) * 100).map(party => <tr key={party.id}><td>{party.name}</td><td>{party.phone}</td><td>{party.email || "-"}</td><td>{party.address || "-"}</td></tr>)}</tbody></table></div>
           <button type="button" className="secondary" disabled={!historyPage} onClick={() => setHistoryPage(p => p - 1)}>Previous</button>
@@ -623,6 +645,12 @@ export function BulkAddPartiesModal({
           <button type="button" className="secondary" onClick={() => setSelectedImport("")}>Back to entry</button>
         </div>}
       </section>
+      {deleteCandidates.length > 0 && <Modal title="Confirm contact deletion" onClose={() => { if (!saving) setDeleteCandidates([]); }}>
+        <p>Remove these {deleteCandidates.length} contacts from All Parties? Contacts linked to invoices, credit notes or an opening balance will be kept.</p>
+        <div style={{ maxHeight: 300, overflow: "auto" }}>{deleteCandidates.map(p => <p key={p.id}>{p.name} — {p.phone}</p>)}</div>
+        <button type="button" className="secondary" disabled={saving} onClick={() => setDeleteCandidates([])}>Cancel</button>
+        <button type="button" className="primary" disabled={saving} onClick={() => void removeContacts()}>{saving ? "Deleting..." : "Confirm delete"}</button>
+      </Modal>}
       {!selectedImport && rows.length > 0 && <>
       {fileName && <p style={{ padding: "0 16px" }}>Selected file: <strong>{fileName}</strong></p>}
       <fieldset disabled={saving} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
@@ -1078,6 +1106,7 @@ export function Parties({
         <BulkAddPartiesModal
           existingParties={rows}
           onSaveParties={handleBulkAddParties}
+          onRemoveParties={ids => setRows(rows.filter(p => !ids.includes(String(p.id))))}
           onClose={() => setBulkModalOpen(false)}
           notify={notify}
         />

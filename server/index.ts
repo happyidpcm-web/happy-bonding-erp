@@ -451,6 +451,21 @@ app.get("/api/parties", async (req, res) => {
 });
 
 // Import membership is recorded atomically with each new party in the audit log.
+app.post("/api/parties/remove-selected", requirePermission("parties.write"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  const ids = req.body?.ids;
+  if (!Array.isArray(ids) || !ids.length || ids.length > 20000 || ids.some(id => typeof id !== "string")) return res.status(400).json({ error: "Select 1 to 20,000 contacts" });
+  const organizationId = req.session!.organizationId;
+  const deletedIds = await db.$transaction(async tx => {
+    const eligible = await tx.party.findMany({ where: { organizationId, branchId, id: { in: ids }, active: true, openingBalance: 0, invoices: { none: {} }, creditNotes: { none: {} } }, select: { id: true } });
+    const removed = eligible.map(p => p.id);
+    await tx.party.updateMany({ where: { organizationId, branchId, id: { in: removed } }, data: { active: false } });
+    await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: "parties.removed", entityType: "Party", entityId: branchId, metadata: { branchId, partyIds: removed } } });
+    return removed;
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  res.json({ deletedIds, protectedCount: new Set(ids).size - deletedIds.length });
+});
+
 app.get("/api/party-imports", requirePermission("parties.write"), async (req, res) => {
   const branchId = requireBranch(req, res); if (!branchId) return;
   const events = await db.auditEvent.findMany({ where: { organizationId: req.session!.organizationId, action: "party.created", metadata: { path: ["branchId"], equals: branchId } }, orderBy: { occurredAt: "desc" } });

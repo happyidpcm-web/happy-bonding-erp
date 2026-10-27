@@ -189,6 +189,9 @@ export const api = {
   async partyImports(): Promise<Array<{ id: string; fileName: string; createdAt: string; partyIds: string[] }>> {
     return request("/party-imports");
   },
+  async removeSelectedParties(ids: string[]): Promise<{ deletedIds: string[]; protectedCount: number }> {
+    return request("/parties/remove-selected", { method: "POST", body: JSON.stringify({ ids }) });
+  },
   async importParties(contacts: Array<{ name: string; phone: string; email?: string; address?: string }>): Promise<{ imported:number; skipped:number; invalid:number; duplicateInFile:number; duplicateInDb:number }> {
       return await request("/parties/import", { method: "POST", body: JSON.stringify({ contacts }) });
 
