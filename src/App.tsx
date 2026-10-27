@@ -1,3 +1,4 @@
+import ownerSignatureUrl from "./assets/owner-signature.png";
 import { useDismissibleDropdown } from "./hooks/useDismissibleDropdown";
 import { isInvoiceInDateRange, type CustomDateRange } from "./utils/invoiceDateRange";
 export { isInvoiceInDateRange, type CustomDateRange } from "./utils/invoiceDateRange";
@@ -81,7 +82,7 @@ const nav: { section: string; items: { id: Page; label: string; icon: typeof Lay
   ]},
 ];
 
-export const defaultSignatureUrl = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 70" width="220" height="60"><path d="M10 45 C30 10, 45 5, 55 45 C65 25, 75 15, 85 45 C95 10, 110 30, 130 40 C140 15, 155 25, 175 35 C185 10, 205 35, 240 15" stroke="%23111827" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M25 50 C80 48, 140 52, 210 48" stroke="%23111827" stroke-width="1.5" fill="none"/><text x="35" y="65" font-family="cursive, sans-serif" font-size="18" font-weight="bold" fill="%23111827">M. Saravana</text></svg>`;
+export const defaultSignatureUrl = ownerSignatureUrl;
 
 export const defaultInvoiceSetting: InvoiceSetting = { invoicePrefix: "HB/SL", paymentTermsDays: 30, terms: "NO REFUND ONCE SOLD. EXCHANGE ONLY AS PER STORE POLICY.", bankName: "", accountName: "", accountNumber: "", ifsc: "", upiId: "", qrText: "", signatureText: "Authorized signatory for Happy Bonding Men's Wear", signatureUrl: "" };
 
@@ -2976,7 +2977,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
             <div className="ref-signature-area">
               <span className="ref-sig-title">{setting.signatureText || `Authorized signatory for Happy Bonding Men's Wear (${localStorage.getItem("hb_signature_name") || "M. Saravanan"})`}</span>
               <div className="ref-sig-img">
-                <img src={setting.signatureUrl || undefined} alt="Digital Signature" style={{ height: 48, objectFit: "contain" }} />
+                <img src={setting.signatureUrl || defaultSignatureUrl} alt="Digital Signature" style={{ height: 48, objectFit: "contain" }} />
               </div>
             </div>
 
@@ -3567,7 +3568,7 @@ function InvoiceSettingsEditor({setting,setSetting,onSave}:{setting:InvoiceSetti
     <div className="signature-editor-box">
       <strong>Stored Digital Signature (Applied automatically to all invoices)</strong>
       <div className="signature-preview">
-        <img src={setting.signatureUrl || undefined} alt="Stored Digital Signature Preview" />
+        <img src={setting.signatureUrl || defaultSignatureUrl} alt="Stored Digital Signature Preview" />
       </div>
       <label>Upload New Signature Image (PNG / JPEG / SVG):
         <input type="file" accept="image/*" onChange={e => handleSignatureUpload(e.target.files?.[0])} />

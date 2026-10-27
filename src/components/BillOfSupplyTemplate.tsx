@@ -1,8 +1,8 @@
 import React from "react";
+import ownerSignatureUrl from "../assets/owner-signature.png";
 import happyBondingLogo from "../assets/happy-bonding-logo-white.png";
 import type { Invoice, InvoiceSetting } from "../types";
 
-const defaultSignatureUrl = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 70" width="220" height="60"><path d="M10 45 C30 10, 45 5, 55 45 C65 25, 75 15, 85 45 C95 10, 110 30, 130 40 C140 15, 155 25, 175 35 C185 10, 205 35, 240 15" stroke="%23111827" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M25 50 C80 48, 140 52, 210 48" stroke="%23111827" stroke-width="1.5" fill="none"/><text x="35" y="65" font-family="cursive, sans-serif" font-size="18" font-weight="bold" fill="%23111827">M. Saravana</text></svg>`;
 
 export function numberToWords(num: number): string {
   if (!num || num === 0) return "Zero Rupees";
@@ -185,7 +185,7 @@ export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: 
 
             <div className="gold-signature-box">
               <div className="sig-img-wrap">
-                {setting.signatureUrl && <img src={setting.signatureUrl} alt="Signature" />}
+                <img src={setting.signatureUrl || ownerSignatureUrl} alt="Signature" />
               </div>
               <div className="sig-label">Signature</div>
               <div className="sig-company">{setting.signatureText || "Happy Bonding Men's Wear"}</div>
