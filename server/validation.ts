@@ -8,7 +8,7 @@ const optGstin = () => z.preprocess(v => (v === "" || v === null ? undefined : v
 const optDate = () => z.preprocess(v => (v === "" || v === null || v === "Invalid Date" ? undefined : v), z.coerce.date().optional());
 
 export const partyInput = z.object({
-  name: z.string().trim().min(2).max(120), type: z.enum(["CUSTOMER", "SUPPLIER", "BOTH"]),
+  name: z.string().trim().min(1).max(120), type: z.enum(["CUSTOMER", "SUPPLIER", "BOTH"]),
   phone: optString(20), email: optEmail(), gstin: optGstin(), pan: optString(10), category: optString(80),
   stateCode: optString(2), address: optString(500), shippingAddress: optString(500), sameAsBilling: z.boolean().default(true),
   openingBalance: z.coerce.number().default(0), openingBalanceType: z.enum(["TO_COLLECT", "TO_PAY"]).default("TO_COLLECT"),
