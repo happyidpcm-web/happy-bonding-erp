@@ -453,12 +453,13 @@ export function BulkAddPartiesModal({
     })),
   ];
 
-  const [rows, setRows] = useState<BulkPartyRow[]>(initialRows);
+  const [rows, setRows] = useState<BulkPartyRow[]>([]);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const [result, setResult] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
+  const [uploadedContacts, setUploadedContacts] = useState<Awaited<ReturnType<typeof parseContactsFile>>>([]);
   const [importId, setImportId] = useState(() => crypto.randomUUID());
   const [history, setHistory] = useState<Awaited<ReturnType<typeof api.partyImports>>>([]);
   const [historyError, setHistoryError] = useState("");
@@ -475,6 +476,7 @@ export function BulkAddPartiesModal({
     return existingParties.filter(party => ids.has(String(party.id)));
   }, [selectedBatch, existingParties]);
   const normalizeMobile = (phone: string) => phone.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "");
+  const existingMobiles = useMemo(() => new Set(existingParties.map(p => normalizeMobile(p.phone || "")).filter(Boolean)), [existingParties]);
   const upload = async (file: File) => {
     if (savingRef.current) return;
     savingRef.current = true;
@@ -484,6 +486,7 @@ export function BulkAddPartiesModal({
       if (!contacts.length) throw new Error("No valid contacts found. Use Party Name and Mobile Number columns.");
       setRows(contacts.map(c => ({ ...initialRows[0], id: crypto.randomUUID(), name: c.name, phone: c.phone, email: c.email || "", billingAddress: c.address || "" })));
       setFileName(file.name); setImportId(crypto.randomUUID()); setSelectedImport("");
+      setUploadedContacts(contacts);
       setResult(contacts.length + " contacts ready. Review and click Save Parties.");
     } catch (error) { setResult(error instanceof Error ? error.message : "Unable to read file"); }
     finally { savingRef.current = false; setSaving(false); }
@@ -494,13 +497,15 @@ export function BulkAddPartiesModal({
   };
 
   const handleReset = () => {
-    setRows(initialRows);
+    setRows([]);
+    setUploadedContacts([]);
     setFileName(""); setImportId(crypto.randomUUID()); setSelectedImport("");
     setResult("");
   };
 
   const handleClearAll = () => {
-    setRows(initialRows);
+    setRows([]);
+    setUploadedContacts([]);
     setFileName(""); setImportId(crypto.randomUUID()); setSelectedImport("");
     setResult("");
   };
@@ -547,7 +552,7 @@ export function BulkAddPartiesModal({
         await loadHistory();
         if (!failure) setSelectedImport(importId); setHistoryPage(0);
       }
-      setRows(current => { const remaining = current.filter(r => !completed.has(r.id)); return remaining.length ? remaining : initialRows; });
+      setRows(current => current.filter(r => !completed.has(r.id)));
       const message = saved.length + " parties saved. " + skipped + " duplicate mobile numbers skipped. " + failure;
       setResult(message); notify(message);
     } finally { setSaving(false); savingRef.current = false; }
@@ -576,7 +581,7 @@ export function BulkAddPartiesModal({
           <button type="button" className="secondary" onClick={handleClearAll} disabled={saving}>
             Clear All Parties
           </button>
-          <button type="button" className="primary" onClick={handleSave} disabled={saving} style={{ background: "#4f46e5", borderColor: "#4f46e5" }}>
+          <button type="button" className="primary" onClick={handleSave} disabled={saving || !rows.length || !!selectedImport} style={{ background: "#4f46e5", borderColor: "#4f46e5" }}>
             {saving ? "Saving..." : "Save Parties"}
           </button>
         </div>
@@ -587,6 +592,19 @@ export function BulkAddPartiesModal({
       </div>
 
       <div role="status" style={{ padding: 16 }}>{result}</div>
+      {fileName && uploadedContacts.length > 0 && <section style={{ padding: "0 16px 16px" }}>
+        <h3>Uploaded file: {fileName} ({uploadedContacts.length} contacts)</h3>
+        <p>File preview. Contacts already in All Parties are skipped when saving.</p>
+        <div className="table-scroll" style={{ maxHeight: 300, overflow: "auto" }}>
+          <table><thead><tr><th>Name</th><th>Mobile</th><th>Status</th></tr></thead>
+            <tbody>{uploadedContacts.slice(0, 100).map((contact, index) => <tr key={index}>
+              <td>{contact.name}</td><td>{contact.phone}</td>
+              <td>{existingMobiles.has(normalizeMobile(contact.phone)) ? "Already in All Parties" : "Not saved yet"}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+        {uploadedContacts.length > 100 && <p>Showing the first 100 of {uploadedContacts.length} uploaded contacts.</p>}
+      </section>}
       <section style={{ padding: "0 16px 16px" }}>
         <h3>Import History</h3>
         {historyError && <p role="alert">{historyError} <button type="button" onClick={() => void loadHistory()}>Retry</button></p>}
@@ -605,7 +623,7 @@ export function BulkAddPartiesModal({
           <button type="button" className="secondary" onClick={() => setSelectedImport("")}>Back to entry</button>
         </div>}
       </section>
-      {!selectedImport && <>
+      {!selectedImport && rows.length > 0 && <>
       {fileName && <p style={{ padding: "0 16px" }}>Selected file: <strong>{fileName}</strong></p>}
       <fieldset disabled={saving} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <div className="bulk-spreadsheet-container">
