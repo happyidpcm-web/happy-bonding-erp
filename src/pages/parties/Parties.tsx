@@ -428,46 +428,6 @@ export function BulkAddPartiesModal({
   notify: (msg: string) => void;
 }) {
   const initialRows: BulkPartyRow[] = [
-    {
-      id: "1",
-      name: "Sample Party A",
-      phone: "7999999999",
-      gstin: "24AABCS1429B1Z0",
-      shippingAddress: "Icon Imperio, Pune",
-      shippingPincode: "560029",
-      shippingCity: "Bangalore",
-      shippingState: "Karnataka",
-      billingAddress: "139, Pandeyganj, Lucknow",
-      billingPincode: "226004",
-      billingCity: "Lucknow",
-      billingState: "Uttar Pradesh",
-      partyType: "Supplier",
-      openingBalance: "2000",
-      creditPeriod: "1",
-      email: "",
-      birthday: "",
-      kovilThiruvila: "",
-    },
-    {
-      id: "2",
-      name: "Sample Party B",
-      phone: "9899999999",
-      gstin: "09AABCS1429B1Z8",
-      shippingAddress: "139, 5th main, Hongasandra, Bangalore",
-      shippingPincode: "560029",
-      shippingCity: "Bangalore",
-      shippingState: "Karnataka",
-      billingAddress: "139, Pandeyganj, Lucknow",
-      billingPincode: "226004",
-      billingCity: "Lucknow",
-      billingState: "Uttar Pradesh",
-      partyType: "Supplier",
-      openingBalance: "0",
-      creditPeriod: "2",
-      email: "supplier@gmail.com",
-      birthday: "",
-      kovilThiruvila: "",
-    },
     ...Array.from({ length: 8 }, (_, i) => ({
       id: String(i + 3),
       name: "",
@@ -491,6 +451,23 @@ export function BulkAddPartiesModal({
   ];
 
   const [rows, setRows] = useState<BulkPartyRow[]>(initialRows);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const [result, setResult] = useState("");
+  const fileInput = useRef<HTMLInputElement>(null);
+  const normalizeMobile = (phone: string) => phone.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "");
+  const upload = async (file: File) => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      const contacts = await parseContactsFile(file);
+      if (!contacts.length) throw new Error("No valid contacts found. Use Party Name and Mobile Number columns.");
+      setRows(contacts.map(c => ({ ...initialRows[0], id: crypto.randomUUID(), name: c.name, phone: c.phone, email: c.email || "", billingAddress: c.address || "" })));
+      setResult(contacts.length + " contacts ready. Review and click Save Parties.");
+    } catch (error) { setResult(error instanceof Error ? error.message : "Unable to read file"); }
+    finally { savingRef.current = false; setSaving(false); }
+  };
 
   const updateCell = (id: string, field: keyof BulkPartyRow, val: string) => {
     setRows(rows.map(r => r.id === id ? { ...r, [field]: val } : r));
@@ -498,91 +475,92 @@ export function BulkAddPartiesModal({
 
   const handleReset = () => {
     setRows(initialRows);
-    notify("Form reset to default sample rows");
+    setResult("");
   };
 
   const handleClearAll = () => {
-    setRows(rows.map(r => ({ ...r, name: "", phone: "", gstin: "", shippingAddress: "", billingAddress: "", openingBalance: "0", email: "" })));
-    notify("Cleared all table entries");
+    setRows(initialRows);
+    setResult("");
   };
 
   const handleSave = async () => {
-    const validRows = rows.filter(r => r.name.trim());
-    if (!validRows.length) {
-      notify("Please enter at least one Party Name");
-      return;
-    }
-
-    const seenMobiles = new Set<string>();
-    const newPartiesList: Party[] = [];
-    let duplicatesSkipped = 0;
-
-    for (const r of validRows) {
-      const phoneDigits = r.phone.replace(/\D/g, "");
-      
-      // Check duplicate mobile number against existing database and current batch
-      if (phoneDigits && (seenMobiles.has(phoneDigits) || existingParties.some(p => p.phone && p.phone.replace(/\D/g, "") === phoneDigits))) {
-        duplicatesSkipped++;
-        continue; // Skip duplicate mobile number as requested!
+    if (savingRef.current) return;
+    const validRows = rows.filter(r => r.name.trim() || r.phone.trim() || r.email.trim());
+    if (!validRows.length) { setResult("Please enter at least one Party Name"); return; }
+    const invalid = validRows.find(r => !r.name.trim() || (r.phone.trim() && !/^\d{10}$/.test(normalizeMobile(r.phone))));
+    if (invalid) { setResult("Check row " + (rows.indexOf(invalid) + 1) + ": name is required and mobile must have 10 digits."); return; }
+    savingRef.current = true;
+    setSaving(true);
+    const saved: Party[] = [];
+    const completed = new Set<string>();
+    const seen = new Set(existingParties.map(p => normalizeMobile(p.phone || "")).filter(Boolean));
+    let skipped = 0;
+    let failure = "";
+    try {
+      for (const r of validRows) {
+        const phone = normalizeMobile(r.phone);
+        if (phone && seen.has(phone)) { skipped++; completed.add(r.id); continue; }
+        setResult("Saving " + (saved.length + 1) + " of " + validRows.length + " parties...");
+        try {
+          const party = await api.createParty({
+            name: r.name.trim(), phone, type: r.partyType === "Supplier" ? "Supplier" : "Customer",
+            gstin: r.gstin.trim() || undefined,
+            address: [r.billingAddress, r.billingCity, r.billingState, r.billingPincode].map(v => v.trim()).filter(Boolean).join(", ") || undefined,
+            shippingAddress: [r.shippingAddress, r.shippingCity, r.shippingState, r.shippingPincode].map(v => v.trim()).filter(Boolean).join(", ") || undefined,
+            openingBalance: Number(r.openingBalance || 0),
+            openingBalanceType: Number(r.openingBalance) < 0 ? "TO_PAY" : "TO_COLLECT",
+            creditPeriodDays: Number(r.creditPeriod || 0), email: r.email.trim() || undefined,
+            customBirthday: r.birthday.trim() || undefined, customKovilThiruvila: r.kovilThiruvila.trim() || undefined,
+          });
+          saved.push(party); completed.add(r.id);
+          if (phone) seen.add(phone);
+        } catch (error) {
+          failure = "Row " + (rows.indexOf(r) + 1) + ": " + (error instanceof Error ? error.message : "Save failed") + ". Remaining rows kept for retry.";
+          break;
+        }
       }
-
-      if (phoneDigits) seenMobiles.add(phoneDigits);
-
-      newPartiesList.push({
-        id: Date.now() + Math.random(),
-        name: r.name.trim(),
-        phone: r.phone.trim(),
-        gstin: r.gstin.trim() || undefined,
-        address: r.billingAddress.trim() || undefined,
-        shippingAddress: r.shippingAddress.trim() || undefined,
-        type: (r.partyType || "Customer") as "Customer" | "Supplier",
-        balance: Number(r.openingBalance || 0),
-        creditPeriodDays: Number(r.creditPeriod || 30),
-        email: r.email.trim() || undefined,
-        customBirthday: r.birthday.trim() || undefined,
-        customKovilThiruvila: r.kovilThiruvila.trim() || undefined,
-      });
-    }
-
-    if (newPartiesList.length > 0) {
-      onSaveParties(newPartiesList);
-      notify(`Successfully added ${newPartiesList.length} parties! ${duplicatesSkipped ? `(${duplicatesSkipped} duplicate mobile numbers skipped)` : ""}`);
-      onClose();
-    } else {
-      notify(`All entered parties had duplicate mobile numbers (${duplicatesSkipped} skipped).`);
-    }
+      if (saved.length) onSaveParties(saved);
+      setRows(current => { const remaining = current.filter(r => !completed.has(r.id)); return remaining.length ? remaining : initialRows; });
+      const message = saved.length + " parties saved. " + skipped + " duplicate mobile numbers skipped. " + failure;
+      setResult(message); notify(message);
+    } finally { setSaving(false); savingRef.current = false; }
   };
 
   return (
     <div className="bulk-add-parties-fullscreen">
       <div className="bulk-add-header">
         <div className="bulk-add-title">
-          <button type="button" className="icon-button" onClick={onClose} title="Back to Parties">
+          <button type="button" className="icon-button" onClick={onClose} disabled={saving} title="Back to Parties">
             <ArrowLeft size={18} />
           </button>
           <h2>Bulk Add Parties</h2>
-          <button type="button" className="text-button" style={{ color: "#2563eb", font: "600 12px Manrope" }} onClick={() => notify("How to Use guide opened")}>
+          <button type="button" className="text-button" style={{ color: "#2563eb", font: "600 12px Manrope" }} onClick={() => setResult("Enter contacts manually or upload Excel/CSV. Review and click Save Parties. Existing mobile numbers are skipped.")}>
             ⓘ How to Use
           </button>
         </div>
 
         <div className="bulk-add-actions">
-          <button type="button" className="secondary" onClick={handleReset}>
+          <input ref={fileInput} type="file" accept=".csv,.xlsx,.xls" hidden onChange={e => { const file = e.target.files?.[0]; e.target.value = ""; if (file) void upload(file); }} />
+          <button type="button" className="secondary" disabled={saving} onClick={() => fileInput.current?.click()}>Upload Contacts</button>
+          <button type="button" className="secondary" disabled={saving} onClick={() => setRows(current => [...current, ...initialRows.map(r => ({ ...r, id: crypto.randomUUID() }))])}>Add Rows</button>
+          <button type="button" className="secondary" onClick={handleReset} disabled={saving}>
             Reset
           </button>
-          <button type="button" className="secondary" onClick={handleClearAll}>
+          <button type="button" className="secondary" onClick={handleClearAll} disabled={saving}>
             Clear All Parties
           </button>
-          <button type="button" className="primary" onClick={handleSave} style={{ background: "#4f46e5", borderColor: "#4f46e5" }}>
-            Save Parties
+          <button type="button" className="primary" onClick={handleSave} disabled={saving} style={{ background: "#4f46e5", borderColor: "#4f46e5" }}>
+            {saving ? "Saving..." : "Save Parties"}
           </button>
         </div>
       </div>
 
       <div className="bulk-add-warning-banner">
-        <span>You can upload only 4000 parties at once. For uploading more than 4000 parties, please contact our support team at 7400417400</span>
+        <span>Upload Excel/CSV with Party Name and Mobile Number columns. Only contact details are imported; opening balances start at zero. Duplicate mobile numbers are skipped.</span>
       </div>
 
+      <div role="status" style={{ padding: 16 }}>{result}</div>
+      <fieldset disabled={saving} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <div className="bulk-spreadsheet-container">
         <table className="bulk-spreadsheet-table">
           <thead>
@@ -638,6 +616,7 @@ export function BulkAddPartiesModal({
           </tbody>
         </table>
       </div>
+      </fieldset>
     </div>
   );
 }
@@ -920,7 +899,7 @@ export function Parties({
                   <button
                     onClick={() => {
                       setBulkActionDropdownOpen(false);
-                      notify("Bulk party entry is unavailable. Use Add Party or the backend contact import.");
+                      setBulkModalOpen(true);
                     }}
                     className="bulk-add-item-btn"
                   >
