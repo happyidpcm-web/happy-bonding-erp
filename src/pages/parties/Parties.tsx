@@ -458,6 +458,22 @@ export function BulkAddPartiesModal({
   const savingRef = useRef(false);
   const [result, setResult] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
+  const [fileName, setFileName] = useState("");
+  const [importId, setImportId] = useState(() => crypto.randomUUID());
+  const [history, setHistory] = useState<Awaited<ReturnType<typeof api.partyImports>>>([]);
+  const [historyError, setHistoryError] = useState("");
+  const [selectedImport, setSelectedImport] = useState("");
+  const [historyPage, setHistoryPage] = useState(0);
+  const loadHistory = async () => {
+    try { setHistory(await api.partyImports()); setHistoryError(""); }
+    catch (error) { setHistoryError(error instanceof Error ? error.message : "Unable to load import history"); }
+  };
+  useEffect(() => { void loadHistory(); }, []);
+  const selectedBatch = history.find(batch => batch.id === selectedImport);
+  const importedContacts = useMemo(() => {
+    const ids = new Set(selectedBatch?.partyIds || []);
+    return existingParties.filter(party => ids.has(String(party.id)));
+  }, [selectedBatch, existingParties]);
   const normalizeMobile = (phone: string) => phone.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "");
   const upload = async (file: File) => {
     if (savingRef.current) return;
@@ -467,6 +483,7 @@ export function BulkAddPartiesModal({
       const contacts = await parseContactsFile(file);
       if (!contacts.length) throw new Error("No valid contacts found. Use Party Name and Mobile Number columns.");
       setRows(contacts.map(c => ({ ...initialRows[0], id: crypto.randomUUID(), name: c.name, phone: c.phone, email: c.email || "", billingAddress: c.address || "" })));
+      setFileName(file.name); setImportId(crypto.randomUUID()); setSelectedImport("");
       setResult(contacts.length + " contacts ready. Review and click Save Parties.");
     } catch (error) { setResult(error instanceof Error ? error.message : "Unable to read file"); }
     finally { savingRef.current = false; setSaving(false); }
@@ -478,11 +495,13 @@ export function BulkAddPartiesModal({
 
   const handleReset = () => {
     setRows(initialRows);
+    setFileName(""); setImportId(crypto.randomUUID()); setSelectedImport("");
     setResult("");
   };
 
   const handleClearAll = () => {
     setRows(initialRows);
+    setFileName(""); setImportId(crypto.randomUUID()); setSelectedImport("");
     setResult("");
   };
 
@@ -506,6 +525,7 @@ export function BulkAddPartiesModal({
         setResult("Saving " + (saved.length + 1) + " of " + validRows.length + " parties...");
         try {
           const party = await api.createParty({
+            importId, importFileName: fileName || "Manual entry",
             name: r.name.trim(), phone, type: r.partyType === "Supplier" ? "Supplier" : "Customer",
             gstin: r.gstin.trim() || undefined,
             address: [r.billingAddress, r.billingCity, r.billingState, r.billingPincode].map(v => v.trim()).filter(Boolean).join(", ") || undefined,
@@ -522,7 +542,11 @@ export function BulkAddPartiesModal({
           break;
         }
       }
-      if (saved.length) onSaveParties(saved);
+      if (saved.length) {
+        onSaveParties(saved);
+        await loadHistory();
+        if (!failure) setSelectedImport(importId); setHistoryPage(0);
+      }
       setRows(current => { const remaining = current.filter(r => !completed.has(r.id)); return remaining.length ? remaining : initialRows; });
       const message = saved.length + " parties saved. " + skipped + " duplicate mobile numbers skipped. " + failure;
       setResult(message); notify(message);
@@ -545,7 +569,7 @@ export function BulkAddPartiesModal({
         <div className="bulk-add-actions">
           <input ref={fileInput} type="file" accept=".csv,.xlsx,.xls,.json" hidden onChange={e => { const file = e.target.files?.[0]; e.target.value = ""; if (file) void upload(file); }} />
           <button type="button" className="secondary" disabled={saving} onClick={() => fileInput.current?.click()}>Upload Contacts</button>
-          <button type="button" className="secondary" disabled={saving} onClick={() => setRows(current => [...current, ...initialRows.map(r => ({ ...r, id: crypto.randomUUID() }))])}>Add Rows</button>
+          <button type="button" className="secondary" disabled={saving} onClick={() => { setSelectedImport(""); setRows(current => [...current, ...initialRows.map(r => ({ ...r, id: crypto.randomUUID() }))]); }}>Add Rows</button>
           <button type="button" className="secondary" onClick={handleReset} disabled={saving}>
             Reset
           </button>
@@ -563,6 +587,26 @@ export function BulkAddPartiesModal({
       </div>
 
       <div role="status" style={{ padding: 16 }}>{result}</div>
+      <section style={{ padding: "0 16px 16px" }}>
+        <h3>Import History</h3>
+        {historyError && <p role="alert">{historyError} <button type="button" onClick={() => void loadHistory()}>Retry</button></p>}
+        {!history.length && !historyError && <p>No recorded imports yet. New uploads will appear here after saving.</p>}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {history.map(batch => <button type="button" className={selectedImport === batch.id ? "primary" : "secondary"} key={batch.id} disabled={saving} onClick={() => { setSelectedImport(batch.id); setHistoryPage(0); }}>
+            {batch.fileName} — {batch.partyIds.length} added · {new Date(batch.createdAt).toLocaleString("en-IN")}
+          </button>)}
+        </div>
+        {selectedBatch && <div style={{ marginTop: 16 }}>
+          <h3>{selectedBatch.fileName} — Saved Contacts ({importedContacts.length})</h3>
+          <div className="table-scroll"><table><thead><tr><th>Name</th><th>Mobile</th><th>Email</th><th>Address</th></tr></thead>
+          <tbody>{importedContacts.slice(historyPage * 100, (historyPage + 1) * 100).map(party => <tr key={party.id}><td>{party.name}</td><td>{party.phone}</td><td>{party.email || "-"}</td><td>{party.address || "-"}</td></tr>)}</tbody></table></div>
+          <button type="button" className="secondary" disabled={!historyPage} onClick={() => setHistoryPage(p => p - 1)}>Previous</button>
+          <button type="button" className="secondary" disabled={(historyPage + 1) * 100 >= importedContacts.length} onClick={() => setHistoryPage(p => p + 1)}>Next</button>
+          <button type="button" className="secondary" onClick={() => setSelectedImport("")}>Back to entry</button>
+        </div>}
+      </section>
+      {!selectedImport && <>
+      {fileName && <p style={{ padding: "0 16px" }}>Selected file: <strong>{fileName}</strong></p>}
       <fieldset disabled={saving} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <div className="bulk-spreadsheet-container">
         <table className="bulk-spreadsheet-table">
@@ -592,7 +636,7 @@ export function BulkAddPartiesModal({
             {rows.map((row, idx) => (
               <tr key={row.id}>
                 <td className="row-num">{idx + 1}</td>
-                <td><input value={row.name} onChange={e => updateCell(row.id, "name", e.target.value)} placeholder="Sample Party Name" /></td>
+                <td><input value={row.name} onChange={e => updateCell(row.id, "name", e.target.value)} placeholder="Enter party name" /></td>
                 <td><input value={row.phone} onChange={e => updateCell(row.id, "phone", e.target.value)} placeholder="Mobile Number" /></td>
                 <td><input value={row.gstin} onChange={e => updateCell(row.id, "gstin", e.target.value)} placeholder="GST Number" /></td>
                 <td><input value={row.shippingAddress} onChange={e => updateCell(row.id, "shippingAddress", e.target.value)} /></td>
@@ -620,6 +664,7 @@ export function BulkAddPartiesModal({
         </table>
       </div>
       </fieldset>
+      </>}
     </div>
   );
 }

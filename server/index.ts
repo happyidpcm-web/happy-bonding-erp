@@ -450,6 +450,20 @@ app.get("/api/parties", async (req, res) => {
   }));
 });
 
+// Import membership is recorded atomically with each new party in the audit log.
+app.get("/api/party-imports", requirePermission("parties.write"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  const events = await db.auditEvent.findMany({ where: { organizationId: req.session!.organizationId, action: "party.created", metadata: { path: ["branchId"], equals: branchId } }, orderBy: { occurredAt: "desc" } });
+  const groups = new Map<string, { id: string; fileName: string; createdAt: Date; partyIds: string[] }>();
+  for (const event of events) {
+    const meta = event.metadata as { importId?: string; fileName?: string } | null;
+    if (!meta?.importId) continue;
+    const group = groups.get(meta.importId) || { id: meta.importId, fileName: meta.fileName || "Manual entry", createdAt: event.occurredAt, partyIds: [] };
+    group.partyIds.push(event.entityId); groups.set(group.id, group);
+  }
+  res.json([...groups.values()]);
+});
+
 app.post("/api/parties", requirePermission("parties.write"), async (req, res) => {
   const branchId = requireBranch(req, res); if (!branchId) return;
   const input = parseInput(partyInput, req.body);
@@ -460,8 +474,14 @@ app.post("/api/parties", requirePermission("parties.write"), async (req, res) =>
       if (existingPhone) return res.status(400).json({ error: `Mobile number ${norm} is already registered to customer '${existingPhone.name}'` });
     }
   }
-  const row = await db.party.create({ data: { ...input, branchId, organizationId: req.session!.organizationId }, });
-  await audit(req, "party.created", "Party", row.id); res.status(201).json(row);
+  const importId = typeof req.body.importId === "string" && /^[a-zA-Z0-9-]{1,80}$/.test(req.body.importId) ? req.body.importId : undefined;
+  const fileName = typeof req.body.importFileName === "string" ? req.body.importFileName.slice(0, 255) : "Manual entry";
+  const row = await db.$transaction(async tx => {
+    const party = await tx.party.create({ data: { ...input, branchId, organizationId: req.session!.organizationId } });
+    await tx.auditEvent.create({ data: { organizationId: req.session!.organizationId, actorId: req.session!.userId, action: "party.created", entityType: "Party", entityId: party.id, metadata: { branchId, ...(importId ? { importId, fileName } : {}) } } });
+    return party;
+  });
+  res.status(201).json(row);
 });
 
 app.put("/api/parties/:id", requirePermission("parties.write"), async (req, res) => {

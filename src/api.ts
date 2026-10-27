@@ -174,7 +174,7 @@ export const api = {
       return await request<PartyLedger>(`/parties/${id}/ledger`);
 
   },
-  async createParty(input: PartyInput): Promise<Party> {
+  async createParty(input: PartyInput & { importId?: string; importFileName?: string }): Promise<Party> {
     const payload = cleanPayload({ ...input, phone: input.phone || undefined, type: input.type === "Supplier" ? "SUPPLIER" : "CUSTOMER" });
       const row = await request<PartyRow>("/parties", { method: "POST", body: JSON.stringify(payload) });
       return partyFromApi(row);
@@ -185,6 +185,9 @@ export const api = {
       const row = await request<PartyRow>(`/parties/${id}`, { method: "PUT", body: JSON.stringify(payload) });
       return partyFromApi(row);
 
+  },
+  async partyImports(): Promise<Array<{ id: string; fileName: string; createdAt: string; partyIds: string[] }>> {
+    return request("/party-imports");
   },
   async importParties(contacts: Array<{ name: string; phone: string; email?: string; address?: string }>): Promise<{ imported:number; skipped:number; invalid:number; duplicateInFile:number; duplicateInDb:number }> {
       return await request("/parties/import", { method: "POST", body: JSON.stringify({ contacts }) });
