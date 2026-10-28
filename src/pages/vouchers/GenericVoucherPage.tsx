@@ -1,3 +1,4 @@
+import { DateRangeFilter } from "../../components/DateRangeFilter";
 import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
@@ -985,9 +986,11 @@ export function GenericVoucherPage({
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [dateFilter, setDateFilter] = useState("Last 365 Days");
+  const [customDateRange, setCustomDateRange] = useState<CustomDateRange>({ from: "", to: "" });
 
   const filtered = useMemo(() => {
     return records.filter(r => {
+      if (!isInvoiceInDateRange(r, dateFilter, customDateRange)) return false;
       const status = type === "Purchase Invoice" ? purchasePaymentStatus(r) : r.status;
       if (statusFilter !== "All" && status !== statusFilter) return false;
       if (query.trim()) {
@@ -996,7 +999,7 @@ export function GenericVoucherPage({
       }
       return true;
     });
-  }, [records, query, statusFilter, dateFilter, type]);
+  }, [records, query, statusFilter, dateFilter, customDateRange, type]);
 
   const handleSaveNewRecord = async (record: VoucherRecord) => {
     const saved = editingRecord ? await api.updatePurchaseVoucher(record) : await api.saveVoucher(type, record);
@@ -1236,6 +1239,7 @@ export function GenericVoucherPage({
               />
             </div>
 
+            <DateRangeFilter value={dateFilter} range={customDateRange} onChange={setDateFilter} onRangeChange={setCustomDateRange} />
             {/* Status Dropdown */}
             <select
               value={statusFilter}

@@ -1,3 +1,5 @@
+import { DateRangeFilter } from "../../components/DateRangeFilter";
+import type { CustomDateRange } from "../../utils/invoiceDateRange";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, BarChart3, Boxes, ChevronDown, Download, ExternalLink, FileSpreadsheet, FileText, Mail, Percent, Plus, Printer, Search, ShieldCheck, Sparkles, Star, Tag, Trash2, Upload, Users, X
@@ -220,6 +222,7 @@ export function StockSummaryReportScreen({
 }) {
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
   const [dateFilter, setDateFilter] = useState("Today");
+  const [customDateRange, setCustomDateRange] = useState<CustomDateRange>({ from: "", to: "" });
   const [emailModalOpen, setEmailModalOpen] = useState(false);
 
   const categories = useMemo(() => Array.from(new Set(products.map(p => p.category || "General"))), [products]);
@@ -301,22 +304,8 @@ export function StockSummaryReportScreen({
           {categories.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
 
-        <select
-          value={dateFilter}
-          onChange={e => setDateFilter(e.target.value)}
-          style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
-        >
-          <option value="Today">Today</option>
-          <option value="Yesterday">Yesterday</option>
-          <option value="This Week">This Week</option>
-          <option value="Last Week">Last Week</option>
-          <option value="Last 7 days">Last 7 days</option>
-          <option value="This Month">This Month</option>
-          <option value="Previous Month">Previous Month</option>
-          <option value="This Quarter">This Quarter</option>
-          <option value="This Year">This Year</option>
-          <option value="Custom Range">Custom Range</option>
-        </select>
+        <DateRangeFilter value={dateFilter} range={customDateRange} onChange={setDateFilter} onRangeChange={setCustomDateRange} />
+        <small style={{ color: "#64748b" }}>Current stock snapshot; historical stock by date is unavailable.</small>
       </div>
 
       <article className="card table-card">
@@ -470,6 +459,7 @@ export function ItemSalesSummaryReportScreen({
 }) {
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
   const [dateFilter, setDateFilter] = useState("This Week");
+  const [customDateRange, setCustomDateRange] = useState<CustomDateRange>({ from: "", to: "" });
   const [emailModalOpen, setEmailModalOpen] = useState(false);
 
   const categories = useMemo(() => Array.from(new Set(products.map(p => p.category || "General"))), [products]);
@@ -477,7 +467,7 @@ export function ItemSalesSummaryReportScreen({
   const itemSalesSummary = useMemo(() => {
     const qtyMap = new Map<string, number>();
 
-    invoices.forEach(inv => {
+    invoices.filter(inv => isInvoiceInDateRange(inv, dateFilter, customDateRange)).forEach(inv => {
       if (inv.lines) {
         inv.lines.forEach(line => {
           const key = (line.sku || line.itemName).toLowerCase();
@@ -491,7 +481,7 @@ export function ItemSalesSummaryReportScreen({
       .map(p => {
         const keySku = (p.sku || "").toLowerCase();
         const keyName = (p.name || "").toLowerCase();
-        const salesQty = qtyMap.get(keySku) || qtyMap.get(keyName) || (Math.floor(Math.abs(Number(p.id) || 1) % 15) + 1);
+        const salesQty = qtyMap.get(keySku) || qtyMap.get(keyName) || 0;
         return {
           ...p,
           salesQty,
@@ -499,7 +489,7 @@ export function ItemSalesSummaryReportScreen({
         };
       })
       .sort((a, b) => b.salesQty - a.salesQty);
-  }, [products, invoices, categoryFilter]);
+  }, [products, invoices, categoryFilter, dateFilter, customDateRange]);
 
   const exportToExcel = () => {
     const data = itemSalesSummary.map(p => ({
@@ -550,22 +540,7 @@ export function ItemSalesSummaryReportScreen({
           {categories.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
 
-        <select
-          value={dateFilter}
-          onChange={e => setDateFilter(e.target.value)}
-          style={{ padding: "8px 32px 8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, minWidth: 160, background: "#ffffff", cursor: "pointer" }}
-        >
-          <option value="Today">Today</option>
-          <option value="Yesterday">Yesterday</option>
-          <option value="This Week">This Week</option>
-          <option value="Last Week">Last Week</option>
-          <option value="Last 7 days">Last 7 days</option>
-          <option value="This Month">This Month</option>
-          <option value="Previous Month">Previous Month</option>
-          <option value="This Quarter">This Quarter</option>
-          <option value="This Year">This Year</option>
-          <option value="Custom Range">Custom Range</option>
-        </select>
+        <DateRangeFilter value={dateFilter} range={customDateRange} onChange={setDateFilter} onRangeChange={setCustomDateRange} />
       </div>
 
       <article className="card table-card">
@@ -613,6 +588,7 @@ export function SalesSummaryReportScreen({
 }) {
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [dateFilter, setDateFilter] = useState("Last 365 Days");
+  const [customDateRange, setCustomDateRange] = useState<CustomDateRange>({ from: "", to: "" });
   const [partyFilter, setPartyFilter] = useState("All Parties");
   const [statusFilter, setStatusFilter] = useState("All");
 
@@ -626,12 +602,12 @@ export function SalesSummaryReportScreen({
 
   const filteredInvoices = useMemo(() => {
     return allRows.filter(r => {
-      if (!isInvoiceInDateRange(r, dateFilter)) return false;
+      if (!isInvoiceInDateRange(r, dateFilter, customDateRange)) return false;
       if (statusFilter !== "All" && r.status !== statusFilter) return false;
       if (partyFilter !== "All Parties" && r.party !== partyFilter) return false;
       return true;
     });
-  }, [allRows, dateFilter, statusFilter, partyFilter]);
+  }, [allRows, dateFilter, customDateRange, statusFilter, partyFilter]);
 
   const totalSalesVal = useMemo(() => {
     return filteredInvoices.reduce((sum, inv) => sum + inv.amount, 0);
@@ -695,14 +671,7 @@ export function SalesSummaryReportScreen({
         <select style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, background: "#fff" }}>
           <option>All Staff ▾</option>
         </select>
-        <select value={dateFilter} onChange={e => setDateFilter(e.target.value)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, background: "#fff" }}>
-          <option value="Last 365 Days">Last 365 Days ▾</option>
-          <option value="This Week">This Week</option>
-          <option value="Today">Today</option>
-          <option value="Yesterday">Yesterday</option>
-          <option value="This Month">This Month</option>
-          <option value="Previous Month">Previous Month</option>
-        </select>
+        <DateRangeFilter value={dateFilter} range={customDateRange} onChange={setDateFilter} onRangeChange={setCustomDateRange} />
         <select style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, background: "#fff" }}>
           <option>Invoice Type ▾</option>
         </select>
@@ -776,10 +745,13 @@ export function DayBookReportScreen({
   notify: (msg: string) => void;
 }) {
   const [emailModalOpen, setEmailModalOpen] = useState(false);
-  const netAmount = invoices.reduce((sum, r) => sum + r.amount, 0) || 8433519;
+  const [dateFilter, setDateFilter] = useState("This Week");
+  const [customDateRange, setCustomDateRange] = useState<CustomDateRange>({ from: "", to: "" });
+  const filteredInvoices = useMemo(() => invoices.filter(row => isInvoiceInDateRange(row, dateFilter, customDateRange)), [invoices, dateFilter, customDateRange]);
+  const netAmount = filteredInvoices.reduce((sum, r) => sum + r.amount, 0);
 
   const exportToExcel = () => {
-    const data = invoices.map(r => ({
+    const data = filteredInvoices.map(r => ({
       "DATE": r.date,
       "PARTY NAME": r.party,
       "TRANSACTION TYPE": "Sales Invoice",
@@ -825,7 +797,7 @@ export function DayBookReportScreen({
 
       <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
         <select style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, background: "#fff" }}><option>All Staff ▾</option></select>
-        <select style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, background: "#fff" }}><option>This Week ▾</option></select>
+        <DateRangeFilter value={dateFilter} range={customDateRange} onChange={setDateFilter} onRangeChange={setCustomDateRange} />
         <select style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, background: "#fff" }}><option>All Transactions ▾</option></select>
       </div>
 
@@ -850,7 +822,7 @@ export function DayBookReportScreen({
               </tr>
             </thead>
             <tbody>
-              {invoices.map(r => (
+              {filteredInvoices.map(r => (
                 <tr key={r.id}>
                   <td>{r.date}</td>
                   <td><strong>{r.party}</strong></td>
@@ -885,10 +857,13 @@ export function BillWiseProfitReportScreen({
   notify: (msg: string) => void;
 }) {
   const [emailModalOpen, setEmailModalOpen] = useState(false);
-  const totalGrossProfit = invoices.reduce((sum, r) => sum + Math.round(r.amount * 0.25), 0) || 337340;
+  const [dateFilter, setDateFilter] = useState("This Week");
+  const [customDateRange, setCustomDateRange] = useState<CustomDateRange>({ from: "", to: "" });
+  const filteredInvoices = useMemo(() => invoices.filter(row => isInvoiceInDateRange(row, dateFilter, customDateRange)), [invoices, dateFilter, customDateRange]);
+  const totalGrossProfit = filteredInvoices.reduce((sum, r) => sum + Math.round(r.amount * 0.25), 0);
 
   const exportToExcel = () => {
-    const data = invoices.map(r => {
+    const data = filteredInvoices.map(r => {
       const cost = Math.round(r.amount * 0.75);
       const profit = r.amount - cost;
       return {
@@ -936,7 +911,7 @@ export function BillWiseProfitReportScreen({
 
       <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
         <select style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, background: "#fff" }}><option>All Staff ▾</option></select>
-        <select style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, background: "#fff" }}><option>This Week ▾</option></select>
+        <DateRangeFilter value={dateFilter} range={customDateRange} onChange={setDateFilter} onRangeChange={setCustomDateRange} />
         <select style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, background: "#fff" }}><option>All Transactions ▾</option></select>
       </div>
 
@@ -959,7 +934,7 @@ export function BillWiseProfitReportScreen({
               </tr>
             </thead>
             <tbody>
-              {invoices.map(r => {
+              {filteredInvoices.map(r => {
                 const cost = Math.round(r.amount * 0.75);
                 const profit = r.amount - cost;
                 return (

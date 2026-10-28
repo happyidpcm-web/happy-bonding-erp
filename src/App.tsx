@@ -1324,12 +1324,10 @@ function SalesInvoicesListView({
   notify: (msg: string) => void;
 }) {
   const [deleting, setDeleting] = useState(false);
-  const [bulkOpen, setBulkOpen] = useState(false);
-  const bulkRef = useDismissibleDropdown(bulkOpen, () => setBulkOpen(false));
   const deleteInvoices = async (targets: Invoice[]) => {
     if (deleting || !targets.length) return;
     if (!window.confirm(`Delete ${targets.length === 1 ? targets[0].number : `${targets.length} sales invoices`}? Stock will remain unchanged. Allocated receipts will be reversed. This cannot be undone.`)) return;
-    setDeleting(true); setBulkOpen(false); setOpenMenuId(null);
+    setDeleting(true); setOpenMenuId(null);
     const deleted = new Set<string | number>();
     const failures: string[] = [];
     try {
@@ -1659,19 +1657,6 @@ function SalesInvoicesListView({
         </div>
 
         <div className="sales-toolbar-right-group">
-          <div ref={bulkRef} style={{ position: "relative" }}>
-          <button
-            type="button"
-            className="sales-bulk-actions-btn"
-            disabled={deleting || !filtered.some(row => selectedIds.has(row.id))}
-            onClick={() => setBulkOpen(!bulkOpen)}
-          >
-            <span>{deleting ? "Deleting..." : `Bulk Actions (${filtered.filter(row => selectedIds.has(row.id)).length})`}</span>
-            <ChevronDown size={14} />
-          </button>
-          {bulkOpen && <div className="sales-context-menu-popover"><button type="button" onClick={() => void deleteInvoices(filtered.filter(row => selectedIds.has(row.id)))}><Trash2 size={14} /> Delete selected</button></div>}
-          </div>
-
           <button
             type="button"
             className="sales-create-purple-btn"
