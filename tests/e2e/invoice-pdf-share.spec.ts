@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
     localStorage.setItem("hb_erp_branch", "test-branch");
     Object.defineProperty(navigator, "canShare", { configurable: true, value: () => false });
   });
-  const invoice = { id: "pdf-test", invoiceNumber: "TEST/26-27/42", invoiceDate: "2026-10-15T08:00:00.000Z", party: { name: "PDF Customer", phone: "9876543210" }, grandTotal: "599", paidAmount: "599", paymentStatus: "PAID", lines: [{ itemName: "Test shirt", sku: "SHIRT", quantity: 1, unitPrice: "599", mrp: "649", discount: "0", taxRate: "0", total: "599" }] };
+  const invoice = { id: "pdf-test", invoiceNumber: "TEST/26-27/42", invoiceDate: "2026-10-28T08:00:00.000Z", party: { name: "PDF Customer", phone: "9876543210" }, grandTotal: "599", paidAmount: "599", paymentStatus: "PAID", lines: [{ itemName: "Test shirt", sku: "SHIRT", quantity: 1, unitPrice: "599", mrp: "649", discount: "0", taxRate: "0", total: "599" }] };
   await page.route("**/api/**", async route => {
     const path = new URL(route.request().url()).pathname;
     let json: unknown = [];
@@ -18,6 +18,7 @@ test.beforeEach(async ({ page }) => {
     if (path === "/api/sales/pdf-test") json = invoice;
     await route.fulfill({ json });
   });
+  await page.route("https://**/*", route => route.abort());
   await page.goto("/");
   await page.getByRole("button", { name: "Sales", exact: true }).click();
   await page.getByRole("button", { name: "Sales Invoices", exact: true }).click();
@@ -78,4 +79,11 @@ test("native sharing includes a PDF file; cancellation preserves it for retry", 
   expect(data.active).toBe(true);
   await expect(share).toBeEnabled();
   await expect(dialog.getByRole("alert")).toHaveCount(0);
+});
+
+test('download completes even when font readiness stays pending', async ({page}) => {
+ await page.evaluate(() => Object.defineProperty(document.fonts, 'ready', {configurable:true,get:()=>new Promise(()=>{})}));
+ const download=page.waitForEvent('download');
+ await page.locator('.full-invoice-top-bar').getByRole('button',{name:'Download PDF',exact:true}).click();
+ expect((await download).suggestedFilename()).toContain('.pdf');
 });
