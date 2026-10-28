@@ -248,8 +248,7 @@ export function DashboardLive({
     window.addEventListener("focus", refresh);
     return () => { active = false; window.removeEventListener("focus", refresh); };
   }, [branchId, reload]);
-  const invoiceTransactions = transactions.filter(row => row.type === "Sales Invoice" || row.type === "Purchase Invoice");
-  const displayList = showAll ? invoiceTransactions : invoiceTransactions.slice(0, 10);
+  const displayList = showAll ? transactions : transactions.slice(0, 10);
   const onSeeAllTransactions = () => setShowAll(value => !value);
 
   return (
@@ -266,7 +265,10 @@ export function DashboardLive({
         <article className="card transactions" style={{ gridColumn: "1 / -1" }}>
           <div className="card-title">
             <div>
-              <h2>Latest Transactions</h2>
+              <h2>{showAll ? "All Transactions" : "Latest Transactions"}</h2>
+              <p role="status" style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0" }}>
+                {loading ? "Loading…" : `Showing ${displayList.length} of ${transactions.length} transactions`}
+              </p>
             </div>
             <button className="text-button" style={{ font: "700 13px Manrope", color: "#2563eb" }} onClick={onSeeAllTransactions}>
               {showAll ? "Show Latest Transactions" : "See All Transactions →"}
@@ -299,7 +301,7 @@ export function DashboardLive({
                 {!loading && !error && !displayList.length && (
                   <tr>
                     <td colSpan={5} style={{ textAlign: "center", padding: "20px", color: "#64748b" }}>
-                      No sales or purchase invoices recorded yet. Click <strong>+ Create Sales Invoice</strong> to add a sale.
+                      No transactions recorded for this branch yet.
                     </td>
                   </tr>
                 )}

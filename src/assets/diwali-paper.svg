@@ -7,5 +7,5 @@
 <ellipse cx="120" cy="420" rx="290" ry="420" fill="url(#wash)"/>
 <ellipse cx="680" cy="180" rx="250" ry="310" fill="url(#wash)"/>
 <ellipse cx="390" cy="1040" rx="400" ry="240" fill="url(#wash)"/>
-<g opacity=".55"><use href="#mandala" transform="translate(0 0)"/><use href="#mandala" transform="translate(800 0)"/><use href="#mandala" transform="translate(800 1132) scale(1.4)"/></g>
+<g opacity=".55"><use href="#mandala" transform="translate(0 0)"/><use href="#mandala" transform="translate(800 0)"/></g>
 </svg>

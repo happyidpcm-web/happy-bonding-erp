@@ -52,6 +52,8 @@
   right: 0;
   height: 130px;
   background: url("../assets/diwali-footer.svg") center bottom / 100% 130px no-repeat;
+  /* Leave the signature column free of footer decoration. */
+  clip-path: inset(0 40% 0 0);
   pointer-events: none;
 }
 .diwali-invoice .diwali-greeting { display: none !important; }
@@ -78,6 +80,11 @@
   background: #fffbf3;
 }
 .bill-of-supply-template.diwali-invoice .summary-right { padding: 16px; }
+.bill-of-supply-template.diwali-invoice .gold-signature-box {
+  position: relative;
+  z-index: 1;
+  background: #fffbf3;
+}
 .bill-of-supply-template.diwali-invoice .purple-header-table th {
   background: #7d241f !important;
   color: #ffffff !important;
