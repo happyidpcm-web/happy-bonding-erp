@@ -1,5 +1,6 @@
 import { DateRangeFilter } from "../../components/DateRangeFilter";
 import type { CustomDateRange } from "../../utils/invoiceDateRange";
+import { invoiceExcelDate } from "../../utils/invoiceDateRange";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, BarChart3, Boxes, ChevronDown, Download, ExternalLink, FileSpreadsheet, FileText, Mail, Percent, Plus, Printer, Search, ShieldCheck, Sparkles, Star, Tag, Trash2, Upload, Users, X
@@ -615,7 +616,7 @@ export function SalesSummaryReportScreen({
 
   const exportToExcel = () => {
     const data = filteredInvoices.map(r => ({
-      "DATE": r.date,
+      "DATE": invoiceExcelDate(r),
       "INVOICE NO": r.number,
       "PARTY NAME": r.party,
       "DUE DATE": (r as any).dueDate || "-",
@@ -627,6 +628,10 @@ export function SalesSummaryReportScreen({
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
+    for (let row = 2; row <= data.length + 1; row++) {
+      if (ws[`A${row}`]?.t === "n") ws[`A${row}`].z = "dd/mm/yyyy";
+    }
+    ws["!cols"] = [{ wch: 12 }];
     XLSX.utils.book_append_sheet(wb, ws, "Sales Summary");
     XLSX.writeFile(wb, `happy_bonding_sales_summary_${new Date().toISOString().slice(0, 10)}.xlsx`);
     notify("Sales Summary exported to Excel!");

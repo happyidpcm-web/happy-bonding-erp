@@ -22,6 +22,13 @@ function parseInvoiceDate(dateStr: string): Date {
 
 export type CustomDateRange = { from: string; to: string };
 
+export function invoiceExcelDate(invoice: { date: string; dateISO?: string }): number | "" {
+  const date = parseInvoiceDate(invoice.dateISO || invoice.date);
+  if (Number.isNaN(date.getTime())) return "";
+  // Excel's date serial, with no time fraction or timezone conversion.
+  return (Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - Date.UTC(1899, 11, 30)) / 86400000;
+}
+
 export function isInvoiceInDateRange(r: { date: string; dateISO?: string }, filter: string, customRange?: CustomDateRange, now = new Date()): boolean {
   const d = parseInvoiceDate(r.dateISO || r.date);
   if (isNaN(d.getTime())) return false;
