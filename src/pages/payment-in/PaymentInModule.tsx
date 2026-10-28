@@ -1,3 +1,4 @@
+import { DateRangeFilter } from "../../components/DateRangeFilter";
 import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
@@ -25,13 +26,10 @@ import type { Invoice, Party } from "../../types";
 import { downloadInvoicePdf } from "../../utils/pdf";
 import {
   CustomDateRange,
-  CustomDateRangePopover,
-  customRangeLabel,
   isInvoiceInDateRange,
   Metric,
   Modal,
   PageHeading,
-  REPORT_DATE_OPTIONS,
 } from "../../App";
 
 export interface PaymentInRecord {
@@ -210,13 +208,9 @@ export function PaymentInModule({
   const [records, setRecords] = useState<PaymentInRecord[]>([]);
   const [query, setQuery] = useState("");
   const [dateFilter, setDateFilter] = useState("Last 365 Days");
-  const [dateMenuOpen, setDateMenuOpen] = useState(false);
-  const dateRef = useDismissibleDropdown(dateMenuOpen, () => setDateMenuOpen(false));
   const [customDateRange, setCustomDateRange] = useState<CustomDateRange>({ from: "2025-08-16", to: "2026-08-15" });
   const [invoiceQuery, setInvoiceQuery] = useState("");
   const [invoiceDateFilter, setInvoiceDateFilter] = useState("Last 365 Days");
-  const [invoiceDateMenuOpen, setInvoiceDateMenuOpen] = useState(false);
-  const invoiceDateRef = useDismissibleDropdown(invoiceDateMenuOpen, () => setInvoiceDateMenuOpen(false));
   const [invoiceCustomDateRange, setInvoiceCustomDateRange] = useState<CustomDateRange>({ from: "2025-08-16", to: "2026-08-15" });
 
   const [editingRecord, setEditingRecord] = useState<PaymentInRecord | null>(null);
@@ -368,7 +362,7 @@ export function PaymentInModule({
       setRecords(next);
       setQuery("");
       setDateFilter("Last 365 Days");
-      setDateMenuOpen(false);
+
       setCustomDateRange({ from: "2025-08-16", to: "2026-08-15" });
       await onDataChanged?.();
       notify(`Payment In #${fullNum} saved successfully`);
@@ -403,7 +397,7 @@ export function PaymentInModule({
         <article className="card" style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 16px", marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div ref={dateRef} style={{ position: "relative", width: 220 }}>
+              <div style={{ position: "relative", width: 220 }}>
                 <Search size={15} color="#94a3b8" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
                 <input
                   value={query}
@@ -412,48 +406,7 @@ export function PaymentInModule({
                   style={{ width: "100%", paddingLeft: 34, paddingRight: 10, height: 38, border: "1px solid #cbd5e1", borderRadius: 8, fontSize: 13, background: "#fff" }}
                 />
               </div>
-              <div style={{ position: "relative", width: 220 }}>
-                <button
-                  type="button"
-                  onClick={() => setDateMenuOpen(open => !open)}
-                  style={{ width: "100%", height: 38, padding: "0 12px", border: "1px solid #cbd5e1", borderRadius: 8, fontSize: 13, background: "#fff", color: "#334155", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}
-                >
-                  <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <Calendar size={15} color="#64748b" />
-                    {dateFilter === "Custom Range" ? customRangeLabel(customDateRange) : dateFilter}
-                  </span>
-                  <ChevronDown size={14} color="#64748b" />
-                </button>
-                {dateMenuOpen && dateFilter !== "Custom Range" && (
-                  <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, width: 260, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, boxShadow: "0 12px 28px rgba(15,23,42,.14)", zIndex: 999, padding: 6 }}>
-                    {REPORT_DATE_OPTIONS.map(opt => (
-                      <button
-                        key={opt.label}
-                        type="button"
-                        onClick={() => {
-                          setDateFilter(opt.label);
-                          if (opt.label === "Custom Range") return;
-                          setDateMenuOpen(false);
-                        }}
-                        style={{ width: "100%", border: 0, background: dateFilter === opt.label ? "#eef2ff" : "transparent", color: dateFilter === opt.label ? "#4f46e5" : "#334155", padding: "8px 10px", borderRadius: 6, textAlign: "left", fontSize: 12, display: "grid", gap: 2 }}
-                      >
-                        <span>{opt.label}</span>
-                        {opt.sub && <small style={{ color: "#94a3b8" }}>{opt.sub}</small>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {dateMenuOpen && dateFilter === "Custom Range" && (
-                  <CustomDateRangePopover
-                    range={customDateRange}
-                    onCancel={() => setDateMenuOpen(false)}
-                    onApply={range => {
-                      setCustomDateRange(range);
-                      setDateMenuOpen(false);
-                    }}
-                  />
-                )}
-              </div>
+              <DateRangeFilter value={dateFilter} range={customDateRange} onChange={setDateFilter} onRangeChange={setCustomDateRange} />
             </div>
 
             <button
@@ -887,47 +840,7 @@ export function PaymentInModule({
                   style={{ width: "100%", paddingLeft: 28, height: 32, border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 12 }}
                 />
               </div>
-              <div ref={invoiceDateRef} style={{ position: "relative", width: 190 }}>
-                <button
-                  type="button"
-                  onClick={() => setInvoiceDateMenuOpen(open => !open)}
-                  style={{ width: "100%", height: 32, padding: "0 8px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 12, color: "#334155", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}
-                >
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {invoiceDateFilter === "Custom Range" ? customRangeLabel(invoiceCustomDateRange) : invoiceDateFilter}
-                  </span>
-                  <ChevronDown size={13} color="#64748b" />
-                </button>
-                {invoiceDateMenuOpen && invoiceDateFilter !== "Custom Range" && (
-                  <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, width: 260, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, boxShadow: "0 12px 28px rgba(15,23,42,.14)", zIndex: 999, padding: 6 }}>
-                    {REPORT_DATE_OPTIONS.map(opt => (
-                      <button
-                        key={opt.label}
-                        type="button"
-                        onClick={() => {
-                          setInvoiceDateFilter(opt.label);
-                          if (opt.label === "Custom Range") return;
-                          setInvoiceDateMenuOpen(false);
-                        }}
-                        style={{ width: "100%", border: 0, background: invoiceDateFilter === opt.label ? "#eef2ff" : "transparent", color: invoiceDateFilter === opt.label ? "#4f46e5" : "#334155", padding: "8px 10px", borderRadius: 6, textAlign: "left", fontSize: 12, display: "grid", gap: 2 }}
-                      >
-                        <span>{opt.label}</span>
-                        {opt.sub && <small style={{ color: "#94a3b8" }}>{opt.sub}</small>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {invoiceDateMenuOpen && invoiceDateFilter === "Custom Range" && (
-                  <CustomDateRangePopover
-                    range={invoiceCustomDateRange}
-                    onCancel={() => setInvoiceDateMenuOpen(false)}
-                    onApply={range => {
-                      setInvoiceCustomDateRange(range);
-                      setInvoiceDateMenuOpen(false);
-                    }}
-                  />
-                )}
-              </div>
+              <DateRangeFilter value={invoiceDateFilter} range={invoiceCustomDateRange} onChange={setInvoiceDateFilter} onRangeChange={setInvoiceCustomDateRange} />
             </div>
           </div>
 
