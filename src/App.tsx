@@ -2977,7 +2977,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
             <div className="ref-signature-area">
               <span className="ref-sig-title">{setting.signatureText || `Authorized signatory for Happy Bonding Men's Wear (${localStorage.getItem("hb_signature_name") || "M. Saravanan"})`}</span>
               <div className="ref-sig-img">
-                <img src={setting.signatureUrl || defaultSignatureUrl} alt="Digital Signature" style={{ height: 48, objectFit: "contain" }} />
+                <img src={ownerSignatureUrl} alt="Digital Signature" style={{ height: 48, objectFit: "contain" }} />
               </div>
             </div>
 
