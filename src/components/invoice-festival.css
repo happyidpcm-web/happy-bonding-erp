@@ -38,3 +38,51 @@
 .bill-of-supply-template.diwali-invoice .amount-words-box {
   background-color: rgba(255, 255, 255, .88);
 }
+
+/* Keep ornamentation in reserved space, never behind invoice amounts. */
+.a4-bill-document.bill-of-supply-template.diwali-invoice {
+  border: 1px solid #e6bd7c !important;
+  padding-bottom: 145px !important;
+}
+.diwali-invoice::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 130px;
+  background: url("../assets/diwali-footer.svg") center bottom / 100% 130px no-repeat;
+  pointer-events: none;
+}
+.diwali-invoice .diwali-greeting { display: none !important; }
+.diwali-invoice .gold-ornament { display: none; }
+.bill-of-supply-template.diwali-invoice .doc-header {
+  min-height: 170px;
+  padding-right: 72px;
+  background: url("../assets/diwali-lamps.svg") right top / 75px 150px no-repeat;
+  border-bottom-color: #e6bd7c;
+}
+.bill-of-supply-template.diwali-invoice .shop-info h1 {
+  color: #791d20;
+  font-family: Georgia, serif;
+}
+.bill-of-supply-template.diwali-invoice .badge-box {
+  background: #fce6c0;
+  border-color: #e6bd7c;
+}
+.bill-of-supply-template.diwali-invoice .doc-meta-strip,
+.bill-of-supply-template.diwali-invoice .addr-box,
+.bill-of-supply-template.diwali-invoice .summary-right {
+  border: 1px solid #e6bd7c;
+  border-radius: 8px;
+  background: #fffbf3;
+}
+.bill-of-supply-template.diwali-invoice .summary-right { padding: 16px; }
+.bill-of-supply-template.diwali-invoice .purple-header-table th {
+  background: #7d241f !important;
+  color: #ffffff !important;
+}
+.bill-of-supply-template.diwali-invoice .purple-header-table td { background: #fffbf3; }
+.bill-of-supply-template.diwali-invoice .purple-subtotal-bar { background: #f7dfb6 !important; }
+.bill-of-supply-template.diwali-invoice .grand-total-row,
+.bill-of-supply-template.diwali-invoice .discount-line { color: #791d20; }
