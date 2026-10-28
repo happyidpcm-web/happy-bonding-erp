@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="360" viewBox="0 0 360 360">
+  <!-- Pale ink is baked into the artwork so invoice text stays fully opaque. -->
+  <g fill="none" stroke="#f2e7d1" stroke-width="1.2">
+    <g transform="translate(60 75)">
+      <path d="M-23 5Q0 36 23 5Q0 16-23 5Z" fill="#faf3e8"/>
+      <path d="M0-24C-12-9-6 1 0 2C9-4 9-12 0-24Z" fill="#fbf3df"/>
+      <path d="M-15 16Q0 24 15 16M-30 0L-35-4M30 0L35-4"/>
+    </g>
+    <g transform="translate(250 245)">
+      <circle r="34"/><circle r="26"/><circle r="7"/>
+      <path d="M0-26Q18-14 0 0Q-18-14 0-26ZM26 0Q14 18 0 0Q14-18 26 0ZM0 26Q-18 14 0 0Q18 14 0 26ZM-26 0Q-14-18 0 0Q-14 18-26 0Z"/>
+      <path d="M0-42V-37M42 0H37M0 42V37M-42 0H-37"/>
+    </g>
+    <path d="M250 58V74M242 66H258M101 253V265M95 259H107"/>
+    <circle cx="165" cy="150" r="2"/><circle cx="325" cy="160" r="2"/>
+  </g>
+</svg>

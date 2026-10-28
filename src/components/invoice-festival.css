@@ -23,3 +23,17 @@
   -webkit-print-color-adjust: exact;
 }
 .bill-of-supply-template.diwali-invoice .amount-words-box { border-left-color: #bc9238; }
+.a4-bill-document.bill-of-supply-template.diwali-invoice {
+  background-color: #fffdf8 !important;
+  background-image: url("../assets/diwali-paper.svg") !important;
+  background-repeat: repeat !important;
+  background-size: 360px 360px !important;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.bill-of-supply-template.diwali-invoice .doc-meta-strip,
+.bill-of-supply-template.diwali-invoice .addr-box,
+.bill-of-supply-template.diwali-invoice .amount-words-box {
+  background-color: rgba(255, 255, 255, .88);
+}
