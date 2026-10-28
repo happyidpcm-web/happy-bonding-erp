@@ -17,17 +17,17 @@
 .diwali-invoice .diwali-greeting .diwali-spark { margin-left: auto; font-size: 24px; color: #b58c34; }
 .bill-of-supply-template.diwali-invoice .purple-header-table th,
 .bill-of-supply-template.diwali-invoice .purple-subtotal-bar {
-  background: #fff3d9;
-  color: #78352f;
+  background: #fff3d9 !important;
+  color: #78352f !important;
   print-color-adjust: exact;
   -webkit-print-color-adjust: exact;
 }
 .bill-of-supply-template.diwali-invoice .amount-words-box { border-left-color: #bc9238; }
 .a4-bill-document.bill-of-supply-template.diwali-invoice {
-  background-color: #fffdf8 !important;
+  background-color: #fffaf0 !important;
   background-image: url("../assets/diwali-paper.svg") !important;
   background-repeat: repeat !important;
-  background-size: 360px 360px !important;
+  background-size: 300px 300px !important;
   print-color-adjust: exact;
   -webkit-print-color-adjust: exact;
 }
