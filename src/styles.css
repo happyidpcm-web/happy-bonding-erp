@@ -723,11 +723,15 @@ body{background:#fffdf7;color:#140d08}.sidebar{background:linear-gradient(180deg
   overflow: auto;
   display: flex;
   justify-content: center;
+  align-items: flex-start;
   background: #eef1f6;
 }
 .a4-bill-document {
   width: 800px;
   min-height: 980px;
+  height: auto;
+  max-height: none;
+  flex-shrink: 0;
   background: #ffffff;
   border-radius: 4px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.1);
@@ -1073,6 +1077,7 @@ body{background:#fffdf7;color:#140d08}.sidebar{background:linear-gradient(180deg
   color: #111827;
 }
 .gold-signature-box {
+  break-inside: avoid;
   margin-top: 18px;
   border: 1.5px solid #d4af37;
   border-radius: 12px;
@@ -2608,7 +2613,7 @@ input:checked + .slider:before {
     box-shadow: none !important;
     box-sizing: border-box !important;
     background: #ffffff !important;
-    page-break-inside: avoid !important;
+    page-break-inside: auto !important;
     page-break-before: avoid !important;
     page-break-after: avoid !important;
   }
