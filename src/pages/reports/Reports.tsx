@@ -1,3 +1,4 @@
+import { SearchablePicker } from "../../components/SearchablePicker";
 import { DateRangeFilter } from "../../components/DateRangeFilter";
 import type { CustomDateRange } from "../../utils/invoiceDateRange";
 import { invoiceExcelDate } from "../../utils/invoiceDateRange";
@@ -296,14 +297,7 @@ export function StockSummaryReportScreen({
       </div>
 
       <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-        <select
-          value={categoryFilter}
-          onChange={e => setCategoryFilter(e.target.value)}
-          style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
-        >
-          <option value="All Categories">Search Category</option>
-          {categories.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
+        <SearchablePicker value={categoryFilter} onChange={setCategoryFilter} placeholder="Search Categories" emptyValue="All Categories" emptyLabel="All Categories" options={categories.map(c => ({ value: c, label: c }))} />
 
         <DateRangeFilter value={dateFilter} range={customDateRange} onChange={setDateFilter} onRangeChange={setCustomDateRange} />
         <small style={{ color: "#64748b" }}>Current stock snapshot; historical stock by date is unavailable.</small>
@@ -532,14 +526,7 @@ export function ItemSalesSummaryReportScreen({
       </div>
 
       <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-        <select
-          value={categoryFilter}
-          onChange={e => setCategoryFilter(e.target.value)}
-          style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, minWidth: 200 }}
-        >
-          <option value="All Categories">Search Category</option>
-          {categories.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
+        <SearchablePicker value={categoryFilter} onChange={setCategoryFilter} placeholder="Search Categories" emptyValue="All Categories" emptyLabel="All Categories" options={categories.map(c => ({ value: c, label: c }))} />
 
         <DateRangeFilter value={dateFilter} range={customDateRange} onChange={setDateFilter} onRangeChange={setCustomDateRange} />
       </div>
@@ -669,10 +656,7 @@ export function SalesSummaryReportScreen({
       </div>
 
       <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-        <select value={partyFilter} onChange={e => setPartyFilter(e.target.value)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, background: "#fff" }}>
-          <option value="All Parties">Search Party ▾</option>
-          {partiesList.map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
+        <SearchablePicker value={partyFilter} onChange={setPartyFilter} placeholder="Search Party" emptyValue="All Parties" emptyLabel="All Parties" options={partiesList.map(p => ({ value: p, label: p }))} />
         <select style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, background: "#fff" }}>
           <option>All Staff ▾</option>
         </select>

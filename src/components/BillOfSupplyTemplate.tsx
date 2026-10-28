@@ -2,6 +2,8 @@ import React from "react";
 import ownerSignatureUrl from "../assets/owner-signature.png";
 import happyBondingLogo from "../assets/happy-bonding-logo-white.png";
 import type { Invoice, InvoiceSetting } from "../types";
+import { hasDiwaliInvoiceTheme } from "../utils/invoiceDateRange";
+import "./invoice-festival.css";
 
 
 export function numberToWords(num: number): string {
@@ -39,8 +41,9 @@ function CornerFiligree() {
   );
 }
 
-export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: Invoice; setting: InvoiceSetting }>(
-  ({ invoice, setting }, ref) => {
+export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: Invoice; setting: InvoiceSetting; seasonalTheme?: boolean }>(
+  ({ invoice, setting, seasonalTheme = false }, ref) => {
+    const diwali = seasonalTheme && hasDiwaliInvoiceTheme(invoice);
     const lines = invoice.lines ?? [];
 
     const totalQty = lines.reduce((s, l) => s + l.quantity, 0);
@@ -55,8 +58,18 @@ export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: 
     const amountText = (value: number) => value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     return (
-      <div ref={ref} className="a4-bill-document gold-frame bill-of-supply-template exact-ref-design">
+      <div ref={ref} className={`a4-bill-document gold-frame bill-of-supply-template exact-ref-design${diwali ? " diwali-invoice" : ""}`}>
         <CornerFiligree />
+        {diwali && <div className="diwali-greeting">
+          <svg aria-hidden="true" width="42" height="42" viewBox="0 0 48 48" fill="none">
+            <path d="M24 5C17 14 19 20 24 22C30 19 31 14 24 5Z" fill="#d99b25" />
+            <path d="M24 13C21 18 22 21 24 22C27 20 27 17 24 13Z" fill="#fff1b8" />
+            <path d="M7 26H41C38 36 32 41 24 41C16 41 10 36 7 26Z" fill="#893c37" />
+            <path d="M7 26Q24 33 41 26M14 35Q24 40 34 35" stroke="#d4af37" strokeWidth="2" />
+          </svg>
+          <div><strong>Happy Diwali</strong><span>Wishing you and your family light, happiness & prosperity</span></div>
+          <span className="diwali-spark" aria-hidden="true">✦</span>
+        </div>}
 
         {/* Header Section */}
         <div className="doc-header flex-header">

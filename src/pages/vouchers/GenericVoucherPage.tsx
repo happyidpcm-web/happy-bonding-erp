@@ -1,3 +1,4 @@
+import { SearchablePicker } from "../../components/SearchablePicker";
 import { DateRangeFilter } from "../../components/DateRangeFilter";
 import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import React, { useState, useEffect, useRef, useMemo } from "react";
@@ -435,18 +436,7 @@ export function CreateQuotationScreen({
           {type === "Sales Return" || type === "Credit Note" ? (
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b", display: "block", marginBottom: 2 }}>Link to Invoice:</label>
-              <select
-                value={linkedInvoice}
-                onChange={e => setLinkedInvoice(e.target.value)}
-                style={{ width: "100%", height: 32, padding: "0 8px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 12, background: "#fff" }}
-              >
-                <option value="">🔍 Search invoices ▾</option>
-                {invoices.map(inv => (
-                  <option key={inv.id} value={inv.number}>
-                    {inv.number} - {inv.party} (₹ {inv.amount})
-                  </option>
-                ))}
-              </select>
+              <SearchablePicker value={linkedInvoice} onChange={setLinkedInvoice} placeholder="Search invoices" options={invoices.map(inv => ({ value: inv.number, label: inv.number + " - " + inv.party + " (" + inv.amount + ")" }))} />
             </div>
           ) : type === "Delivery Challan" ? null : (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>

@@ -22,6 +22,11 @@ function parseInvoiceDate(dateStr: string): Date {
 
 export type CustomDateRange = { from: string; to: string };
 
+export function hasDiwaliInvoiceTheme(invoice: { date: string; dateISO?: string }): boolean {
+  const date = parseInvoiceDate(invoice.dateISO || invoice.date);
+  return date >= new Date(2026, 9, 28) && date < new Date(2026, 10, 9);
+}
+
 export function invoiceExcelDate(invoice: { date: string; dateISO?: string }): number | "" {
   const date = parseInvoiceDate(invoice.dateISO || invoice.date);
   if (Number.isNaN(date.getTime())) return "";

@@ -1144,7 +1144,7 @@ function InvoiceDetailModal({
         {pdfShareOpen && documentRef.current && <InvoicePdfShare invoice={invoice} businessName={setting.business?.name || "Happy Bonding"} element={documentRef.current} onClose={() => setPdfShareOpen(false)} />}
         <div className="full-invoice-content-grid">
           <div className="bill-document-preview-wrapper">
-            <BillOfSupplyTemplate ref={documentRef} invoice={invoice} setting={setting} />
+            <BillOfSupplyTemplate ref={documentRef} invoice={invoice} setting={setting} seasonalTheme />
           </div>
 
           <aside className="payment-history-drawer card">

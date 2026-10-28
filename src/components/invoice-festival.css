@@ -1,0 +1,25 @@
+.bill-of-supply-template.diwali-invoice .diwali-greeting {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  margin-bottom: 18px;
+  border: 1px solid #e8d3a4;
+  border-radius: 6px;
+  background: #fffaf0;
+  color: #78352f;
+  break-inside: avoid;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+.diwali-invoice .diwali-greeting strong { display: block; font: 700 20px Manrope, sans-serif; letter-spacing: .03em; }
+.diwali-invoice .diwali-greeting span { display: block; font-size: 11px; line-height: 1.6; color: #785e32; }
+.diwali-invoice .diwali-greeting .diwali-spark { margin-left: auto; font-size: 24px; color: #b58c34; }
+.bill-of-supply-template.diwali-invoice .purple-header-table th,
+.bill-of-supply-template.diwali-invoice .purple-subtotal-bar {
+  background: #fff3d9;
+  color: #78352f;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+.bill-of-supply-template.diwali-invoice .amount-words-box { border-left-color: #bc9238; }

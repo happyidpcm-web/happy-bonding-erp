@@ -1,3 +1,4 @@
+import { SearchablePicker } from "../../components/SearchablePicker";
 import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -121,14 +122,7 @@ export function CreateOfferModal({
               <Search size={15} color="#94a3b8" />
               <input value={searchItem} onChange={e => setSearchItem(e.target.value)} placeholder="Search any item..." />
             </div>
-            <select
-              value={categoryFilter}
-              onChange={e => setCategoryFilter(e.target.value)}
-              style={{ padding: "0 14px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, background: "#ffffff", height: 40 }}
-            >
-              <option value="All Categories">Search Categories</option>
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <SearchablePicker value={categoryFilter} onChange={setCategoryFilter} placeholder="Search Categories" emptyValue="All Categories" emptyLabel="All Categories" options={categories.map(c => ({ value: c, label: c }))} />
           </div>
 
           <div className="table-scroll" style={{ maxHeight: 280, overflowY: "auto", border: "1px solid #e2e8f0", borderRadius: 8, background: "#ffffff" }}>
@@ -1655,10 +1649,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
               />
             </div>
             <div className="category-select-wrap">
-              <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
-                <option value="All Categories">Search Categories</option>
-                {categoriesList.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <SearchablePicker value={categoryFilter} onChange={setCategoryFilter} placeholder="Search Categories" emptyValue="All Categories" emptyLabel="All Categories" options={categoriesList.map(c => ({ value: c, label: c }))} />
               <ChevronDown size={14} />
             </div>
             <button
@@ -2023,7 +2014,7 @@ export function ItemModal({ initialItem, saving, onClose, onSave }: { initialIte
         <section className="item-panel">
           {tab === "Basic Details" && <div className="item-section grid-2">
             <label>Item Type <span>*</span><div className="choice-row"><button type="button" className={form.type === "Product" ? "selected" : ""} onClick={() => setField("type", "Product")}>Product</button><button type="button" className={form.type === "Service" ? "selected" : ""} onClick={() => setField("type", "Service")}>Service</button></div></label>
-            <label>Category<select value={form.category} onChange={e => setField("category", e.target.value)}><option value="">Search Categories</option><option>Shirt</option><option>Pant</option><option>T-Shirt</option><option>Accessories</option></select></label>
+            <label>Category<SearchablePicker value={form.category} onChange={value => setField("category", value)} placeholder="Search Categories" options={["Shirt", "Pant", "T-Shirt", "Accessories"].map(c => ({ value: c, label: c }))} /></label>
             <label className="full">Item Name <span>*</span><input autoFocus value={form.name} onChange={e => setField("name", e.target.value)} placeholder="ex: Maggie 20gm" /></label>
             <label>Purchase Price<input type="number" min="0" step="0.01" value={form.purchasePrice} onChange={e => setField("purchasePrice", e.target.value)} placeholder="Cost per item" /></label>
             <label>MRP<input type="number" min="0" step="0.01" value={form.mrp} onChange={e => setField("mrp", e.target.value)} placeholder="Maximum retail price" /></label>

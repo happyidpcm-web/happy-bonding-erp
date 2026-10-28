@@ -1,3 +1,4 @@
+import { SearchablePicker } from "../../components/SearchablePicker";
 import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -972,13 +973,7 @@ export function Parties({
               />
             </div>
             <div className="category-select-wrap">
-              <select
-                value={categoryFilter}
-                onChange={e => { setCategoryFilter(e.target.value); setPageIndex(0); }}
-              >
-                <option value="All Categories">Search Categories</option>
-                {categoriesList.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <SearchablePicker value={categoryFilter} onChange={value => { setCategoryFilter(value); setPageIndex(0); }} placeholder="Search Categories" emptyValue="All Categories" emptyLabel="All Categories" options={categoriesList.map(c => ({ value: c, label: c }))} />
               <ChevronDown size={14} />
             </div>
           </div>
