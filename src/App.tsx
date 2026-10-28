@@ -13,6 +13,7 @@ import { money } from "./data";
 import { api } from "./api";
 import { NumberInput } from "./components/NumberInput";
 import { EditableInvoiceNumber } from "./components/EditableInvoiceNumber";
+import { DiscountInput } from "./components/DiscountInput";
 import type { Branch, Expense, Invoice, InvoiceLineItem, InvoiceSetting, OwnerBranchSummary, Page, Party, Product, StaffUser } from "./types";
 import * as XLSX from "xlsx";
 import happyBondingLogo from "./assets/happy-bonding-logo-white.png";
@@ -2280,6 +2281,8 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   const itemMatches=itemSearch?products.filter(p=>`${p.name} ${p.sku}`.toLowerCase().includes(itemSearch.toLowerCase())).slice(0,5):[];
   const subtotal=lines.reduce((sum,line)=>sum+line.product.sellingPrice*line.qty,0);
   const discount=lines.reduce((sum,line)=>sum+line.discount,0);
+  const discountBase=Math.max(0,Math.round((subtotal-discount)*100)/100);
+  useEffect(() => { setInvoiceDiscount(current => Math.min(Math.max(0, current), discountBase)); }, [discountBase]);
   const taxable=Math.max(0,subtotal-discount-invoiceDiscount);
   const taxBaseBeforeInvoiceDiscount=Math.max(0,subtotal-discount);
   const tax=taxBaseBeforeInvoiceDiscount<=0?0:lines.reduce((sum,line)=>{
@@ -2740,8 +2743,8 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
                     </td>
                     <td>
                       <div className="discount-cell-wrap">
-                        <div className="disc-input-row"><span>%</span><input type="number" value={Math.round((line.discount / (line.product.sellingPrice * line.qty)) * 100) || 0} onChange={e => { const p = Number(e.target.value); const amt = (line.product.sellingPrice * line.qty * p) / 100; setLines(lines.map(x => x.product.id === line.product.id ? { ...x, discount: amt } : x)); }} /></div>
-                        <div className="disc-input-row"><span>₹</span><input type="number" value={line.discount} onChange={e => setLines(lines.map(x => x.product.id === line.product.id ? { ...x, discount: Number(e.target.value) } : x))} /></div>
+                        <div className="disc-input-row"><span>%</span><DiscountInput label={`Discount percentage for ${line.product.name}`} max={100} value={Math.round((line.discount / (line.product.sellingPrice * line.qty)) * 10000) / 100 || 0} onChange={p => { const amt = Math.round(line.product.sellingPrice * line.qty * p) / 100; setLines(rows => rows.map(x => x.product.id === line.product.id ? { ...x, discount: amt } : x)); }} /></div>
+                        <div className="disc-input-row"><span>₹</span><DiscountInput label={`Discount amount for ${line.product.name}`} max={Math.max(0, Math.round(line.product.sellingPrice * line.qty * 100) / 100)} value={line.discount} onChange={amount => setLines(rows => rows.map(x => x.product.id === line.product.id ? { ...x, discount: amount } : x))} /></div>
                       </div>
                     </td>
                     <td>
@@ -2902,25 +2905,15 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
               <div className="disc-inputs-group">
                 <div className="disc-input-box">
                   <span>%</span>
-                  <input
-                    type="number"
-                    value={invoiceDiscount && taxable ? Math.round((invoiceDiscount / taxable) * 100 * 10) / 10 : ""}
-                    onChange={e => {
-                      const pct = Number(e.target.value);
-                      setInvoiceDiscount(Math.round((taxable * pct) / 100));
-                    }}
-                    placeholder="0"
-                  />
+                  <DiscountInput label="Invoice discount percentage" max={100}
+                    value={discountBase ? Math.round(invoiceDiscount / discountBase * 10000) / 100 : 0}
+                    onChange={pct => setInvoiceDiscount(Math.round(discountBase * pct) / 100)} />
                 </div>
                 <span className="slash">/</span>
                 <div className="disc-input-box">
                   <span>₹</span>
-                  <input
-                    type="number"
-                    value={invoiceDiscount || ""}
-                    onChange={e => setInvoiceDiscount(Number(e.target.value))}
-                    placeholder="0"
-                  />
+                  <DiscountInput label="Invoice discount amount" max={discountBase}
+                    value={invoiceDiscount} onChange={setInvoiceDiscount} />
                 </div>
                 <button type="button" className="clear-row-btn" onClick={() => setInvoiceDiscount(0)}>ⓧ</button>
               </div>
