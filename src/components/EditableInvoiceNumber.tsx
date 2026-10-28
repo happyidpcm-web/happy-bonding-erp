@@ -28,7 +28,7 @@ export function EditableInvoiceNumber({ label, value, onChange, currency = false
     {error && <small role="alert" style={{ color: "#b91c1c" }}>{integer ? "Enter a whole number" : "Enter a number"} ≥ {min}</small>}
   </div>;
   return <button type="button" className="gray-val-box invoice-number-display" aria-label={`Edit ${label}`}
-    title="Double-click to edit (or press Enter)" onDoubleClick={start}
+    title="Click to edit (or press Enter)" onClick={start}
     onKeyDown={e => { if (e.key === "Enter" || e.key === "F2") { e.preventDefault(); start(); } }}>
     {currency ? value.toLocaleString("en-IN", { style: "currency", currency: "INR" }) : value}
   </button>;
