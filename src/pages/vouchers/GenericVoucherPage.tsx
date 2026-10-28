@@ -1275,7 +1275,19 @@ export function GenericVoucherPage({
             </thead>
             <tbody>
               {filtered.map(row => (
-                <tr key={row.id} style={{ borderBottom: "1px solid #f1f5f9", fontSize: 13, color: "#1e293b" }}>
+                <tr key={row.id}
+                  tabIndex={type === "Purchase Invoice" ? 0 : undefined}
+                  onClick={event => {
+                    if (type !== "Purchase Invoice" || (event.target as HTMLElement).closest("button, input, a, select, [role='menu']")) return;
+                    setSelectedVoucher(row);
+                  }}
+                  onKeyDown={event => {
+                    if (type === "Purchase Invoice" && event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
+                      event.preventDefault();
+                      setSelectedVoucher(row);
+                    }
+                  }}
+                  style={{ borderBottom: "1px solid #f1f5f9", fontSize: 13, color: "#1e293b", cursor: type === "Purchase Invoice" ? "pointer" : undefined }}>
                   {type === "Purchase Invoice" && <td><input aria-label={`Select ${row.number}`} type="checkbox" disabled={deleting} checked={selectedIds.has(row.id)} onChange={() => setSelectedIds(ids => { const next = new Set(ids); if (next.has(row.id)) next.delete(row.id); else next.add(row.id); return next; })} /></td>}
                   <td style={{ padding: "14px 16px", color: "#64748b" }}>{row.date}</td>
                   <td style={{ padding: "14px 16px" }} className="mono"><strong>{row.number}</strong></td>

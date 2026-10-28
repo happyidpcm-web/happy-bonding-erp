@@ -1311,6 +1311,12 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
   const [lowStockOnly, setLowStockOnly] = useState(false);
+  const showLowStock = () => {
+    setQuery("");
+    setCategoryFilter("All Categories");
+    setSelectedItemIds([]);
+    setLowStockOnly(true);
+  };
   const [modal, setModal] = useState(false);
   const [editingItem, setEditingItem] = useState<Product | null>(null);
   const [selectedItemIds, setSelectedItemIds] = useState<(string | number)[]>([]);
@@ -1626,14 +1632,16 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
           <small className="inventory-metric-note">Available quantity × selling price</small>
         </article>
 
-        <article className="party-metric-box">
+        <button type="button" className="party-metric-box" onClick={showLowStock}
+          aria-pressed={lowStockOnly} aria-label={`Show ${lowStockCount} low stock items`}
+          style={{ textAlign: "left", cursor: "pointer", outline: lowStockOnly ? "2px solid #4f46e5" : undefined }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span>Low Stock</span>
             <ExternalLink size={14} color="#94a3b8" />
           </div>
           <strong style={{ color: lowStockCount > 0 ? "#dc2626" : "#0f172a" }}>{lowStockCount}</strong>
           <small className="inventory-metric-note">Item variants with fewer than 10 pieces</small>
-        </article>
+        </button>
       </div>
 
       {/* Main Items Table Card */}
@@ -1655,10 +1663,11 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
             <button
               type="button"
               className={`secondary ${lowStockOnly ? "active-purple" : ""}`}
-              onClick={() => setLowStockOnly(!lowStockOnly)}
+              aria-pressed={lowStockOnly}
+              onClick={() => { if (lowStockOnly) setLowStockOnly(false); else showLowStock(); }}
               style={{ display: "flex", alignItems: "center", gap: 6 }}
             >
-              <Boxes size={14} /> Low Stock
+              <Boxes size={14} /> {lowStockOnly ? "Show All Items" : "Low Stock"}
             </button>
           </div>
 
