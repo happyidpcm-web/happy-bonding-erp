@@ -87,7 +87,7 @@ export function ExpensesModule({ notify, currentBranchId }: { notify: (msg: stri
         </button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, marginBottom: 20 }}>
+      <div className="expense-summary-row">
         {summaryCards.map(card => (
           <button key={card.category} type="button" className="summary-action expense-summary"
             aria-pressed={categoryFilter === card.category} onClick={() => setCategoryFilter(card.category)}>
