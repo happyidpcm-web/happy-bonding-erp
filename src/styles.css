@@ -5480,6 +5480,6 @@ input:checked + .slider:before {
 .summary-action[aria-pressed="true"] { border-color: #4f46e5; background: #eef2ff; }
 .expense-summary-row { display: flex; flex-wrap: nowrap; gap: 10px; overflow-x: auto; padding: 6px; margin: -6px -6px 14px; }
 .expense-summary { flex: 1 0 130px; min-width: 0; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; }
-.expense-summary span { display: block; color: #64748b; font-weight: 600; }
-.expense-summary strong { display: block; margin-top: 4px; font-size: 20px; color: #0f172a; }
-.expense-summary[aria-pressed="true"] strong { color: #4f46e5; }
+.expense-summary span { display: block; font-family: 'Manrope', sans-serif; font-size: 13px; line-height: 1.5; color: #000; font-weight: 500; }
+.expense-summary strong { display: block; margin-top: 4px; font-family: 'Manrope', sans-serif; font-size: 20px; color: #000; }
+.expense-summary[aria-pressed="true"] strong { color: #000; }

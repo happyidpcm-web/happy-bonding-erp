@@ -331,7 +331,7 @@ export default function App() {
       </div>
       <div className="new-sale-split-wrap" ref={createDropdownRef}>
         <button className="new-sale-main-btn" onClick={openSalesInvoice}>
-          Create Sales Invoice <span>F2</span>
+          Create Sales Invoice
         </button>
         <button
           type="button"
