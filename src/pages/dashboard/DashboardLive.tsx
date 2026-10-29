@@ -4,7 +4,7 @@ import { ChevronDown, IndianRupee as CircleIndianRupee, CreditCard, WalletCards 
 import { api } from "../../api";
 import { money } from "../../data";
 import type { Invoice, OwnerBranchSummary, Party, Product } from "../../types";
-import { PageHeading, Metric } from "../../App";
+import { PageHeading, Metric, Modal } from "../../App";
 
 export function SalesReportChartCard({ invoices }: { invoices: Invoice[] }) {
   const [viewMode, setViewMode] = useState<"Daily" | "Weekly">("Daily");
@@ -233,6 +233,7 @@ export function DashboardLive({
   const toPay = Math.abs(parties.filter(r => r.balance < 0).reduce((a, b) => a + b.balance, 0));
   const cashBalance = invoices.filter(i => i.status === "Paid").reduce((a, b) => a + b.amount, 0);
 
+  const [metricDetail, setMetricDetail] = useState<"collect" | "pay" | "cash" | null>(null);
   const [transactions, setTransactions] = useState<Awaited<ReturnType<typeof api.transactions>>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -256,11 +257,26 @@ export function DashboardLive({
     <>
       <PageHeading title="Dashboard" subtitle="Business Overview" action="Create Sales Invoice" onAction={onNewSale} />
       <div className="metrics-grid three">
-        <Metric label="↓ To Collect" value={`₹ ${toCollect.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`} icon={CircleIndianRupee} tone="green" />
-        <Metric label="↑ To Pay" value={`₹ ${toPay.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`} icon={CreditCard} tone="red" />
-        <Metric label="🏛️ Total Cash + Bank Balance" value={`₹ ${cashBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`} icon={WalletCards} tone="blue" />
+        <Metric label="↓ To Collect" value={`₹ ${toCollect.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`} onClick={() => setMetricDetail("collect")} icon={CircleIndianRupee} tone="green" />
+        <Metric label="↑ To Pay" value={`₹ ${toPay.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`} onClick={() => setMetricDetail("pay")} icon={CreditCard} tone="red" />
+        <Metric label="🏛️ Total Cash + Bank Balance" value={`₹ ${cashBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`} onClick={() => setMetricDetail("cash")} icon={WalletCards} tone="blue" />
       </div>
 
+      {metricDetail && <Modal title={metricDetail === "collect" ? "To Collect" : metricDetail === "pay" ? "To Pay" : "Paid Sales Breakdown"} onClose={() => setMetricDetail(null)}>
+        {metricDetail === "cash" && <p>This dashboard total is calculated from paid sales invoices.</p>}
+        <div className="table-scroll"><table>
+          <thead><tr><th>{metricDetail === "cash" ? "Invoice" : "Party"}</th><th className="right">Amount</th></tr></thead>
+          <tbody>
+            {metricDetail === "cash" ? <>
+              {invoices.filter(i => i.status === "Paid").map(i => <tr key={i.id}><td><button type="button" className="text-button" onClick={() => { setMetricDetail(null); onSelectInvoice(i); }}>{i.number}</button></td><td className="right">{money(i.amount)}</td></tr>)}
+              {!invoices.some(i => i.status === "Paid") && <tr><td colSpan={2}>No paid sales invoices.</td></tr>}
+            </> : <>
+              {parties.filter(p => metricDetail === "collect" ? p.balance > 0 : p.balance < 0).map(p => <tr key={p.id}><td>{p.name}</td><td className="right">{money(Math.abs(p.balance))}</td></tr>)}
+              {!parties.some(p => metricDetail === "collect" ? p.balance > 0 : p.balance < 0) && <tr><td colSpan={2}>No outstanding balances.</td></tr>}
+            </>}
+          </tbody>
+        </table></div>
+      </Modal>}
       <div className="dashboard-grid" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* 1. Latest Transactions Card FIRST */}
         <article className="card transactions" style={{ gridColumn: "1 / -1" }}>

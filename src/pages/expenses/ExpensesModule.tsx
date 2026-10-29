@@ -70,12 +70,10 @@ export function ExpensesModule({ notify, currentBranchId }: { notify: (msg: stri
   const categories = ["Shop Rent", "Electricity", "Tea/Refreshments", "Staff Advance", "Freight", "Shop Maintenance", "Printing & Stationery", "Other"];
   const filtered = expenses.filter(x => categoryFilter === "All" || x.category === categoryFilter);
 
-  const totalSpent = filtered.reduce((acc, x) => acc + Number(x.amount || 0), 0);
-  const rentSpent = expenses.filter(x => x.category === "Shop Rent").reduce((acc, x) => acc + Number(x.amount || 0), 0);
-  const elecSpent = expenses.filter(x => x.category === "Electricity").reduce((acc, x) => acc + Number(x.amount || 0), 0);
-  const teaSpent = expenses.filter(x => x.category === "Tea/Refreshments").reduce((acc, x) => acc + Number(x.amount || 0), 0);
-  const advanceSpent = expenses.filter(x => x.category === "Staff Advance").reduce((acc, x) => acc + Number(x.amount || 0), 0);
-  const freightSpent = expenses.filter(x => x.category === "Freight").reduce((acc, x) => acc + Number(x.amount || 0), 0);
+  const summaryCards = [
+    { category: "All", label: "Total Expenses" },
+    ...categories.map(category => ({ category, label: category === "Tea/Refreshments" ? "Tea / Refreshments" : category === "Freight" ? "Freight & Transport" : category })),
+  ];
 
   return (
     <div style={{ padding: "0 4px" }}>
@@ -90,35 +88,18 @@ export function ExpensesModule({ notify, currentBranchId }: { notify: (msg: stri
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-          <small style={{ color: "#64748b", fontWeight: 600 }}>Total Expenses</small>
-          <h2 style={{ fontSize: 20, color: "#4f46e5", margin: "4px 0 0" }}>₹{totalSpent.toLocaleString("en-IN")}</h2>
-        </div>
-        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-          <small style={{ color: "#64748b", fontWeight: 600 }}>Shop Rent</small>
-          <h3 style={{ fontSize: 18, color: "#0f172a", margin: "4px 0 0" }}>₹{rentSpent.toLocaleString("en-IN")}</h3>
-        </div>
-        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-          <small style={{ color: "#64748b", fontWeight: 600 }}>Electricity</small>
-          <h3 style={{ fontSize: 18, color: "#0f172a", margin: "4px 0 0" }}>₹{elecSpent.toLocaleString("en-IN")}</h3>
-        </div>
-        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-          <small style={{ color: "#64748b", fontWeight: 600 }}>Tea / Refreshments</small>
-          <h3 style={{ fontSize: 18, color: "#0f172a", margin: "4px 0 0" }}>₹{teaSpent.toLocaleString("en-IN")}</h3>
-        </div>
-        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-          <small style={{ color: "#64748b", fontWeight: 600 }}>Staff Advance</small>
-          <h3 style={{ fontSize: 18, color: "#0f172a", margin: "4px 0 0" }}>₹{advanceSpent.toLocaleString("en-IN")}</h3>
-        </div>
-        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
-          <small style={{ color: "#64748b", fontWeight: 600 }}>Freight & Transport</small>
-          <h3 style={{ fontSize: 18, color: "#0f172a", margin: "4px 0 0" }}>₹{freightSpent.toLocaleString("en-IN")}</h3>
-        </div>
+        {summaryCards.map(card => (
+          <button key={card.category} type="button" className="summary-action expense-summary"
+            aria-pressed={categoryFilter === card.category} onClick={() => setCategoryFilter(card.category)}>
+            <span>{card.label}</span>
+            <strong>{"₹"}{expenses.filter(x => card.category === "All" || x.category === card.category).reduce((sum, x) => sum + Number(x.amount || 0), 0).toLocaleString("en-IN")}</strong>
+          </button>
+        ))}
       </div>
 
       <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 16px", marginBottom: 16, display: "flex", gap: 12, alignItems: "center" }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: "#64748b" }}>Category Filter:</span>
-        <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={{ padding: "6px 12px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 13 }}>
+        <select aria-label="Expense category filter" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={{ padding: "6px 12px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 13 }}>
           <option value="All">All Categories</option>
           {categories.map(c => <option key={c} value={c}>{c}</option>)}
         </select>

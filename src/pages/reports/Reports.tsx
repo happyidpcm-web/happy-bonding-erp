@@ -222,6 +222,7 @@ export function StockSummaryReportScreen({
   onBack: () => void;
   notify: (msg: string) => void;
 }) {
+  const [stockDetail, setStockDetail] = useState<"value" | "quantity" | null>(null);
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
   const [dateFilter, setDateFilter] = useState("Today");
   const [customDateRange, setCustomDateRange] = useState<CustomDateRange>({ from: "", to: "" });
@@ -255,6 +256,12 @@ export function StockSummaryReportScreen({
 
   return (
     <div className="report-screen-wrap printable-report">
+      {stockDetail && <Modal title={stockDetail === "value" ? "Stock Value Breakdown" : "Stock Quantity Breakdown"} onClose={() => setStockDetail(null)}>
+        <div className="table-scroll"><table><thead><tr><th>Item</th><th>{stockDetail === "value" ? "Value" : "Quantity"}</th></tr></thead><tbody>
+          {filteredProducts.map(p => <tr key={p.id}><td>{p.name}</td><td>{stockDetail === "value" ? money(p.sellingPrice * p.stock) : p.stock}</td></tr>)}
+          {!filteredProducts.length && <tr><td colSpan={2}>No items in this category.</td></tr>}
+        </tbody></table></div>
+      </Modal>}
       <div className="page-heading">
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <button type="button" className="icon-button" onClick={onBack} title="Back to Items">
@@ -280,16 +287,16 @@ export function StockSummaryReportScreen({
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-        <div className="party-metric-box">
+        <button type="button" className="party-metric-box summary-action" onClick={() => setStockDetail("value")}>
           <span>Total Stock Value</span>
           <strong style={{ color: totalStockVal < 0 ? "#dc2626" : "#0f172a" }}>
             ₹ {totalStockVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
           </strong>
-        </div>
-        <div className="party-metric-box">
+        </button>
+        <button type="button" className="party-metric-box summary-action" onClick={() => setStockDetail("quantity")}>
           <span>Total Stock Quantity</span>
           <strong>{totalStockQty}</strong>
-        </div>
+        </button>
       </div>
 
       <div style={{ background: "#fffbe6", border: "1px solid #ffe58f", padding: "8px 16px", borderRadius: 8, marginBottom: 16, fontSize: 12, color: "#d48806" }}>

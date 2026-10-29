@@ -132,6 +132,7 @@ export interface StaffMember {
 }
 
 export function Staff() {
+  const [attendanceFilter, setAttendanceFilter] = useState<StaffMember["status"] | "All">("All");
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [addStaffModal, setAddStaffModal] = useState(false);
   const [name, setName] = useState("");
@@ -189,17 +190,18 @@ export function Staff() {
     <>
       <PageHeading title="Staff Attendance & Payroll" subtitle="Manage store staff members, daily attendance and monthly payroll." action="+ Add Staff" onAction={() => setAddStaffModal(true)} />
       <div className="metrics-grid">
-        <Metric label="Present Today" value={`${presentCount} Staff`} icon={Users} tone="green" />
-        <Metric label="Absent Today" value={`${absentCount} Staff`} icon={Users} tone="red" />
-        <Metric label="On Leave Today" value={`${leaveCount} Staff`} icon={Users} tone="blue" />
-        <Metric label="Monthly Salary Due" value={money(totalSalaryDue)} icon={Banknote} />
+        <Metric onClick={() => setAttendanceFilter("Present")} selected={attendanceFilter === "Present"} label="Present Today" value={`${presentCount} Staff`} icon={Users} tone="green" />
+        <Metric onClick={() => setAttendanceFilter("Absent")} selected={attendanceFilter === "Absent"} label="Absent Today" value={`${absentCount} Staff`} icon={Users} tone="red" />
+        <Metric onClick={() => setAttendanceFilter("On Leave")} selected={attendanceFilter === "On Leave"} label="On Leave Today" value={`${leaveCount} Staff`} icon={Users} tone="blue" />
+        <Metric onClick={() => setAttendanceFilter("All")} selected={attendanceFilter === "All"} label="Monthly Salary Due" value={money(totalSalaryDue)} icon={Banknote} />
       </div>
 
       <article className="card table-card" style={{ marginTop: 20 }}>
         <div className="card-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <h2 style={{ margin: 0 }}>Staff Directory & Daily Attendance</h2>
-            <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>Click buttons to update staff attendance for today</p>
+            <p role="status" style={{ margin: 0, fontSize: 12, color: "#64748b" }}>Showing: {attendanceFilter === "All" ? "All staff" : attendanceFilter}</p>
+            <button type="button" className="text-button" onClick={() => setAttendanceFilter("All")}>Show All Staff</button>
           </div>
           <button type="button" className="primary compact" onClick={() => setAddStaffModal(true)}>+ Add Staff Member</button>
         </div>
@@ -216,7 +218,8 @@ export function Staff() {
               </tr>
             </thead>
             <tbody>
-              {staffList.map(s => (
+              {!staffList.some(s => attendanceFilter === "All" || s.status === attendanceFilter) && <tr><td colSpan={5}>No staff match this filter.</td></tr>}
+              {staffList.filter(s => attendanceFilter === "All" || s.status === attendanceFilter).map(s => (
                 <tr key={s.id}>
                   <td><strong>{s.name}</strong></td>
                   <td>{s.phone || "-"}</td>

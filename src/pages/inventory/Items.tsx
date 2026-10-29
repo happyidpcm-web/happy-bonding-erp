@@ -1623,14 +1623,14 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
 
       {/* 2 Metric Cards matching Image 1: Stock Value & Low Stock */}
       <div className="items-metrics-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
-        <article className="party-metric-box">
+        <button type="button" className="party-metric-box summary-action" onClick={() => setActiveSubScreen("stock_summary")}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span>Stock Selling Value</span>
             <ExternalLink size={14} color="#94a3b8" />
           </div>
           <strong>₹ {totalStockValue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong>
           <small className="inventory-metric-note">Available quantity × selling price</small>
-        </article>
+        </button>
 
         <button type="button" className="party-metric-box" onClick={showLowStock}
           aria-pressed={lowStockOnly} aria-label={`Show ${lowStockCount} low stock items`}

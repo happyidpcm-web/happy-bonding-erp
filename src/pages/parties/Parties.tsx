@@ -810,6 +810,8 @@ export function Parties({
   autoOpenShareLedger?: boolean;
   onClearAutoOpenShareLedger?: () => void;
 }) {
+  const [balanceFilter, setBalanceFilter] = useState("all");
+  const selectBalance = (filter: string) => { setBalanceFilter(filter); setPageIndex(0); setQuery(""); setCategoryFilter("All Categories"); };
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
   const [modal, setModal] = useState(false);
@@ -849,9 +851,9 @@ export function Parties({
     return rows.filter(r => {
       const matchQuery = `${r.name} ${r.phone}`.toLowerCase().includes(query.toLowerCase());
       const matchCat = categoryFilter === "All Categories" || r.category === categoryFilter;
-      return matchQuery && matchCat;
+      return matchQuery && matchCat && (balanceFilter === "all" || (balanceFilter === "collect" ? r.balance > 0 : r.balance < 0));
     });
-  }, [rows, query, categoryFilter]);
+  }, [rows, query, categoryFilter, balanceFilter]);
 
   const totalPages = Math.ceil(filtered.length / pageSize) || 1;
   const visibleList = useMemo(() => query.trim() ? filtered.slice(0, 100) : filtered.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize), [filtered, query, pageIndex]);
@@ -944,20 +946,20 @@ export function Parties({
 
       {/* 3 Metric Cards matching reference image */}
       <div className="parties-metrics-row">
-        <article className="party-metric-box active-blue">
+        <button type="button" className="party-metric-box summary-action" aria-pressed={balanceFilter === "all"} onClick={() => selectBalance("all")}>
           <span>All Parties</span>
           <strong>{totalPartiesCount}</strong>
-        </article>
+        </button>
 
-        <article className="party-metric-box">
+        <button type="button" className="party-metric-box summary-action" aria-pressed={balanceFilter === "collect"} onClick={() => selectBalance("collect")}>
           <span>↓ To Collect</span>
           <strong style={{ color: "#16a34a" }}>₹ {toCollect.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong>
-        </article>
+        </button>
 
-        <article className="party-metric-box">
+        <button type="button" className="party-metric-box summary-action" aria-pressed={balanceFilter === "pay"} onClick={() => selectBalance("pay")}>
           <span>↑ To Pay</span>
           <strong style={{ color: "#dc2626" }}>₹ {toPay.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong>
-        </article>
+        </button>
       </div>
 
       {/* Parties Table Card */}

@@ -887,8 +887,9 @@ export function PageHeading({ title, subtitle, action, onAction }: { title: stri
   return <div className="page-heading"><div><h1>{title}</h1><p>{subtitle}</p></div>{action && <button className="primary" onClick={onAction}><Plus size={17}/>{action}</button>}</div>;
 }
 
-export function Metric({ label, value, icon: Icon, tone = "amber", hint }: { label: string; value: string; icon: typeof TrendingUp; tone?: string; hint?: string }) {
-  return <article className={`metric ${tone}`}><div className="metric-icon"><Icon size={20}/></div><div><span>{label}</span><strong>{value}</strong>{hint && <small>{hint}</small>}</div></article>;
+export function Metric({ label, value, icon: Icon, tone = "amber", hint, onClick, selected }: { label: string; value: string; icon: typeof TrendingUp; tone?: string; hint?: string; onClick?: () => void; selected?: boolean }) {
+  const content = <><div className="metric-icon"><Icon size={20}/></div><div><span>{label}</span><strong>{value}</strong>{hint && <small>{hint}</small>}</div></>;
+  return onClick ? <button type="button" className={`metric ${tone} summary-action`} onClick={onClick} aria-pressed={selected}>{content}</button> : <article className={`metric ${tone}`}>{content}</article>;
 }
 
 
