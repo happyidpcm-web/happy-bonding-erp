@@ -1,3 +1,4 @@
+import ownerSignatureUrl from "../../assets/owner-signature.png";
 import { SearchablePicker } from "../../components/SearchablePicker";
 import { DateRangeFilter } from "../../components/DateRangeFilter";
 import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
@@ -669,7 +670,13 @@ export function CreateQuotationScreen({
             </span>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <img
-                src={signatureUrl || undefined}
+                src={signatureUrl || ownerSignatureUrl}
+                onError={(event) => {
+                  const image = event.currentTarget;
+                  if (image.getAttribute("src") !== ownerSignatureUrl) {
+                    image.src = ownerSignatureUrl;
+                  }
+                }}
                 alt="Digital Signature"
                 style={{ height: 48, objectFit: "contain" }}
               />
