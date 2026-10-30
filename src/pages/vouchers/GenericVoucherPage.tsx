@@ -1,4 +1,5 @@
 import ownerSignatureUrl from "../../assets/owner-signature.png";
+import { indexParties, searchParties } from "../../utils/partySearch";
 import { SearchablePicker } from "../../components/SearchablePicker";
 import { DateRangeFilter } from "../../components/DateRangeFilter";
 import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
@@ -280,15 +281,9 @@ export function CreateQuotationScreen({
   const partyDropdownRef = useDismissibleDropdown(partyDropdownOpen, () => setPartyDropdownOpen(false));
   const [partyQuery, setPartyQuery] = useState("");
 
-  const matchedParties = useMemo(() => {
-    const rows = [...parties, ...createdSuppliers.filter(supplier => !parties.some(party => party.id === supplier.id))];
-    // Existing customers may also supply goods; reuse their record instead of creating a duplicate.
-    const eligible = rows;
-    if (!partyQuery.trim()) return eligible;
-    const q = partyQuery.trim().toLowerCase();
-    const digits = q.replace(/\D/g, "");
-    return eligible.filter(p => p.name.toLowerCase().includes(q) || (p.phone && (p.phone.includes(q) || (digits.length > 0 && p.phone.replace(/\D/g, "").includes(digits)))));
-  }, [parties, partyQuery, createdSuppliers, type]);
+  const partyIndex = useMemo(() => indexParties(parties, createdSuppliers), [parties, createdSuppliers]);
+  const partyMatches = useMemo(() => searchParties(partyIndex, partyQuery, type === "Purchase Invoice"), [partyIndex, partyQuery, type]);
+  const matchedParties = partyMatches.rows;
 
   return (
     <div className="printable-report" style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 20, minHeight: "85vh" }}>
@@ -404,6 +399,7 @@ export function CreateQuotationScreen({
                       No matching party found. Search by name or phone, or create a new supplier.
                     </div>
                   )}
+                  {partyMatches.total > matchedParties.length && <div style={{ padding: 8, fontSize: 11, color: "#64748b" }}>Showing {matchedParties.length} of {partyMatches.total} matches. Type more of the name or phone to narrow the list.</div>}
                 </div>
               )}
             </div>

@@ -250,7 +250,7 @@ export function DashboardLive({
     return () => { active = false; window.removeEventListener("focus", refresh); };
   }, [branchId, reload]);
   const salesTransactions = transactions.filter(transaction => transaction.type === "Sales Invoice");
-  const displayList = showAll ? salesTransactions : salesTransactions.slice(0, 10);
+  const displayList = showAll ? salesTransactions : salesTransactions.slice(0, 3);
   const onSeeAllTransactions = () => setShowAll(value => !value);
 
   return (
