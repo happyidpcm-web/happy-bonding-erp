@@ -1,6 +1,6 @@
 import ownerSignatureUrl from "./assets/owner-signature.png";
 import { useDismissibleDropdown } from "./hooks/useDismissibleDropdown";
-import { isInvoiceInDateRange, type CustomDateRange } from "./utils/invoiceDateRange";
+import { isInvoiceInDateRange, isValidCustomDateRange, type CustomDateRange, type DateRangeSelection } from "./utils/invoiceDateRange";
 export { isInvoiceInDateRange, type CustomDateRange } from "./utils/invoiceDateRange";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -174,8 +174,10 @@ export default function App() {
   const createDropdownRef = useDismissibleDropdown(createDropdownOpen, () => setCreateDropdownOpen(false));
   const [autoOpenShareLedger, setAutoOpenShareLedger] = useState(false);
   const [activeReportSubScreen, setActiveReportSubScreen] = useState<string | null>(null);
+  const [reportDateSelection, setReportDateSelection] = useState<DateRangeSelection>();
 
-  const handleNavigateReportsFromSales = (reportName: string) => {
+  const handleNavigateReportsFromSales = (reportName: string, selection?: DateRangeSelection) => {
+    setReportDateSelection(selection);
     setPage("reports");
     if (reportName === "sales_summary") setActiveReportSubScreen("Sales summary");
     else if (reportName === "daybook") setActiveReportSubScreen("DayBook");
@@ -185,6 +187,7 @@ export default function App() {
   };
 
   const go = (id: Page) => {
+    if (id === "reports") setReportDateSelection(undefined);
     if (id === "sales") setSalesView(view => ({ key: view.key + 1, create: false }));
     setPage(id);
     setSidebar(false);
@@ -533,7 +536,7 @@ export default function App() {
 
         {page === "reminders" && <RemindersModule parties={partyRows} invoices={invoiceRows} notify={notify} />}
 
-        {page === "reports" && <Reports products={productRows} invoices={invoiceRows} notify={notify} initialReport={activeReportSubScreen}/>} 
+        {page === "reports" && <Reports products={productRows} invoices={invoiceRows} notify={notify} initialReport={activeReportSubScreen} initialDateSelection={reportDateSelection}/>}
         {page === "cash" && <CashBank notify={notify}/>} 
         {page === "pos" && <Sales rows={invoiceRows} products={productRows} parties={partyRows} setting={invoiceSetting} setSetting={setInvoiceSetting} setRows={setInvoiceRows} setParties={setPartyRows} setProducts={setProductRows} notify={notify} key="pos" initialCreate={true} onSelectInvoice={openInvoiceDetail} onNavigateReports={handleNavigateReportsFromSales}/>}
         {page === "staff" && <Staff/>} 
@@ -1253,6 +1256,7 @@ export function CustomDateRangePopover({
   onCancel: () => void;
 }) {
   const [draft, setDraft] = useState<CustomDateRange>(range);
+  const valid = isValidCustomDateRange(draft);
   return (
     <div style={{ position: "absolute", top: "calc(100% + 8px)", left: 0, width: 344, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 6, boxShadow: "0 12px 28px rgba(15,23,42,.16)", zIndex: 1000, padding: 14 }}>
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 18px minmax(0, 1fr)", alignItems: "end", gap: 10, marginBottom: 14, color: "#64748b", fontSize: 14 }}>
@@ -1277,14 +1281,19 @@ export function CustomDateRangePopover({
           />
         </label>
       </div>
-      {draft.from && draft.to && draft.from > draft.to && <p role="alert">End date must be on or after start date.</p>}
+      <div style={{ display: "flex", gap: 16, marginBottom: 14 }}>
+        <label>From Time<input type="time" value={draft.fromTime || ""} onChange={e => setDraft(prev => ({ ...prev, fromTime: e.target.value }))} /></label>
+        <label>To Time<input type="time" value={draft.toTime || ""} onChange={e => setDraft(prev => ({ ...prev, toTime: e.target.value }))} /></label>
+      </div>
+      <p style={{ fontSize: 12, color: "#64748b" }}>Times are in IST, as shown on the invoice. Leave blank for the full day. Invoices without a recorded time are excluded when filtering by time.</p>
+      {draft.from && draft.to && !valid && <p role="alert">End date and time must be on or after start date and time.</p>}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 14, fontSize: 12, fontWeight: 700 }}>
         <button type="button" onClick={onCancel} style={{ border: 0, background: "transparent", color: "#475569", padding: "8px 0" }}>CANCEL</button>
         <button
           type="button"
-          onClick={() => onApply(draft)}
-          disabled={!draft.from || !draft.to || draft.from > draft.to}
-          style={{ border: 0, background: "transparent", color: draft.from && draft.to && draft.from <= draft.to ? "#4f46e5" : "#a8b1c2", padding: "8px 0", fontWeight: 800 }}
+          onClick={() => { if (valid) onApply(draft); }}
+          disabled={!valid}
+          style={{ border: 0, background: "transparent", color: valid ? "#4f46e5" : "#a8b1c2", padding: "8px 0", fontWeight: 800 }}
         >
           OK
         </button>
@@ -1296,7 +1305,8 @@ export function CustomDateRangePopover({
 export function customRangeLabel(range: CustomDateRange) {
   if (!range.from || !range.to) return "Custom Date Range";
   const fmt = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-  return `${fmt(range.from)} - ${fmt(range.to)}`;
+  const timed = Boolean(range.fromTime || range.toTime);
+  return `${fmt(range.from)}${timed ? ` ${range.fromTime || "00:00"}` : ""} - ${fmt(range.to)}${timed ? ` ${range.toTime || "23:59"} IST` : ""}`;
 }
 
 function SalesInvoicesListView({
@@ -1320,7 +1330,7 @@ function SalesInvoicesListView({
   onDuplicateInvoice: (inv: Invoice) => void;
   onShowEditHistory?: (inv: Invoice) => void;
   onIssueCreditNote?: (inv: Invoice) => void;
-  onOpenReportView: (reportName: string) => void;
+  onOpenReportView: (reportName: string, selection?: DateRangeSelection) => void;
   onOpenQuickSettings: () => void;
   notify: (msg: string) => void;
 }) {
@@ -1487,7 +1497,7 @@ function SalesInvoicesListView({
                   type="button"
                   onClick={() => {
                     setReportsDropdownOpen(false);
-                    onOpenReportView("sales_summary");
+                    onOpenReportView("sales_summary", { filter: dateFilter, range: customDateRange });
                   }}
                 >
                   <FileText size={14} /> Sales Summary
@@ -1497,7 +1507,7 @@ function SalesInvoicesListView({
                   type="button"
                   onClick={() => {
                     setReportsDropdownOpen(false);
-                    onOpenReportView("gstr1");
+                    onOpenReportView("gstr1", { filter: dateFilter, range: customDateRange });
                   }}
                 >
                   <FileSpreadsheet size={14} /> GSTR-1 (Sales)
@@ -1507,7 +1517,7 @@ function SalesInvoicesListView({
                   type="button"
                   onClick={() => {
                     setReportsDropdownOpen(false);
-                    onOpenReportView("daybook");
+                    onOpenReportView("daybook", { filter: dateFilter, range: customDateRange });
                   }}
                 >
                   <ClipboardList size={14} /> DayBook
@@ -1517,7 +1527,7 @@ function SalesInvoicesListView({
                   type="button"
                   onClick={() => {
                     setReportsDropdownOpen(false);
-                    onOpenReportView("bill_wise_profit");
+                    onOpenReportView("bill_wise_profit", { filter: dateFilter, range: customDateRange });
                   }}
                 >
                   <TrendingUp size={14} /> Bill Wise Profit
@@ -2041,7 +2051,7 @@ function QuickInvoiceSettingsModal({
 }
 
 type InvoiceLineDraft={product:Product;qty:number;discount:number;taxRate:number};
-function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setProducts,notify,initialCreate,onSelectInvoice,onNavigateReports}:{rows:Invoice[];products:Product[];parties:Party[];setting:InvoiceSetting;setSetting:(x:InvoiceSetting)=>void;setRows:(x:Invoice[])=>void;setParties:(x:Party[])=>void;setProducts:(x:Product[])=>void;notify:(s:string)=>void;initialCreate:boolean;onSelectInvoice:(inv:Invoice)=>void;onNavigateReports?:(reportName: string)=>void}) {
+function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setProducts,notify,initialCreate,onSelectInvoice,onNavigateReports}:{rows:Invoice[];products:Product[];parties:Party[];setting:InvoiceSetting;setSetting:(x:InvoiceSetting)=>void;setRows:(x:Invoice[])=>void;setParties:(x:Party[])=>void;setProducts:(x:Product[])=>void;notify:(s:string)=>void;initialCreate:boolean;onSelectInvoice:(inv:Invoice)=>void;onNavigateReports?:(reportName: string, selection?: DateRangeSelection)=>void}) {
   const [activeReportView, setActiveReportView] = useState<string | null>(null);
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false);
   const [query,setQuery]=useState("");
@@ -2462,9 +2472,9 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
           }
           setCreditNoteInvoice(inv);
         }}
-        onOpenReportView={(reportName: string) => {
+        onOpenReportView={(reportName: string, selection?: DateRangeSelection) => {
           if (onNavigateReports) {
-            onNavigateReports(reportName);
+            onNavigateReports(reportName, selection);
           } else {
             setActiveReportView(reportName);
           }

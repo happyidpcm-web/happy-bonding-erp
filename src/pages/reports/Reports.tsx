@@ -1,7 +1,7 @@
 import { SearchablePicker } from "../../components/SearchablePicker";
 import { DateRangeFilter } from "../../components/DateRangeFilter";
-import type { CustomDateRange } from "../../utils/invoiceDateRange";
-import { invoiceExcelDate } from "../../utils/invoiceDateRange";
+import type { CustomDateRange, DateRangeSelection } from "../../utils/invoiceDateRange";
+import { invoiceExcelDate, invoiceTime } from "../../utils/invoiceDateRange";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, BarChart3, Boxes, ChevronDown, Download, ExternalLink, FileSpreadsheet, FileText, Mail, Percent, Plus, Printer, Search, ShieldCheck, Sparkles, Star, Tag, Trash2, Upload, Users, X
@@ -576,14 +576,16 @@ export function SalesSummaryReportScreen({
   invoices,
   onBack,
   notify,
+  initialDateSelection,
 }: {
   invoices: Invoice[];
+  initialDateSelection?: DateRangeSelection;
   onBack: () => void;
   notify: (msg: string) => void;
 }) {
   const [emailModalOpen, setEmailModalOpen] = useState(false);
-  const [dateFilter, setDateFilter] = useState("Last 365 Days");
-  const [customDateRange, setCustomDateRange] = useState<CustomDateRange>({ from: "", to: "" });
+  const [dateFilter, setDateFilter] = useState(initialDateSelection?.filter || "Last 365 Days");
+  const [customDateRange, setCustomDateRange] = useState<CustomDateRange>(initialDateSelection?.range || { from: "", to: "" });
   const [partyFilter, setPartyFilter] = useState("All Parties");
   const [statusFilter, setStatusFilter] = useState("All");
 
@@ -611,6 +613,7 @@ export function SalesSummaryReportScreen({
   const exportToExcel = () => {
     const data = filteredInvoices.map(r => ({
       "DATE": invoiceExcelDate(r),
+      "TIME (IST)": invoiceTime(r),
       "INVOICE NO": r.number,
       "PARTY NAME": r.party,
       "DUE DATE": (r as any).dueDate || "-",
@@ -625,7 +628,7 @@ export function SalesSummaryReportScreen({
     for (let row = 2; row <= data.length + 1; row++) {
       if (ws[`A${row}`]?.t === "n") ws[`A${row}`].z = "dd/mm/yyyy";
     }
-    ws["!cols"] = [{ wch: 12 }];
+    ws["!cols"] = [{ wch: 12 }, { wch: 12 }];
     XLSX.utils.book_append_sheet(wb, ws, "Sales Summary");
     XLSX.writeFile(wb, `happy_bonding_sales_summary_${new Date().toISOString().slice(0, 10)}.xlsx`);
     notify("Sales Summary exported to Excel!");
@@ -735,14 +738,16 @@ export function DayBookReportScreen({
   invoices,
   onBack,
   notify,
+  initialDateSelection,
 }: {
   invoices: Invoice[];
+  initialDateSelection?: DateRangeSelection;
   onBack: () => void;
   notify: (msg: string) => void;
 }) {
   const [emailModalOpen, setEmailModalOpen] = useState(false);
-  const [dateFilter, setDateFilter] = useState("This Week");
-  const [customDateRange, setCustomDateRange] = useState<CustomDateRange>({ from: "", to: "" });
+  const [dateFilter, setDateFilter] = useState(initialDateSelection?.filter || "This Week");
+  const [customDateRange, setCustomDateRange] = useState<CustomDateRange>(initialDateSelection?.range || { from: "", to: "" });
   const filteredInvoices = useMemo(() => invoices.filter(row => isInvoiceInDateRange(row, dateFilter, customDateRange)), [invoices, dateFilter, customDateRange]);
   const netAmount = filteredInvoices.reduce((sum, r) => sum + r.amount, 0);
 
@@ -847,14 +852,16 @@ export function BillWiseProfitReportScreen({
   invoices,
   onBack,
   notify,
+  initialDateSelection,
 }: {
   invoices: Invoice[];
+  initialDateSelection?: DateRangeSelection;
   onBack: () => void;
   notify: (msg: string) => void;
 }) {
   const [emailModalOpen, setEmailModalOpen] = useState(false);
-  const [dateFilter, setDateFilter] = useState("This Week");
-  const [customDateRange, setCustomDateRange] = useState<CustomDateRange>({ from: "", to: "" });
+  const [dateFilter, setDateFilter] = useState(initialDateSelection?.filter || "This Week");
+  const [customDateRange, setCustomDateRange] = useState<CustomDateRange>(initialDateSelection?.range || { from: "", to: "" });
   const filteredInvoices = useMemo(() => invoices.filter(row => isInvoiceInDateRange(row, dateFilter, customDateRange)), [invoices, dateFilter, customDateRange]);
   const totalGrossProfit = filteredInvoices.reduce((sum, r) => sum + Math.round(r.amount * 0.25), 0);
 
@@ -962,11 +969,13 @@ export function Reports({
   invoices,
   notify,
   initialReport,
+  initialDateSelection,
 }: {
   products: Product[];
   invoices: Invoice[];
   notify: (msg: string) => void;
   initialReport?: string | null;
+  initialDateSelection?: DateRangeSelection;
 }) {
   const [activeReport, setActiveReport] = useState<string | null>(initialReport || null);
   const [activeFilterTag, setActiveFilterTag] = useState<string | null>(null);
@@ -1007,6 +1016,7 @@ export function Reports({
   ) {
     return (
       <SalesSummaryReportScreen
+        initialDateSelection={initialDateSelection}
         invoices={invoices}
         onBack={() => setActiveReport(null)}
         notify={notify}
@@ -1017,6 +1027,7 @@ export function Reports({
   if (activeReport === "Bill-wise profit") {
     return (
       <BillWiseProfitReportScreen
+        initialDateSelection={initialDateSelection}
         invoices={invoices}
         onBack={() => setActiveReport(null)}
         notify={notify}
@@ -1047,6 +1058,7 @@ export function Reports({
   ) {
     return (
       <DayBookReportScreen
+        initialDateSelection={initialDateSelection}
         invoices={invoices}
         onBack={() => setActiveReport(null)}
         notify={notify}

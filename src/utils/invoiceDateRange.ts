@@ -20,7 +20,24 @@ function parseInvoiceDate(dateStr: string): Date {
   return d;
 }
 
-export type CustomDateRange = { from: string; to: string };
+export type CustomDateRange = { from: string; to: string; fromTime?: string; toTime?: string };
+export type DateRangeSelection = { filter: string; range: CustomDateRange };
+
+// Match the billing time displayed on the invoice, not UTC midnight in dateISO.
+export function invoiceTime(invoice: { date: string }): string {
+  const match = invoice.date.match(/\b(\d{1,2}):(\d{2})\s*(am|pm)?\s*$/i);
+  if (!match) return "";
+  let hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (minute > 59 || (match[3] ? hour < 1 || hour > 12 : hour > 23)) return "";
+  if (match[3]) hour = hour % 12 + (match[3].toLowerCase() === "pm" ? 12 : 0);
+  return `${String(hour).padStart(2, "0")}:${match[2]}`;
+}
+
+export function isValidCustomDateRange(range: CustomDateRange): boolean {
+  return Boolean(range.from && range.to &&
+    `${range.from}T${range.fromTime || "00:00"}` <= `${range.to}T${range.toTime || "23:59"}`);
+}
 
 export function hasDiwaliInvoiceTheme(invoice: { date: string; dateISO?: string }): boolean {
   const date = parseInvoiceDate(invoice.dateISO || invoice.date);
@@ -118,8 +135,21 @@ export function isInvoiceInDateRange(r: { date: string; dateISO?: string }, filt
   }
   if (filter === "Custom Range") {
     if (!customRange?.from || !customRange?.to) return true;
+    if (!isValidCustomDateRange(customRange)) return false;
     const start = parseInvoiceDate(customRange.from);
     const end = parseInvoiceDate(customRange.to);
+    if (customRange.fromTime || customRange.toTime) {
+      const time = invoiceTime(r);
+      // Older invoices without a recorded time must not be assigned an invented time.
+      if (!time) return false;
+      const [hour, minute] = time.split(":").map(Number);
+      d.setHours(hour, minute, 0, 0);
+      const [startHour, startMinute] = (customRange.fromTime || "00:00").split(":").map(Number);
+      const [endHour, endMinute] = (customRange.toTime || "23:59").split(":").map(Number);
+      start.setHours(startHour, startMinute, 0, 0);
+      end.setHours(endHour, endMinute, 59, 999);
+      return d >= start && d <= end;
+    }
     end.setHours(23, 59, 59, 999);
     return d >= start && d <= end;
   }
