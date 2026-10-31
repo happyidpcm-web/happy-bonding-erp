@@ -30,7 +30,7 @@ test("desktop Share creates a real invoice PDF and opens the correct customer ch
   await page.locator(".full-invoice-top-bar").getByRole("button", { name: "Share PDF", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Share invoice PDF" });
   await expect(dialog.getByText("Invoice_TEST_26-27_42.pdf", { exact: true })).toBeVisible({ timeout: 20000 });
-  await expect(dialog).toContainText("The direct chat link cannot attach the PDF automatically");
+  await expect(dialog).toContainText("This browser cannot share PDF files directly");
   const downloadEvent = page.waitForEvent("download");
   await dialog.getByRole("button", { name: "Download PDF", exact: true }).click();
   const download = await downloadEvent;
@@ -43,7 +43,7 @@ test("desktop Share creates a real invoice PDF and opens the correct customer ch
   const link = new URL((await dialog.getByRole("link", { name: "Open Customer WhatsApp" }).getAttribute("href"))!);
   expect(link.hostname).toBe("wa.me");
   expect(link.pathname).toBe("/919876543210");
-  expect(link.searchParams.get("text")).toContain("TEST/26-27/42");
+  expect(link.searchParams.has("text")).toBe(false);
 });
 
 test("native share failure offers download without claiming the invoice was sent", async ({ page }) => {
@@ -53,7 +53,7 @@ test("native share failure offers download without claiming the invoice was sent
   });
   await page.locator(".full-invoice-top-bar").getByRole("button", { name: "Share PDF", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Share invoice PDF" });
-  await dialog.getByRole("button", { name: "Share PDF via other apps", exact: true }).click();
+  await dialog.getByRole("button", { name: "Share PDF on WhatsApp", exact: true }).click();
   await expect(dialog.getByRole("alert")).toContainText("Download the PDF and attach it in WhatsApp");
   await expect(dialog.getByRole("button", { name: "Download PDF", exact: true })).toBeEnabled();
   await expect(dialog.getByRole("link", { name: "Open Customer WhatsApp" })).toBeVisible();
@@ -70,7 +70,7 @@ test("native sharing includes a PDF file; cancellation preserves it for retry", 
   });
   await page.locator(".full-invoice-top-bar").getByRole("button", { name: "Share PDF", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Share invoice PDF" });
-  const share = dialog.getByRole("button", { name: "Share PDF via other apps", exact: true });
+  const share = dialog.getByRole("button", { name: "Share PDF on WhatsApp", exact: true });
   const customerChat = dialog.getByRole("link", { name: "Open Customer WhatsApp" });
   await expect(customerChat).toBeVisible();
   expect(new URL((await customerChat.getAttribute("href"))!).pathname).toBe("/919876543210");
@@ -81,7 +81,7 @@ test("native sharing includes a PDF file; cancellation preserves it for retry", 
   expect(data.type).toBe("application/pdf");
   expect(data.size).toBeGreaterThan(10000);
   expect(data.active).toBe(true);
-  expect(data.text).not.toContain("PDF attached");
+  expect(data.text).toBeUndefined();
   await expect(share).toBeEnabled();
   await expect(dialog.getByRole("alert")).toHaveCount(0);
 });

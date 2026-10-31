@@ -28,18 +28,17 @@ export function InvoicePdfShare({ invoice, businessName, element, onClose }: {
 
   let canShare = false;
   try { canShare = Boolean(file && !nativeUnavailable && typeof navigator.share === "function" && navigator.canShare?.({ files: [file] })); } catch { /* Use download fallback. */ }
-  const message = `${businessName}\nHello ${invoice.party || "Customer"},\nInvoice: ${invoice.number}\nDate: ${invoice.date}\nTotal: Rs. ${invoice.amount.toLocaleString("en-IN")}\nThank you for shopping with us!`;
   const digits = (invoice.partyPhone ?? "").replace(/\D/g, "").replace(/^00/, "");
   const localDigits = digits.length === 11 && digits.startsWith("0") ? digits.slice(1) : digits;
   const phone = localDigits.length === 10 ? `91${localDigits}` : /^[1-9]\d{10,14}$/.test(localDigits) ? localDigits : "";
-  const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  const whatsappUrl = `https://wa.me/${phone}`;
 
   const share = async () => {
     if (!file || sharing) return;
     setSharing(true); setError("");
     try {
       // A fresh click after generation retains the required user activation.
-      await navigator.share({ files: [file], title: `Invoice ${invoice.number}`, text: message });
+      await navigator.share({ files: [file], title: `${businessName} - Invoice ${invoice.number}` });
     } catch (failure) {
       if (!(failure instanceof DOMException && failure.name === "AbortError")) {
         setNativeUnavailable(true);
@@ -54,20 +53,19 @@ export function InvoicePdfShare({ invoice, businessName, element, onClose }: {
       <button type="button" className="icon-button" aria-label="Close PDF sharing" onClick={onClose}><X /></button>
     </div>
     <p><strong>{invoice.number}</strong><br />{invoice.party}{invoice.partyPhone ? ` · ${invoice.partyPhone}` : ""}</p>
-    {phone ? <>
-      <p>Open this customer's WhatsApp chat with the invoice details ready. Review the message and tap Send.</p>
-      <a className="whatsapp-btn" href={whatsappUrl} target="_blank" rel="noopener noreferrer"><MessageCircle size={16} />Open Customer WhatsApp</a>
-    </> : <p role="status">Add a valid customer phone number to the invoice to open their WhatsApp chat.</p>}
     {!file && !error && <p role="status">Preparing your invoice PDF…</p>}
     {error && <p role="alert">{error}</p>}
     {!file && error && <button type="button" className="secondary" onClick={() => setAttempt(value => value + 1)}>Retry PDF</button>}
     {file && <>
       <p className="pdf-share-filename">{file.name}</p>
-      <p>To include the PDF, download it and choose <strong>Attach → Document</strong> in the customer chat, select this file and send.</p>
-      <p>The direct chat link cannot attach the PDF automatically.</p>
+      {canShare ? <>
+        <p>Share the bill as a PDF file. Choose WhatsApp in the share window, then select {invoice.party || "the customer"}{invoice.partyPhone ? ` (${invoice.partyPhone})` : ""} and tap Send.</p>
+        <button type="button" className="whatsapp-btn" disabled={sharing} onClick={share}><MessageCircle size={16} />{sharing ? "Sharing…" : "Share PDF on WhatsApp"}</button>
+        <p>If WhatsApp is not listed, download the PDF and attach it in the customer chat.</p>
+      </> : <p>This browser cannot share PDF files directly. Download the bill, open the customer chat, then choose <strong>Attach → Document</strong> and select the downloaded PDF.</p>}
       <div className="pdf-share-actions">
         <button type="button" className="secondary" onClick={() => { downloadPdfFile(file); setDownloaded(true); }}><Download size={16} />Download PDF</button>
-        {canShare && <button type="button" className="secondary" disabled={sharing} onClick={share}>{sharing ? "Sharing…" : "Share PDF via other apps"}</button>}
+        {phone && <a className="secondary" href={whatsappUrl} target="_blank" rel="noopener noreferrer">Open Customer WhatsApp</a>}
       </div>
       {downloaded && <p role="status">PDF download started. Attach {file.name} in WhatsApp.</p>}
     </>}
