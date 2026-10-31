@@ -113,11 +113,16 @@ body{background:#fffdf7;color:#140d08}.sidebar{background:linear-gradient(180deg
   border-bottom: 1px solid #e2e8f0;
   padding: 10px 18px;
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 32px;
   font-size: 12px;
   font-weight: 700;
   color: #334155;
+}
+
+.invoice-total-quantity {
+  margin-right: auto;
 }
 
 .signature-display-box {

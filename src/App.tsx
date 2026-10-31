@@ -2265,6 +2265,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   const list=rows.filter(x=>`${x.party} ${x.number}`.toLowerCase().includes(query.toLowerCase()));
   const partyMatches=(partySearch.trim()?parties.filter(p=>`${p.name} ${p.phone}`.toLowerCase().includes(partySearch.toLowerCase())):parties).slice(0,8);
   const itemMatches=itemSearch?products.filter(p=>`${p.name} ${p.sku}`.toLowerCase().includes(itemSearch.toLowerCase())).slice(0,5):[];
+  const totalQuantity=lines.reduce((sum,line)=>sum+line.qty,0);
   const subtotal=lines.reduce((sum,line)=>sum+line.product.sellingPrice*line.qty,0);
   const discount=lines.reduce((sum,line)=>sum+line.discount,0);
   const discountBase=Math.max(0,Math.round((subtotal-discount)*100)/100);
@@ -2806,6 +2807,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
           </div>
 
           <div className="subtotal-strip">
+            <span className="invoice-total-quantity" role="status">TOTAL QUANTITY: {totalQuantity.toLocaleString("en-IN")}</span>
             <span>SUBTOTAL</span>
             <span>{money(subtotal)}</span>
             <span>{money(discount)}</span>
