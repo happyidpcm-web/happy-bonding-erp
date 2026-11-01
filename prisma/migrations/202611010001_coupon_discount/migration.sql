@@ -1,1 +1,0 @@
-ALTER TABLE "SalesInvoice" ADD COLUMN "couponDiscount" DECIMAL(14,2) NOT NULL DEFAULT 0;

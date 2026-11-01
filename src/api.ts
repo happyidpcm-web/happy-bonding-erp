@@ -23,7 +23,6 @@ type SalesRow = {
   party: { name: string; phone?: string | null; address?: string | null; gstin?: string | null } | null;
   subtotal?: string;
   discountTotal?: string;
-  couponDiscount?: string;
   invoiceDiscount?: string;
   additionalCharges?: string;
   taxableTotal?: string;
@@ -273,14 +272,14 @@ export const api = {
     const row = await request<SalesRow>(`/sales/${id}`);
     return saleFromApi(row);
   },
-  async createSale(input: { idempotencyKey?: string; partyId?: string; invoiceDate?: Date; markFullyPaid?: boolean; paidAmount: number; paymentMode: "Cash" | "UPI" | "Card" | "Bank"; notes?: string; couponDiscount?: number; invoiceDiscount?: number; additionalCharges?: number; lines: Array<{ variantId: string; quantity: number; unitPrice: number; discount: number; taxRate?: number }> }): Promise<Invoice> {
-      const row = await request<SalesRow>("/sales", { method: "POST", body: JSON.stringify({ idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(), partyId: input.partyId, invoiceDate: (input.invoiceDate ?? new Date()).toISOString(), placeOfSupply: "33", paidAmount: input.paidAmount, markFullyPaid: input.markFullyPaid, paymentMode: input.paymentMode, notes: input.notes, couponDiscount: input.couponDiscount ?? 0, invoiceDiscount: input.invoiceDiscount ?? 0, additionalCharges: input.additionalCharges ?? 0, lines: input.lines }) }, 60000);
+  async createSale(input: { idempotencyKey?: string; partyId?: string; invoiceDate?: Date; markFullyPaid?: boolean; paidAmount: number; paymentMode: "Cash" | "UPI" | "Card" | "Bank"; notes?: string; invoiceDiscount?: number; additionalCharges?: number; lines: Array<{ variantId: string; quantity: number; unitPrice: number; discount: number; taxRate?: number }> }): Promise<Invoice> {
+      const row = await request<SalesRow>("/sales", { method: "POST", body: JSON.stringify({ idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(), partyId: input.partyId, invoiceDate: (input.invoiceDate ?? new Date()).toISOString(), placeOfSupply: "33", paidAmount: input.paidAmount, markFullyPaid: input.markFullyPaid, paymentMode: input.paymentMode, notes: input.notes, invoiceDiscount: input.invoiceDiscount ?? 0, additionalCharges: input.additionalCharges ?? 0, lines: input.lines }) }, 60000);
       return saleFromApi(row);
 
   },
-  async updateSale(id: string | number, input: { partyId?: string; invoiceDate?: Date; markFullyPaid?: boolean; paidAmount: number; paymentMode: "Cash" | "UPI" | "Card" | "Bank"; notes?: string; couponDiscount?: number; invoiceDiscount?: number; additionalCharges?: number; lines: Array<{ variantId: string; quantity: number; unitPrice: number; discount: number; taxRate?: number }> }): Promise<Invoice> {
+  async updateSale(id: string | number, input: { partyId?: string; invoiceDate?: Date; markFullyPaid?: boolean; paidAmount: number; paymentMode: "Cash" | "UPI" | "Card" | "Bank"; notes?: string; invoiceDiscount?: number; additionalCharges?: number; lines: Array<{ variantId: string; quantity: number; unitPrice: number; discount: number; taxRate?: number }> }): Promise<Invoice> {
       // Allow time for the 30s edit transaction plus authentication and response delivery.
-      const row = await request<SalesRow>(`/sales/${id}?response=invoice`, { method: "PUT", body: JSON.stringify({ idempotencyKey: `edit-${id}-${Date.now()}`, partyId: input.partyId, invoiceDate: (input.invoiceDate ?? new Date()).toISOString(), placeOfSupply: "33", paidAmount: input.paidAmount, markFullyPaid: input.markFullyPaid, paymentMode: input.paymentMode, notes: input.notes, couponDiscount: input.couponDiscount ?? 0, invoiceDiscount: input.invoiceDiscount ?? 0, additionalCharges: input.additionalCharges ?? 0, lines: input.lines }) }, 60000);
+      const row = await request<SalesRow>(`/sales/${id}?response=invoice`, { method: "PUT", body: JSON.stringify({ idempotencyKey: `edit-${id}-${Date.now()}`, partyId: input.partyId, invoiceDate: (input.invoiceDate ?? new Date()).toISOString(), placeOfSupply: "33", paidAmount: input.paidAmount, markFullyPaid: input.markFullyPaid, paymentMode: input.paymentMode, notes: input.notes, invoiceDiscount: input.invoiceDiscount ?? 0, additionalCharges: input.additionalCharges ?? 0, lines: input.lines }) }, 60000);
       return saleFromApi(row);
 
   },
@@ -376,7 +375,6 @@ export function saleFromApi(x: SalesRow): Invoice {
     paymentMode: x.payments?.[0]?.payment?.mode ?? "",
     subtotal: Number(x.subtotal ?? 0),
     discountTotal: Number(x.discountTotal ?? 0),
-    couponDiscount: Number(x.couponDiscount ?? 0),
     invoiceDiscount: Number(x.invoiceDiscount ?? 0),
     additionalCharges: Number(x.additionalCharges ?? 0),
     taxableTotal: Number(x.taxableTotal ?? 0),
