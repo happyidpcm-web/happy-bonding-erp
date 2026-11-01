@@ -254,6 +254,7 @@ export function DashboardLive({
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   // Transaction dates are the invoice calendar date, not the time the record was created.
   const todayTransactions = salesTransactions.filter(transaction => transaction.date.slice(0, 10) === today);
+  const todayTotalAmount = todayTransactions.reduce((sum, transaction) => sum + transaction.amount, 0);
   const displayList = showToday ? todayTransactions : showAll ? salesTransactions : salesTransactions.slice(0, 3);
   const onSeeAllTransactions = () => { setShowToday(false); setShowAll(value => !value); };
 
@@ -300,6 +301,18 @@ export function DashboardLive({
             </button>
           </div>
 
+          {showToday && !loading && !error && (
+            <div role="status" style={{ display: "flex", flexWrap: "wrap", gap: 16, padding: "16px 20px", background: "#fffbeb", borderBottom: "1px solid #fde68a" }}>
+              <div style={{ flex: "1 1 180px" }}>
+                <span style={{ display: "block", fontSize: 12, color: "#64748b", marginBottom: 4 }}>Today Total Invoices</span>
+                <strong style={{ fontSize: 22 }}>{todayTransactions.length.toLocaleString("en-IN")}</strong>
+              </div>
+              <div style={{ flex: "1 1 180px" }}>
+                <span style={{ display: "block", fontSize: 12, color: "#64748b", marginBottom: 4 }}>Today Total Amount</span>
+                <strong style={{ fontSize: 22 }}>{money(todayTotalAmount)}</strong>
+              </div>
+            </div>
+          )}
           <div className="table-scroll">
             <table>
               <thead>
