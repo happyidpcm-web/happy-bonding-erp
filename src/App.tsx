@@ -1,4 +1,5 @@
 import ownerSignatureUrl from "./assets/owner-signature.png";
+import { matchesItemSearch } from "./utils/itemSearch";
 import { useDismissibleDropdown } from "./hooks/useDismissibleDropdown";
 import { isInvoiceInDateRange, isValidCustomDateRange, type CustomDateRange, type DateRangeSelection } from "./utils/invoiceDateRange";
 export { isInvoiceInDateRange, type CustomDateRange } from "./utils/invoiceDateRange";
@@ -941,7 +942,7 @@ function AddItemsToBillModal({
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
-      const matchSearch = `${p.name} ${p.sku} ${p.hsnCode || ""}`.toLowerCase().includes(search.toLowerCase());
+      const matchSearch = matchesItemSearch(search, [p.name, p.sku, p.hsnCode]);
       const matchCat = selectedCategory === "All" || p.category === selectedCategory;
       return matchSearch && matchCat;
     });
@@ -2274,7 +2275,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
 
   const list=rows.filter(x=>`${x.party} ${x.number}`.toLowerCase().includes(query.toLowerCase()));
   const partyMatches=(partySearch.trim()?parties.filter(p=>`${p.name} ${p.phone}`.toLowerCase().includes(partySearch.toLowerCase())):parties).slice(0,8);
-  const itemMatches=itemSearch?products.filter(p=>`${p.name} ${p.sku}`.toLowerCase().includes(itemSearch.toLowerCase())).slice(0,5):[];
+  const itemMatches=itemSearch.trim()?products.filter(p=>matchesItemSearch(itemSearch,[p.name,p.sku])).slice(0,5):[];
   const totalQuantity=lines.reduce((sum,line)=>sum+line.qty,0);
   const subtotal=lines.reduce((sum,line)=>sum+line.product.sellingPrice*line.qty,0);
   const discount=lines.reduce((sum,line)=>sum+line.discount,0);
@@ -2937,7 +2938,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
 
             <div className="ref-fully-paid-row">
               <label className="ref-paid-lbl">
-                Mark as fully paid <input type="checkbox" checked={markPaid} onChange={e => { setMarkPaid(e.target.checked); if (e.target.checked) setPaid(total); }} />
+                Mark as fully paid <input type="checkbox" checked={markPaid} onChange={e => { setMarkPaid(e.target.checked); setPaid(e.target.checked ? total : 0); }} />
               </label>
             </div>
 
@@ -3641,13 +3642,7 @@ export function AddItemModal({ products: initialProducts, priceMode = "sales", d
       if (selectedCategory !== "All" && p.category !== selectedCategory) return false;
       if (showOnlySelected && !(qtyMap[String(p.id)] > 0)) return false;
       if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        return (
-          p.name.toLowerCase().includes(q) ||
-          p.sku.toLowerCase().includes(q) ||
-          (p.hsnCode && p.hsnCode.toLowerCase().includes(q)) ||
-          (p.category && p.category.toLowerCase().includes(q))
-        );
+        return matchesItemSearch(searchQuery, [p.name, p.sku, p.hsnCode, p.category]);
       }
       return true;
     });
