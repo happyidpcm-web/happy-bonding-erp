@@ -205,3 +205,22 @@ test("PUT extra charges preserve historical tax and line values", async () => {
 test("PUT checks combined demand of duplicate item rows", async () => {
   await assert.rejects(runEdit(input({ lines: [{ ...line, quantity: 3 }, { ...line, quantity: 3 }] }), saved(), 5), /Insufficient stock/);
 });
+
+test("coupon edits deduct rupees without changing stock or historical tax", async () => {
+  const result = await runEdit(input({ couponDiscount: 50, markFullyPaid: true }));
+  assert.equal(result.data.grandTotal, 150);
+  assert.equal(result.data.paidAmount, 150);
+  assert.equal(result.data.couponDiscount, 50);
+  assert.equal(result.stockCalls, 0);
+  assert.equal(result.lineDeletes, 0);
+  assert.equal(result.data.taxableTotal, undefined);
+  const removed = await runEdit(input({ couponDiscount: 0 }), { ...saved(), couponDiscount: 50, grandTotal: 150 });
+  assert.equal(removed.data.grandTotal, 200);
+  assert.equal(removed.data.couponDiscount, 0);
+});
+
+test("coupon cannot make total negative and rejects negative input", async () => {
+  const result = await runEdit(input({ couponDiscount: 250, paidAmount: 0 }));
+  assert.equal(result.data.grandTotal, 0);
+  assert.throws(() => input({ couponDiscount: -1 }));
+});

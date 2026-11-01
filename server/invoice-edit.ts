@@ -3,7 +3,7 @@ import type { z } from "zod";
 import type { invoiceInput } from "./validation.js";
 
 type Input = z.infer<typeof invoiceInput>;
-type Saved = Pick<SalesInvoice, "invoiceDiscount" | "additionalCharges" | "placeOfSupply"> & { lines: SalesInvoiceLine[] };
+type Saved = Pick<SalesInvoice, "invoiceDiscount" | "additionalCharges" | "placeOfSupply"> & { couponDiscount?: unknown; lines: SalesInvoiceLine[] };
 
 // Compare a multiset, since database relation order is not guaranteed and the
 // same variant can appear on multiple lines with different prices/discounts.
@@ -29,7 +29,7 @@ export function planInvoiceEdit(saved: Saved, input: Input) {
   return {
     stockChanged,
     linesChanged,
-    totalsChanged: linesChanged || Number(saved.additionalCharges) !== input.additionalCharges,
+    totalsChanged: Number(saved.couponDiscount ?? 0) !== input.couponDiscount || linesChanged || Number(saved.additionalCharges) !== input.additionalCharges,
     newQuantities,
   };
 }
