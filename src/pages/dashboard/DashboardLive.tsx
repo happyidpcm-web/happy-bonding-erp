@@ -238,11 +238,12 @@ export function DashboardLive({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showAll, setShowAll] = useState(false);
+  const [showToday, setShowToday] = useState(false);
   const [reload, setReload] = useState(0);
   const branchId = api.currentBranchId();
   useEffect(() => {
     let active = true;
-    setTransactions([]); setLoading(true); setError(""); setShowAll(false);
+    setTransactions([]); setLoading(true); setError(""); setShowAll(false); setShowToday(false);
     const load = () => api.transactions().then(rows => { if (active) { setTransactions(rows); setError(""); } }).catch(e => { if (active) setError(e.message || "Could not load transactions"); }).finally(() => { if (active) setLoading(false); });
     void load();
     const refresh = () => { void load(); };
@@ -250,8 +251,11 @@ export function DashboardLive({
     return () => { active = false; window.removeEventListener("focus", refresh); };
   }, [branchId, reload]);
   const salesTransactions = transactions.filter(transaction => transaction.type === "Sales Invoice");
-  const displayList = showAll ? salesTransactions : salesTransactions.slice(0, 3);
-  const onSeeAllTransactions = () => setShowAll(value => !value);
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  // Transaction dates are the invoice calendar date, not the time the record was created.
+  const todayTransactions = salesTransactions.filter(transaction => transaction.date.slice(0, 10) === today);
+  const displayList = showToday ? todayTransactions : showAll ? salesTransactions : salesTransactions.slice(0, 3);
+  const onSeeAllTransactions = () => { setShowToday(false); setShowAll(value => !value); };
 
   return (
     <>
@@ -279,12 +283,16 @@ export function DashboardLive({
       </Modal>}
       <div className="dashboard-grid" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* 1. Latest Transactions Card FIRST */}
+        <div style={{ display: "flex", gap: 10 }}>
+          <button type="button" className={showToday ? "primary" : "secondary"} aria-pressed={showToday} onClick={() => { setShowToday(value => !value); setShowAll(false); }}>Today</button>
+          {showToday && <button type="button" className="text-button" onClick={() => setShowToday(false)}>Show Latest Transactions</button>}
+        </div>
         <article className="card transactions" style={{ gridColumn: "1 / -1" }}>
           <div className="card-title">
             <div>
-              <h2>{showAll ? "All Transactions" : "Latest Transactions"}</h2>
+              <h2>{showToday ? "Today's Transactions" : showAll ? "All Transactions" : "Latest Transactions"}</h2>
               <p role="status" style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0" }}>
-                {loading ? "Loading…" : `Showing ${displayList.length} of ${salesTransactions.length} sales invoice transactions`}
+                {loading ? "Loading…" : showToday ? `Showing all ${displayList.length} sales invoice transactions for today` : `Showing ${displayList.length} of ${salesTransactions.length} sales invoice transactions`}
               </p>
             </div>
             <button className="text-button" style={{ font: "700 13px Manrope", color: "#2563eb" }} onClick={onSeeAllTransactions}>
@@ -318,7 +326,7 @@ export function DashboardLive({
                 {!loading && !error && !displayList.length && (
                   <tr>
                     <td colSpan={5} style={{ textAlign: "center", padding: "20px", color: "#64748b" }}>
-                      No sales invoice transactions recorded for this branch yet.
+                      {showToday ? "No sales invoices for today in this branch." : "No sales invoice transactions recorded for this branch yet."}
                     </td>
                   </tr>
                 )}
