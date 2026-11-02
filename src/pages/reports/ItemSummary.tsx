@@ -31,7 +31,7 @@ export function ItemSummary({ onBack, notify }: { onBack: () => void; notify: (m
   const rows = (data?.rows || []).filter(r => (category === 'All Categories' || r.category === category) &&
     `${r.name} ${r.sku} ${r.size}`.toLowerCase().includes(search.toLowerCase())).sort((a, b) => Number(b[sort as 'salesQty' | 'purchaseQty' | 'salesAmount' | 'purchaseAmount']) - Number(a[sort as 'salesQty' | 'purchaseQty' | 'salesAmount' | 'purchaseAmount']) || a.name.localeCompare(b.name));
   const totals = rows.reduce((s, r) => ({ salesQty: s.salesQty + r.salesQty, purchaseQty: s.purchaseQty + r.purchaseQty, salesAmount: s.salesAmount + r.salesAmount, purchaseAmount: s.purchaseAmount + r.purchaseAmount }), { salesQty: 0, purchaseQty: 0, salesAmount: 0, purchaseAmount: 0 });
-  const excelRows = rows.map(r => ({ 'Item Name': r.name, 'Item Code': r.sku, Category: r.category, 'Sales Quantity': r.salesQty, 'Purchase Quantity': r.purchaseQty, 'Sales Amount': r.salesAmount, 'Purchase Amount': r.purchaseAmount }));
+  const excelRows = rows.map(r => ({ 'Item Name': r.name, 'Item Code': r.sku, Category: r.category, 'Sales Quantity': r.salesQty, 'Purchase Quantity': r.purchaseQty, 'Current Stock': r.currentStock, 'Sales Amount': r.salesAmount, 'Purchase Amount': r.purchaseAmount }));
   const exportExcel = () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(excelRows), 'Item Sales Purchase');
@@ -56,17 +56,17 @@ export function ItemSummary({ onBack, notify }: { onBack: () => void; notify: (m
       <button className="secondary" disabled={loading} onClick={() => setRetry(n => n + 1)}>Refresh</button>
     </div>
     {data && <div className="item-report-period"><div><span className="item-report-caption">Report period</span><strong>{new Date(data.from + 'T00:00:00Z').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}{data.from !== data.to && <> ? {new Date(data.to + 'T00:00:00Z').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}</>}</strong></div><span className="item-report-count">{rows.length} items</span></div>}
-    <p style={{ fontSize: 12, color: 'var(--muted)' }}>All sizes combined per item. Sales and purchase values before returns; amounts are invoice values, not payments collected.</p>
+    <p style={{ fontSize: 12, color: 'var(--muted)' }}>Purchases and sales follow the selected period. Current stock is the live balance including opening stock and adjustments. Returns are excluded from purchase/sales totals. Older stock receipts use their recorded receipt date.</p>
     {loading ? <p role="status">Loading sales and purchases…</p> : error ? <div role="alert">{error} <button onClick={() => setRetry(n => n + 1)}>Retry</button></div> : <>
       <div className="item-report-totals">
         <div><span>Sales quantity</span><strong>{qty(totals.salesQty)}</strong></div><div><span>Purchase quantity</span><strong>{qty(totals.purchaseQty)}</strong></div>
         <div><span>Sales amount</span><strong>{money(totals.salesAmount)}</strong></div><div><span>Purchase amount</span><strong>{money(totals.purchaseAmount)}</strong></div>
       </div>
       <article className="card table-card"><div className="table-scroll"><table>
-        <thead><tr><th>Item Name</th><th>Item Code</th><th>Category</th><th className="right">Sales Quantity</th><th className="right">Purchase Quantity</th><th className="right">Sales Amount</th><th className="right">Purchase Amount</th></tr></thead>
-        <tbody>{rows.map(r => <tr key={r.id}><td>{r.name}</td><td>{r.sku || '—'}</td><td>{r.category}</td><td className="right">{r.salesQty}</td><td className="right">{r.purchaseQty}</td><td className="right">{money(r.salesAmount)}</td><td className="right">{money(r.purchaseAmount)}</td></tr>)}
-          {!rows.length && <tr><td colSpan={7}>No sales or purchases match this date range and filters.</td></tr>}</tbody>
-        <tfoot><tr><th colSpan={3}>Total</th><th className="right">{qty(totals.salesQty)}</th><th className="right">{qty(totals.purchaseQty)}</th><th className="right">{money(totals.salesAmount)}</th><th className="right">{money(totals.purchaseAmount)}</th></tr></tfoot>
+        <thead><tr><th>Item Name</th><th>Item Code</th><th>Category</th><th className="right">Sales Quantity</th><th className="right">Purchase Quantity</th><th className="right">Current Stock</th><th className="right">Sales Amount</th><th className="right">Purchase Amount</th></tr></thead>
+        <tbody>{rows.map(r => <tr key={r.id}><td>{r.name}</td><td>{r.sku || '—'}</td><td>{r.category}</td><td className="right">{r.salesQty}</td><td className="right">{r.purchaseQty}</td><td className="right">{r.currentStock ?? 0}</td><td className="right">{money(r.salesAmount)}</td><td className="right">{money(r.purchaseAmount)}</td></tr>)}
+          {!rows.length && <tr><td colSpan={8}>No sales or purchases match this date range and filters.</td></tr>}</tbody>
+        <tfoot><tr><th colSpan={3}>Total</th><th className="right">{qty(totals.salesQty)}</th><th className="right">{qty(totals.purchaseQty)}</th><th className="right">{qty(rows.reduce((sum, r) => sum + (r.currentStock ?? 0), 0))}</th><th className="right">{money(totals.salesAmount)}</th><th className="right">{money(totals.purchaseAmount)}</th></tr></tfoot>
       </table></div></article>
     </>}
     {emailOpen && <EmailExcelReportModal reportName={`Item Summary ${data?.from} to ${data?.to}`} reportRows={excelRows} onClose={() => setEmailOpen(false)} notify={notify} />}

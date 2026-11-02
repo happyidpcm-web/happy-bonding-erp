@@ -13,15 +13,19 @@ test('report API enforces permissions and branch scope, filters posted invoices,
   const calls: Array<{ model: string; args: any }> = [];
   replaceMethod(db.productVariant, 'findMany', async (args: unknown) => {
     calls.push({ model: 'variants', args });
-    return [{ id: 'v1', productId: 'product1', sku: 'SHIRT', size: 'M', product: { name: 'Shirt', category: 'Shirts' } }, { id: 'v2', productId: 'product1', sku: 'SHIRT-L', size: 'L', product: { name: 'Shirt', category: 'Shirts' } }];
+    return [{ id: 'v1', productId: 'product1', balances: [{ quantity: '8' }], sku: 'SHIRT', size: 'M', product: { name: 'Shirt', category: 'Shirts' } }, { id: 'v2', productId: 'product1', balances: [{ quantity: '4' }], sku: 'SHIRT-L', size: 'L', product: { name: 'Shirt', category: 'Shirts' } }];
   });
   replaceMethod(db.salesInvoice, 'findMany', async (args: unknown) => {
     calls.push({ model: 'sales', args });
     return [{ invoiceDate: new Date('2026-11-02T00:00:00Z'), createdAt: new Date('2026-11-02T05:00:00Z'), lines: [{ variantId: 'v1', itemName: 'Shirt', sku: 'SHIRT', quantity: '3', total: '900' }] }];
   });
+  replaceMethod(db.stockMovement, 'findMany', async () => [
+    { referenceId: 'legacy-1', variantId: 'v1', quantity: '2', unitCost: '100', occurredAt: new Date('2026-11-02T05:00:00Z'), variant: { product: { name: 'Shirt' } } },
+    { referenceId: 'bill-1', variantId: 'v1', quantity: '10', unitCost: '150', occurredAt: new Date('2026-11-02T05:00:00Z'), variant: { product: { name: 'Shirt' } } },
+  ]);
   replaceMethod(db.voucher, 'findMany', async (args: unknown) => {
     calls.push({ model: 'purchases', args });
-    return [{ date: new Date('2026-11-02T00:00:00Z'), createdAt: new Date('2026-11-02T05:00:00Z'), items: [{ variantId: 'v1', name: 'Shirt', qty: 10, amount: 1500 }, { variantId: 'v2', name: 'Shirt', qty: 5, amount: 750 }] }];
+    return [{ number: 'bill-1', date: new Date('2026-11-02T00:00:00Z'), createdAt: new Date('2026-11-02T05:00:00Z'), items: [{ variantId: 'v1', name: 'Shirt', qty: 10, amount: 1500 }, { variantId: 'v2', name: 'Shirt', qty: 5, amount: 750 }] }];
   });
   replaceMethod(db, '$transaction', async (queries: Promise<unknown>[]) => Promise.all(queries));
   const app = express();
@@ -45,9 +49,10 @@ test('report API enforces permissions and branch scope, filters posted invoices,
   const response = await fetch(`${url}?filter=Custom+Range&from=2026-11-02&to=2026-11-02`);
   assert.equal(response.status, 200);
   const body = await response.json();
-  assert.equal(body.rows[0].salesQty, 3); assert.equal(body.rows[0].purchaseQty, 15);
-  assert.equal(body.rows[0].salesAmount, 900); assert.equal(body.rows[0].purchaseAmount, 2250);
+  assert.equal(body.rows[0].salesQty, 3); assert.equal(body.rows[0].purchaseQty, 17);
+  assert.equal(body.rows[0].salesAmount, 900); assert.equal(body.rows[0].purchaseAmount, 2450);
   assert.equal(body.rows.length, 1);
+  assert.equal(body.rows[0].currentStock, 12);
   assert.equal(body.rows[0].id, 'product1');
   assert.equal(body.rows[0].sku, 'SHIRT, SHIRT-L');
   const sales = calls.find(c => c.model === 'sales')!.args;

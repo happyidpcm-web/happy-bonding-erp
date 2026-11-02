@@ -796,6 +796,7 @@ app.post("/api/purchases/stock-receipt", requirePermission("products.write"), as
           unitCost: line.unitCost,
           referenceType: "PurchaseInvoice",
           referenceId: input.purchaseNumber,
+          occurredAt: input.purchaseDate,
         },
       });
       await audit(req, "purchase.stock_added", "ProductVariant", variant.id, {
