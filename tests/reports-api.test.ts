@@ -13,7 +13,7 @@ test('report API enforces permissions and branch scope, filters posted invoices,
   const calls: Array<{ model: string; args: any }> = [];
   replaceMethod(db.productVariant, 'findMany', async (args: unknown) => {
     calls.push({ model: 'variants', args });
-    return [{ id: 'v1', sku: 'SHIRT', size: 'M', product: { name: 'Shirt', category: 'Shirts' } }];
+    return [{ id: 'v1', productId: 'product1', sku: 'SHIRT', size: 'M', product: { name: 'Shirt', category: 'Shirts' } }, { id: 'v2', productId: 'product1', sku: 'SHIRT-L', size: 'L', product: { name: 'Shirt', category: 'Shirts' } }];
   });
   replaceMethod(db.salesInvoice, 'findMany', async (args: unknown) => {
     calls.push({ model: 'sales', args });
@@ -21,7 +21,7 @@ test('report API enforces permissions and branch scope, filters posted invoices,
   });
   replaceMethod(db.voucher, 'findMany', async (args: unknown) => {
     calls.push({ model: 'purchases', args });
-    return [{ date: new Date('2026-11-02T00:00:00Z'), createdAt: new Date('2026-11-02T05:00:00Z'), items: [{ variantId: 'v1', name: 'Shirt', qty: 10, amount: 1500 }] }];
+    return [{ date: new Date('2026-11-02T00:00:00Z'), createdAt: new Date('2026-11-02T05:00:00Z'), items: [{ variantId: 'v1', name: 'Shirt', qty: 10, amount: 1500 }, { variantId: 'v2', name: 'Shirt', qty: 5, amount: 750 }] }];
   });
   replaceMethod(db, '$transaction', async (queries: Promise<unknown>[]) => Promise.all(queries));
   const app = express();
@@ -45,8 +45,11 @@ test('report API enforces permissions and branch scope, filters posted invoices,
   const response = await fetch(`${url}?filter=Custom+Range&from=2026-11-02&to=2026-11-02`);
   assert.equal(response.status, 200);
   const body = await response.json();
-  assert.equal(body.rows[0].salesQty, 3); assert.equal(body.rows[0].purchaseQty, 10);
-  assert.equal(body.rows[0].salesAmount, 900); assert.equal(body.rows[0].purchaseAmount, 1500);
+  assert.equal(body.rows[0].salesQty, 3); assert.equal(body.rows[0].purchaseQty, 15);
+  assert.equal(body.rows[0].salesAmount, 900); assert.equal(body.rows[0].purchaseAmount, 2250);
+  assert.equal(body.rows.length, 1);
+  assert.equal(body.rows[0].id, 'product1');
+  assert.equal(body.rows[0].sku, 'SHIRT, SHIRT-L');
   const sales = calls.find(c => c.model === 'sales')!.args;
   assert.equal(sales.where.status, 'POSTED'); assert.equal(sales.where.organizationId, 'org1'); assert.equal(sales.where.branchId, 'b1');
   assert.equal(sales.where.invoiceDate.gte.toISOString(), '2026-11-02T00:00:00.000Z');
