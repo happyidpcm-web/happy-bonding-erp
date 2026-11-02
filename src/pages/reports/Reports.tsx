@@ -228,30 +228,31 @@ export function StockSummaryReportScreen({
 }) {
   const [stockDetail, setStockDetail] = useState<"value" | "quantity" | null>(null);
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
-  const [dateFilter, setDateFilter] = useState("Today");
-  const [customDateRange, setCustomDateRange] = useState<CustomDateRange>({ from: "", to: "" });
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState('name');
   const [emailModalOpen, setEmailModalOpen] = useState(false);
 
   const categories = useMemo(() => Array.from(new Set(products.map(p => p.category || "General"))), [products]);
 
   const filteredProducts = useMemo(() => {
-    return products.filter(p => categoryFilter === "All Categories" || p.category === categoryFilter);
-  }, [products, categoryFilter]);
+    return products.filter(p => (categoryFilter === "All Categories" || (p.category || 'General') === categoryFilter) && [p.name, p.sku, p.size].join(' ').toLowerCase().includes(search.trim().toLowerCase())).sort((a,b) => (sort === 'low' ? a.stock-b.stock : sort === 'high' ? b.stock-a.stock : 0) || a.name.localeCompare(b.name));
+  }, [products, categoryFilter, search, sort]);
 
   const totalStockVal = useMemo(() => filteredProducts.reduce((sum, p) => sum + (p.sellingPrice * p.stock), 0), [filteredProducts]);
   const totalStockQty = useMemo(() => filteredProducts.reduce((sum, p) => sum + p.stock, 0), [filteredProducts]);
 
-  const exportToExcel = () => {
-    const data = filteredProducts.map(p => ({
+  const exportRows = filteredProducts.map(p => ({
       "Item Name": p.name,
-      "Batch Number": "-",
+      "Size": p.size,
       "Item Code": p.sku,
       "Purchase Price": p.purchasePrice,
       "Selling Price": p.sellingPrice,
-      "Stock Quantity": `${p.stock} ${p.size || "PCS"}`,
-      "Stock Value": p.sellingPrice * p.stock,
+      "Available Stock (Pieces)": p.stock,
+      "Stock Value (Selling Price)": p.sellingPrice * p.stock,
+      "Stock Value (Purchase Price)": p.purchasePrice * p.stock,
     }));
-    const ws = XLSX.utils.json_to_sheet(data);
+  const exportToExcel = () => {
+    const ws = XLSX.utils.json_to_sheet(exportRows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Stock Summary");
     XLSX.writeFile(wb, `happy_bonding_stock_summary_${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -259,8 +260,8 @@ export function StockSummaryReportScreen({
   };
 
   return (
-    <div className="report-screen-wrap printable-report">
-      {stockDetail && <Modal title={stockDetail === "value" ? "Stock Value Breakdown" : "Stock Quantity Breakdown"} onClose={() => setStockDetail(null)}>
+    <div className="report-screen-wrap printable-report low-stock-report">
+      {stockDetail && <Modal title={stockDetail === "value" ? "Stock Value at Selling Price" : "Stock Quantity Breakdown"} onClose={() => setStockDetail(null)}>
         <div className="table-scroll"><table><thead><tr><th>Item</th><th>{stockDetail === "value" ? "Value" : "Quantity"}</th></tr></thead><tbody>
           {filteredProducts.map(p => <tr key={p.id}><td>{p.name}</td><td>{stockDetail === "value" ? money(p.sellingPrice * p.stock) : p.stock}</td></tr>)}
           {!filteredProducts.length && <tr><td colSpan={2}>No items in this category.</td></tr>}
@@ -292,26 +293,28 @@ export function StockSummaryReportScreen({
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
         <button type="button" className="party-metric-box summary-action" onClick={() => setStockDetail("value")}>
-          <span>Total Stock Value</span>
+          <span>Stock Value (Selling Price)</span>
           <strong style={{ color: totalStockVal < 0 ? "#dc2626" : "#0f172a" }}>
             ₹ {totalStockVal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
           </strong>
         </button>
         <button type="button" className="party-metric-box summary-action" onClick={() => setStockDetail("quantity")}>
-          <span>Total Stock Quantity</span>
+          <span>Available Stock (Pieces)</span>
           <strong>{totalStockQty}</strong>
         </button>
       </div>
 
-      <div style={{ background: "#fffbe6", border: "1px solid #ffe58f", padding: "8px 16px", borderRadius: 8, marginBottom: 16, fontSize: 12, color: "#d48806" }}>
-        <span>This report has more than 500 records. To view the full report, please select the "Email Excel" option and we will send you the full stock summary report over email.</span>
+      <div className="low-stock-summary-cards">
+        <div><span>Total items / sizes</span><strong>{filteredProducts.length.toLocaleString('en-IN')}</strong></div>
+        <div><span>Stock value (current purchase price)</span><strong>{money(filteredProducts.reduce((sum,p) => sum + p.stock*p.purchasePrice, 0))}</strong></div>
       </div>
 
-      <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+      <div className="low-stock-filters">
         <SearchablePicker value={categoryFilter} onChange={setCategoryFilter} placeholder="Search Categories" emptyValue="All Categories" emptyLabel="All Categories" options={categories.map(c => ({ value: c, label: c }))} />
 
-        <DateRangeFilter value={dateFilter} range={customDateRange} onChange={setDateFilter} onRangeChange={setCustomDateRange} />
-        <small style={{ color: "#64748b" }}>Current stock snapshot; historical stock by date is unavailable.</small>
+        <label>Search<input aria-label="Search stock summary" placeholder="Item / code / size" value={search} onChange={e => setSearch(e.target.value)} /></label>
+        <label>Sort by<select value={sort} onChange={e => setSort(e.target.value)}><option value="name">Item name: A to Z</option><option value="low">Stock: Lowest first</option><option value="high">Stock: Highest first</option></select></label>
+        <small style={{ color: "#64748b" }}>Current stock in this branch. Values use the current saved prices; purchase value is not historical accounting cost.</small>
       </div>
 
       <article className="card table-card">
@@ -320,26 +323,27 @@ export function StockSummaryReportScreen({
             <thead>
               <tr>
                 <th>Item Name</th>
-                <th>Batch Number</th>
+                <th>Size</th>
                 <th>Item Code</th>
                 <th className="right">Purchase Price</th>
                 <th className="right">Selling Price</th>
-                <th className="right">Stock Quantity</th>
-                <th className="right">Stock Value</th>
+                <th className="right">Available Stock (Pieces)</th>
+                <th className="right">Stock Value (Selling Price)</th>
               </tr>
             </thead>
             <tbody>
               {filteredProducts.map(p => (
                 <tr key={p.id}>
                   <td><strong>{p.name}</strong></td>
-                  <td>-</td>
-                  <td className="mono">{p.sku}</td>
-                  <td className="right">₹ {p.purchasePrice}</td>
-                  <td className="right">₹ {p.sellingPrice}</td>
+                  <td>{p.size || "-"}</td>
+                  <td>{p.sku}</td>
+                  <td className="right">{money(p.purchasePrice)}</td>
+                  <td className="right">{money(p.sellingPrice)}</td>
                   <td className="right">{p.stock} PCS</td>
-                  <td className="right">₹ {p.sellingPrice * p.stock}</td>
+                  <td className="right">{money(p.sellingPrice * p.stock)}</td>
                 </tr>
               ))}
+              {!filteredProducts.length && <tr><td colSpan={7}>No items match these filters.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -348,6 +352,7 @@ export function StockSummaryReportScreen({
       {emailModalOpen && (
         <EmailExcelReportModal
           reportName="Stock Summary"
+          reportRows={exportRows}
           onClose={() => setEmailModalOpen(false)}
           notify={notify}
         />
