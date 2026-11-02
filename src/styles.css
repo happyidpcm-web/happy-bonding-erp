@@ -5516,3 +5516,5 @@ input:checked + .slider:before {
 .modal:has(.party-sales-history) { width: min(1100px, 95vw); max-height: 90vh; overflow: auto; }
 .party-sales-history { font-family: 'Manrope', sans-serif; }
 .party-sales-history td { white-space: nowrap; }
+.party-history-row { cursor: pointer; }
+.party-history-row:hover { background: #fff8e6; }

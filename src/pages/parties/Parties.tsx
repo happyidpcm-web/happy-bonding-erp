@@ -1025,7 +1025,7 @@ export function Parties({
             </thead>
             <tbody>
               {visibleList.map(p => (
-                <tr key={p.id}>
+                <tr key={p.id} className="party-history-row" onClick={() => setHistoryParty(p)}>
                   <td><button type="button" className="party-history-link" onClick={() => setHistoryParty(p)} title="View sales invoices">{p.name}</button></td>
                   <td>{p.category || "-"}</td>
                   <td>{p.phone || "-"}</td>
@@ -1033,7 +1033,8 @@ export function Parties({
                   <td className={`right ${p.balance < 0 ? "negative" : "positive"}`}>
                     {p.balance < 0 ? "↑ " : "↓ "}₹ {Math.abs(p.balance).toLocaleString("en-IN")}
                   </td>
-                  <td className="right" style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
+                  <td className="right" onClick={e => e.stopPropagation()} style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
+                    <button type="button" className="secondary" onClick={() => setHistoryParty(p)}>View Invoices</button>
                     {p.phone && (
                       <button
                         type="button"
