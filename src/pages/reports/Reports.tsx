@@ -137,14 +137,14 @@ export function RateListReportScreen({
 }) {
   const [emailModalOpen, setEmailModalOpen] = useState(false);
 
-  const exportToExcel = () => {
-    const data = products.map(p => ({
+  const exportRows = products.map(p => ({
       "NAME": p.name,
       "ITEM CODE": p.sku,
-      "MRP": p.mrp || p.sellingPrice,
+      "MRP": p.mrp > 0 ? p.mrp : "Not set",
       "SELLING PRICE": p.sellingPrice,
     }));
-    const ws = XLSX.utils.json_to_sheet(data);
+  const exportToExcel = () => {
+    const ws = XLSX.utils.json_to_sheet(exportRows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Rate List");
     XLSX.writeFile(wb, `happy_bonding_rate_list_${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -165,10 +165,10 @@ export function RateListReportScreen({
         </div>
 
         <div className="header-actions" style={{ display: "flex", gap: 10 }}>
-          <button type="button" className="secondary" onClick={() => setEmailModalOpen(true)}>
+          <button type="button" className="secondary" disabled={!products.length} onClick={() => setEmailModalOpen(true)}>
             <Mail size={15} /> Email Excel
           </button>
-          <button type="button" className="secondary" onClick={exportToExcel}>
+          <button type="button" className="secondary" disabled={!products.length} onClick={exportToExcel}>
             <Download size={15} /> Download Excel ▾
           </button>
           <button type="button" className="secondary" onClick={() => window.print()}>
@@ -177,9 +177,7 @@ export function RateListReportScreen({
         </div>
       </div>
 
-      <div className="rate-list-warning-banner" style={{ background: "#fffbe6", border: "1px solid #ffe58f", padding: "10px 16px", borderRadius: 8, marginBottom: 16, fontSize: 12, color: "#d48806" }}>
-        <span>This report has more than 500 records. To view the full report, please select the "Email Excel" option and we will send you the full rate list report over email.</span>
-      </div>
+      <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16 }}>Total items: <strong>{products.length.toLocaleString("en-IN")}</strong>. Download and email include all items shown.</p>
 
       <article className="card table-card">
         <div className="table-scroll">
@@ -197,10 +195,11 @@ export function RateListReportScreen({
                 <tr key={p.id}>
                   <td><strong>{p.name}</strong></td>
                   <td className="mono">{p.sku}</td>
-                  <td className="right">₹{p.mrp || p.sellingPrice}</td>
+                  <td className="right">{p.mrp > 0 ? money(p.mrp) : "Not set"}</td>
                   <td className="right"><strong>₹{p.sellingPrice}</strong></td>
                 </tr>
               ))}
+              {!products.length && <tr><td colSpan={4}>No items in this branch.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -209,6 +208,7 @@ export function RateListReportScreen({
       {emailModalOpen && (
         <EmailExcelReportModal
           reportName="Rate List"
+          reportRows={exportRows}
           onClose={() => setEmailModalOpen(false)}
           notify={notify}
         />
