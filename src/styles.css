@@ -5518,3 +5518,5 @@ input:checked + .slider:before {
 .party-sales-history td { white-space: nowrap; }
 .party-history-row { cursor: pointer; }
 .party-history-row:hover { background: #fff8e6; }
+.party-invoice-row { cursor: pointer; }
+.party-sales-history .party-invoice-row:hover { background: #fff5dc; }

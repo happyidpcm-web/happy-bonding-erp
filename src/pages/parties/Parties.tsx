@@ -1141,9 +1141,9 @@ function PartySalesHistory({ party, onClose, onSelectInvoice, hidden }: { party:
     <div className="party-sales-history">
       <p>All dates / Current branch / {invoices.length} invoices</p>
       {loading ? <p role="status">Loading invoices...</p> : error ? <p role="alert">{error} <button onClick={() => setRetry(n => n + 1)}>Retry</button></p> : <>
-        <div className="table-scroll"><table><thead><tr><th>Invoice</th><th>Date</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th></tr></thead><tbody>
-          {invoices.map(i => <tr key={i.id}><td><button className="party-history-link" onClick={() => onSelectInvoice(i)}>{i.number}</button></td><td>{i.date}</td><td>{money(i.amount)}</td><td>{money(i.paidAmount ?? 0)}</td><td>{money(Math.max(0, i.amount - (i.paidAmount ?? 0)))}</td><td>{i.status}</td></tr>)}
-          {!invoices.length && <tr><td colSpan={6}>No sales invoices linked to this party in this branch.</td></tr>}
+        <div className="table-scroll"><table><thead><tr><th>Invoice</th><th>Date</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th>Action</th></tr></thead><tbody>
+          {invoices.map(i => <tr key={i.id} className="party-invoice-row" onClick={() => onSelectInvoice(i)}><td><button type="button" className="party-history-link" onClick={e => { e.stopPropagation(); onSelectInvoice(i); }}>{i.number}</button></td><td>{i.date}</td><td>{money(i.amount)}</td><td>{money(i.paidAmount ?? 0)}</td><td>{money(Math.max(0, i.amount - (i.paidAmount ?? 0)))}</td><td>{i.status}</td><td><button type="button" className="secondary" onClick={e => { e.stopPropagation(); onSelectInvoice(i); }}>View Invoice</button></td></tr>)}
+          {!invoices.length && <tr><td colSpan={7}>No sales invoices linked to this party in this branch.</td></tr>}
         </tbody></table></div>
       </>}
     </div>
