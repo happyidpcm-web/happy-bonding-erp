@@ -5488,3 +5488,17 @@ input:checked + .slider:before {
 .expense-summary span { display: block; font-family: 'Manrope', sans-serif; font-size: 13px; line-height: 1.5; color: #000; font-weight: 500; }
 .expense-summary strong { display: block; margin-top: 4px; font-family: 'Manrope', sans-serif; font-size: 20px; color: #000; }
 .expense-summary[aria-pressed="true"] strong { color: #000; }
+
+/* Low Stock Summary: use the same typography for labels, codes and quantities. */
+.low-stock-report { font-family: 'Manrope', sans-serif; font-size: 13px; }
+.low-stock-report table, .low-stock-report button { font-family: inherit; }
+.low-stock-report td { font-size: 12px; }
+.low-stock-report .right { font-variant-numeric: tabular-nums; }
+.low-stock-summary-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
+.low-stock-summary-cards > div { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+.low-stock-summary-cards span, .low-stock-summary-cards small { display: block; color: var(--muted); font-size: 12px; }
+.low-stock-summary-cards strong { display: block; margin: 8px 0; font-size: 24px; font-weight: 800; overflow-wrap: anywhere; }
+.low-stock-summary-cards small { font-size: 11px; }
+.low-stock-explanation { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 0 0 18px; }
+@media (max-width: 700px) { .low-stock-summary-cards { grid-template-columns: 1fr; gap: 10px; } }
+@media print { .low-stock-summary-cards { break-inside: avoid; } }

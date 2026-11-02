@@ -369,15 +369,15 @@ export function LowStockSummaryReportScreen({
   const lowStockItems = useMemo(() => products.filter(p => p.stock < 10), [products]);
   const totalLowStockValue = useMemo(() => lowStockItems.reduce((sum, p) => sum + (p.sellingPrice * p.stock), 0), [lowStockItems]);
 
-  const exportToExcel = () => {
-    const data = lowStockItems.map(p => ({
+  const exportRows = lowStockItems.map(p => ({
       "ITEM NAME": p.name,
       "ITEM CODE": p.sku,
-      "STOCK QUANTITY": `${p.stock} ${p.size || "NOS"}`,
-      "LOW STOCK LEVEL": "10",
-      "STOCK VALUE": p.sellingPrice * p.stock,
+      "AVAILABLE STOCK (PIECES)": p.stock,
+      "LOW STOCK THRESHOLD (PIECES)": 10,
+      "STOCK VALUE (SELLING PRICE)": p.sellingPrice * p.stock,
     }));
-    const ws = XLSX.utils.json_to_sheet(data);
+  const exportToExcel = () => {
+    const ws = XLSX.utils.json_to_sheet(exportRows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Low Stock Summary");
     XLSX.writeFile(wb, `happy_bonding_low_stock_${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -385,7 +385,7 @@ export function LowStockSummaryReportScreen({
   };
 
   return (
-    <div className="report-screen-wrap printable-report">
+    <div className="report-screen-wrap printable-report low-stock-report">
       <div className="page-heading">
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <button type="button" className="icon-button" onClick={onBack} title="Back to Items">
@@ -410,9 +410,12 @@ export function LowStockSummaryReportScreen({
         </div>
       </div>
 
-      <div style={{ padding: "12px 16px", background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8, marginBottom: 16, fontSize: 13, fontWeight: 700, color: "#dc2626" }}>
-        Total Stock Value: ₹ {totalLowStockValue.toLocaleString("en-IN")}
+      <div className="low-stock-summary-cards">
+        <div><span>Total low-stock items</span><strong>{lowStockItems.length.toLocaleString('en-IN')}</strong><small>Each item / size counts separately</small></div>
+        <div><span>Total available pieces</span><strong>{lowStockItems.reduce((sum, p) => sum + p.stock, 0).toLocaleString('en-IN', { maximumFractionDigits: 3 })}</strong></div>
+        <div><span>Stock value (selling price)</span><strong>{money(totalLowStockValue)}</strong></div>
       </div>
+      <p className="low-stock-explanation">Available stock is the quantity currently in store. Items below 10 pieces are listed here, including zero stock.</p>
 
       <article className="card table-card">
         <div className="table-scroll">
@@ -421,21 +424,22 @@ export function LowStockSummaryReportScreen({
               <tr>
                 <th>ITEM NAME</th>
                 <th>ITEM CODE</th>
-                <th className="right">STOCK QUANTITY</th>
-                <th className="right">LOW STOCK LEVEL</th>
-                <th className="right">STOCK VALUE</th>
+                <th className="right">AVAILABLE STOCK (PIECES)</th>
+                <th className="right">LOW STOCK THRESHOLD</th>
+                <th className="right">STOCK VALUE (SELLING PRICE)</th>
               </tr>
             </thead>
             <tbody>
               {lowStockItems.map(p => (
                 <tr key={p.id}>
                   <td><strong>{p.name}</strong></td>
-                  <td className="mono">{p.sku}</td>
-                  <td className="right">{p.stock}.0 {p.size || "NOS"}</td>
+                  <td>{p.sku}</td>
+                  <td className="right">{p.stock.toLocaleString('en-IN', { maximumFractionDigits: 3 })}</td>
                   <td className="right">10</td>
-                  <td className="right">₹ {p.sellingPrice * p.stock}</td>
+                  <td className="right">{money(p.sellingPrice * p.stock)}</td>
                 </tr>
               ))}
+              {!lowStockItems.length && <tr><td colSpan={5}>No low-stock items in this branch.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -444,6 +448,7 @@ export function LowStockSummaryReportScreen({
       {emailModalOpen && (
         <EmailExcelReportModal
           reportName="Low Stock Summary"
+          reportRows={exportRows}
           onClose={() => setEmailModalOpen(false)}
           notify={notify}
         />
