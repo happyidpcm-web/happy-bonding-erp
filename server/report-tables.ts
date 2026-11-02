@@ -136,6 +136,7 @@ reportTablesRouter.get('/:kind', async (req, res) => {
       else if (kind === 'item-party' || kind === 'party-item') {
         const keys = kind === 'item-party' ? ['Item', 'Item Code', 'Size', 'Party'] : ['Party', 'Item', 'Item Code', 'Size'];
         rows = group(rows, keys, sums); columns = [...keys, ...sums];
+        if (kind === 'item-party') rows.sort((a, b) => num(b.Quantity) - num(a.Quantity) || String(a.Item).localeCompare(String(b.Item)));
       } else columns = ['Date', 'Invoice', 'Party', 'Item', 'HSN', 'Tax Rate', ...sums];
       note = 'Posted sales line totals before returns; bill-level adjustments are excluded. Tax breakdown is not a GST filing.';
     }
