@@ -259,7 +259,6 @@ model SalesInvoice {
   placeOfSupply  String
   subtotal       Decimal             @db.Decimal(14, 2)
   discountTotal  Decimal             @default(0) @db.Decimal(14, 2)
-  couponDiscount Decimal @default(0) @db.Decimal(14, 2)
   invoiceDiscount Decimal            @default(0) @db.Decimal(14, 2)
   additionalCharges Decimal          @default(0) @db.Decimal(14, 2)
   taxableTotal   Decimal             @db.Decimal(14, 2)

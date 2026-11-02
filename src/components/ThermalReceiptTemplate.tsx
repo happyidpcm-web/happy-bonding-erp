@@ -84,7 +84,6 @@ export function ThermalReceiptTemplate({
 
       {/* Totals */}
       <div style={{ fontSize: is58 ? "11px" : "12px" }}>
-        {(invoice.couponDiscount ?? 0) > 0 && <div style={{ display: "flex", justifyContent: "space-between" }}><span>Coupon Discount:</span><span>- ?{Number(invoice.couponDiscount).toFixed(2)}</span></div>}
         {(invoice.discountTotal ?? 0) > 0 && <div style={{ display: "flex", justifyContent: "space-between" }}><span>Discount:</span><span>- ₹{Number(invoice.discountTotal).toFixed(2)}</span></div>}
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <span>Subtotal:</span>

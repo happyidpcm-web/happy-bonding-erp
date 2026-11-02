@@ -2110,7 +2110,6 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   const [paymentMode,setPaymentMode]=useState<"Cash"|"UPI"|"Card"|"Bank">("Cash");
   const [notes,setNotes]=useState("");
   const [terms,setTerms]=useState(setting.terms);
-  const [couponDiscount,setCouponDiscount]=useState(0);
   const [invoiceDiscount,setInvoiceDiscount]=useState(0);
   const [additionalCharges,setAdditionalCharges]=useState(0);
 
@@ -2290,9 +2289,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
     const lineTaxable=Math.max(0,lineBase-invoiceDiscountShare);
     return sum+(lineTaxable*(line.taxRate??line.product.taxRate??0)/100);
   },0);
-  const beforeCoupon=Math.max(0,Math.round((subtotal-discount-invoiceDiscount+tax+additionalCharges)*100)/100);
-  useEffect(() => { setCouponDiscount(current => Math.min(current, beforeCoupon)); }, [beforeCoupon]);
-  const total=Math.max(0,Math.round((beforeCoupon-couponDiscount)*100)/100);
+  const total=Math.max(0,Math.round((subtotal-discount-invoiceDiscount+tax+additionalCharges)*100)/100);
   const dueDate=new Date(invoiceDate); dueDate.setDate(dueDate.getDate()+Number(paymentTerms||0));
 
   useEffect(()=>{setPaymentTerms(setting.paymentTermsDays);},[setting.paymentTermsDays]);
@@ -2348,7 +2345,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
     }
   };
   const createPartyFromInvoice=async(e:React.FormEvent<HTMLFormElement>)=>{e.preventDefault();try{setSaving(true);const saved=await api.createParty(partyPayloadFromForm(new FormData(e.currentTarget)));setParties([...parties,saved]);setSelectedParty(saved);setPartyOpen(false);setPartySearch(`${saved.name} ${saved.phone}`);setPartyModal(false);setNewParty({name:"",phone:"",address:"",gstin:""});notify("Party created and selected");}catch(error){notify(error instanceof Error?error.message:"Party save failed");}finally{setSaving(false);}};
-  const resetInvoiceForm=()=>{invoiceSaveKey.current = null;setLines([]);setPartyOpen(false);setPaid(0);setNotes("");setInvoiceDiscount(0);setCouponDiscount(0);setAdditionalCharges(0);setShowNotes(false);setShowTerms(false);setShowBank(false);setShowQr(false);setNewParty({name:"",phone:"",address:"",gstin:""});setPartySearch("");setSelectedParty(undefined);setMarkPaid(false);setInvoiceDate(new Date().toISOString().slice(0,10));};
+  const resetInvoiceForm=()=>{invoiceSaveKey.current = null;setLines([]);setPartyOpen(false);setPaid(0);setNotes("");setInvoiceDiscount(0);setAdditionalCharges(0);setShowNotes(false);setShowTerms(false);setShowBank(false);setShowQr(false);setNewParty({name:"",phone:"",address:"",gstin:""});setPartySearch("");setSelectedParty(undefined);setMarkPaid(false);setInvoiceDate(new Date().toISOString().slice(0,10));};
   const saveInvoice=async(keepOpen=false)=>{
     if (invoiceSaveInFlight.current) return;
     if(!lines.length)return notify("Add at least one item");
@@ -2359,7 +2356,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
       setSaving(true);
       let partyId=selectedParty?.id ? String(selectedParty.id) : undefined;
       const received=markPaid?total:paid;
-      const payload={partyId,invoiceDate:new Date(invoiceDate),paidAmount:Math.min(received,total),markFullyPaid:markPaid,paymentMode,notes:[notes,showTerms?terms:""].filter(Boolean).join("\n"),invoiceDiscount,couponDiscount,additionalCharges,lines:lines.map(x=>({variantId:String(x.product.id),quantity:x.qty,unitPrice:x.product.sellingPrice,mrp:x.product.mrp,discount:x.discount,taxRate:x.taxRate??x.product.taxRate??0}))};
+      const payload={partyId,invoiceDate:new Date(invoiceDate),paidAmount:Math.min(received,total),markFullyPaid:markPaid,paymentMode,notes:[notes,showTerms?terms:""].filter(Boolean).join("\n"),invoiceDiscount,additionalCharges,lines:lines.map(x=>({variantId:String(x.product.id),quantity:x.qty,unitPrice:x.product.sellingPrice,mrp:x.product.mrp,discount:x.discount,taxRate:x.taxRate??x.product.taxRate??0}))};
       if (!editingInvoice) invoiceSaveKey.current ??= crypto.randomUUID();
       const saved=editingInvoice?await api.updateSale(editingInvoice.id,payload):await api.createSale({...payload,idempotencyKey:invoiceSaveKey.current!});
       setRows([saved, ...rows.filter(row => String(row.id) !== String(saved.id))].sort((a, b) => (b.dateISO ?? "").localeCompare(a.dateISO ?? "")));
@@ -2414,7 +2411,6 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
     setPartySearch(party ? `${party.name} ${party.phone}` : inv.party);
     setPaid(0);
     setInvoiceDiscount(inv.invoiceDiscount ?? 0);
-    setCouponDiscount(inv.couponDiscount ?? 0);
     setAdditionalCharges(inv.additionalCharges ?? 0);
     setNotes(inv.notes ?? "");
     setCreating(true);
@@ -2448,7 +2444,6 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
     setPaid(inv.paidAmount ?? 0);
     setPaymentMode((inv.paymentMode as "Cash"|"UPI"|"Card"|"Bank") || "Cash");
     setInvoiceDiscount(inv.invoiceDiscount ?? 0);
-    setCouponDiscount(inv.couponDiscount ?? 0);
     setAdditionalCharges(inv.additionalCharges ?? 0);
     setNotes(inv.notes ?? "");
     const date = new Date(inv.date);
@@ -2920,13 +2915,6 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
                     value={invoiceDiscount} onChange={setInvoiceDiscount} />
                 </div>
                 <button type="button" className="clear-row-btn" onClick={() => setInvoiceDiscount(0)}>ⓧ</button>
-              </div>
-            </div>
-
-            <div className="ref-calc-row">
-              <span>Coupon Discount</span>
-              <div className="disc-input-box"><span>?</span>
-                <DiscountInput label="Coupon discount amount" max={beforeCoupon} value={couponDiscount} onChange={setCouponDiscount} />
               </div>
             </div>
 

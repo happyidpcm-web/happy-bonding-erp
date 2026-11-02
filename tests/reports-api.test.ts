@@ -17,7 +17,7 @@ test('report API enforces permissions and branch scope, filters posted invoices,
   });
   replaceMethod(db.salesInvoice, 'findMany', async (args: unknown) => {
     calls.push({ model: 'sales', args });
-    return [{ invoiceNumber: 'TEST/1', party: { name: 'Customer' }, couponDiscount: '50', grandTotal: '850', paidAmount: '800', invoiceDate: new Date('2026-11-02T00:00:00Z'), createdAt: new Date('2026-11-02T05:00:00Z'), lines: [{ variantId: 'v1', itemName: 'Shirt', sku: 'SHIRT', quantity: '3', total: '900' }] }];
+    return [{ invoiceDate: new Date('2026-11-02T00:00:00Z'), createdAt: new Date('2026-11-02T05:00:00Z'), lines: [{ variantId: 'v1', itemName: 'Shirt', sku: 'SHIRT', quantity: '3', total: '900' }] }];
   });
   replaceMethod(db.voucher, 'findMany', async (args: unknown) => {
     calls.push({ model: 'purchases', args });
@@ -51,13 +51,6 @@ test('report API enforces permissions and branch scope, filters posted invoices,
   assert.equal(sales.where.status, 'POSTED'); assert.equal(sales.where.organizationId, 'org1'); assert.equal(sales.where.branchId, 'b1');
   assert.equal(sales.where.invoiceDate.gte.toISOString(), '2026-11-02T00:00:00.000Z');
   assert.equal(sales.where.invoiceDate.lt.toISOString(), '2026-11-03T00:00:00.000Z');
-  const couponResponse = await fetch(url.replace('item-summary', 'table/coupon-discount') + '?filter=Custom+Range&from=2026-11-02&to=2026-11-02');
-  assert.equal(couponResponse.status, 200);
-  const coupon = await couponResponse.json();
-  assert.equal(coupon.rows[0]['Coupon Discount'], 50);
-  assert.equal(coupon.rows[0].Amount, 850);
-  assert.equal(coupon.rows[0].Balance, 50);
-  assert.ok(coupon.moneyColumns.includes('Coupon Discount'));
   const purchases = calls.find(c => c.model === 'purchases')!.args;
   assert.equal(purchases.where.type, 'Purchase Invoice'); assert.equal(purchases.where.organizationId, 'org1'); assert.equal(purchases.where.branchId, 'b1');
 });
