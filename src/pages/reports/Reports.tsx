@@ -366,7 +366,22 @@ export function LowStockSummaryReportScreen({
   notify: (msg: string) => void;
 }) {
   const [emailModalOpen, setEmailModalOpen] = useState(false);
-  const lowStockItems = useMemo(() => products.filter(p => p.stock < 10), [products]);
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('');
+  const [stockFilter, setStockFilter] = useState('all');
+  const [sort, setSort] = useState('stock-asc');
+  const categories = [...new Set(products.filter(p => p.stock < 10).map(p => p.category))].sort();
+  const lowStockItems = useMemo(() => products.filter(p => {
+    if (p.stock >= 10 || (category && p.category !== category)) return false;
+    if (![p.name, p.sku, p.size].join(' ').toLowerCase().includes(search.trim().toLowerCase())) return false;
+    if (stockFilter === 'out') return p.stock <= 0;
+    if (stockFilter === 'critical') return p.stock > 0 && p.stock <= 5;
+    if (stockFilter === 'low') return p.stock > 5;
+    return true;
+  }).sort((a, b) => {
+    const difference = sort === 'stock-desc' ? b.stock - a.stock : sort === 'value-desc' ? b.stock * b.sellingPrice - a.stock * a.sellingPrice : sort === 'name' ? 0 : a.stock - b.stock;
+    return difference || a.name.localeCompare(b.name) || a.sku.localeCompare(b.sku);
+  }), [products, category, stockFilter, search, sort]);
   const totalLowStockValue = useMemo(() => lowStockItems.reduce((sum, p) => sum + (p.sellingPrice * p.stock), 0), [lowStockItems]);
 
   const exportRows = lowStockItems.map(p => ({
@@ -410,8 +425,15 @@ export function LowStockSummaryReportScreen({
         </div>
       </div>
 
+      <div className="low-stock-filters">
+        <label>Search<input aria-label="Search low-stock items" placeholder="Item name / code / size" value={search} onChange={e => setSearch(e.target.value)} /></label>
+        <label>Category<select aria-label="Low-stock category" value={category} onChange={e => setCategory(e.target.value)}><option value="">All categories</option>{categories.map(c => <option key={c} value={c}>{c || 'Uncategorized'}</option>)}</select></label>
+        <label>Stock level<select aria-label="Stock level" value={stockFilter} onChange={e => setStockFilter(e.target.value)}><option value="all">All low stock (below 10)</option><option value="out">Out of stock (0 or below)</option><option value="critical">Critical (above 0 to 5)</option><option value="low">Low (above 5, below 10)</option></select></label>
+        <label>Sort by<select aria-label="Sort low-stock items" value={sort} onChange={e => setSort(e.target.value)}><option value="stock-asc">Stock: Lowest first</option><option value="stock-desc">Stock: Highest first</option><option value="value-desc">Stock value: Highest first</option><option value="name">Item name: A to Z</option></select></label>
+        <button type="button" className="secondary" onClick={() => { setSearch(''); setCategory(''); setStockFilter('all'); setSort('stock-asc'); }}>Reset filters</button>
+      </div>
       <div className="low-stock-summary-cards">
-        <div><span>Total low-stock items</span><strong>{lowStockItems.length.toLocaleString('en-IN')}</strong><small>Each item / size counts separately</small></div>
+        <div><span>Total low-stock items</span><strong>{lowStockItems.length.toLocaleString('en-IN')}</strong><small>Filtered items; each item / size counts separately</small></div>
         <div><span>Total available pieces</span><strong>{lowStockItems.reduce((sum, p) => sum + p.stock, 0).toLocaleString('en-IN', { maximumFractionDigits: 3 })}</strong></div>
         <div><span>Stock value (selling price)</span><strong>{money(totalLowStockValue)}</strong></div>
       </div>
@@ -439,7 +461,7 @@ export function LowStockSummaryReportScreen({
                   <td className="right">{money(p.sellingPrice * p.stock)}</td>
                 </tr>
               ))}
-              {!lowStockItems.length && <tr><td colSpan={5}>No low-stock items in this branch.</td></tr>}
+              {!lowStockItems.length && <tr><td colSpan={5}>No low-stock items match these filters.</td></tr>}
             </tbody>
           </table>
         </div>

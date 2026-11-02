@@ -5502,3 +5502,9 @@ input:checked + .slider:before {
 .low-stock-explanation { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 0 0 18px; }
 @media (max-width: 700px) { .low-stock-summary-cards { grid-template-columns: 1fr; gap: 10px; } }
 @media print { .low-stock-summary-cards { break-inside: avoid; } }
+.low-stock-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; margin-bottom: 20px; }
+.low-stock-filters label { display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.low-stock-filters input, .low-stock-filters select { font: inherit; color: #312b22; background: white; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-height: 40px; max-width: 100%; }
+.low-stock-filters input:focus-visible, .low-stock-filters select:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+@media(max-width: 700px) { .low-stock-filters label { width: 100%; } }
+@media print { .low-stock-filters { display: none; } }
