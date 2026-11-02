@@ -1,4 +1,6 @@
 import { SearchablePicker } from "../../components/SearchablePicker";
+import { ItemSummary } from './ItemSummary';
+import { BackendReport, backendReports } from './BackendReport';
 import { DateRangeFilter } from "../../components/DateRangeFilter";
 import type { CustomDateRange, DateRangeSelection } from "../../utils/invoiceDateRange";
 import { invoiceExcelDate, invoiceTime } from "../../utils/invoiceDateRange";
@@ -15,11 +17,13 @@ import { Modal, PageHeading, isInvoiceInDateRange } from "../../App";
 export function EmailExcelReportModal({
   reportName,
   products = [],
+  reportRows,
   onClose,
   notify,
 }: {
   reportName: string;
   products?: Product[];
+  reportRows?: Record<string, string | number>[];
   onClose: () => void;
   notify: (msg: string) => void;
 }) {
@@ -34,7 +38,7 @@ export function EmailExcelReportModal({
       // Generate real base64 Excel data
       let base64Excel: string | undefined = undefined;
       try {
-        const excelRows = products.map((p, idx) => ({
+        const excelRows = reportRows ?? products.map((p, idx) => ({
           "S.No": idx + 1,
           "Item Name": p.name,
           "SKU / Item Code": p.sku,
@@ -51,7 +55,7 @@ export function EmailExcelReportModal({
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, reportName.substring(0, 30));
         base64Excel = XLSX.write(wb, { type: "base64", bookType: "xlsx" });
-      } catch {}
+      } catch { throw new Error('Unable to generate the Excel attachment. Please retry.'); }
 
       // Direct Brevo Transactional Email Dispatch with Attachment
       const res = await api.sendBrevoEmail({
@@ -332,7 +336,7 @@ export function StockSummaryReportScreen({
                   <td className="mono">{p.sku}</td>
                   <td className="right">₹ {p.purchasePrice}</td>
                   <td className="right">₹ {p.sellingPrice}</td>
-                  <td className="right">{p.stock}.0 {p.size || "NOS"}</td>
+                  <td className="right">{p.stock} PCS</td>
                   <td className="right">₹ {p.sellingPrice * p.stock}</td>
                 </tr>
               ))}
@@ -370,7 +374,7 @@ export function LowStockSummaryReportScreen({
       "ITEM NAME": p.name,
       "ITEM CODE": p.sku,
       "STOCK QUANTITY": `${p.stock} ${p.size || "NOS"}`,
-      "LOW STOCK LEVEL": "5",
+      "LOW STOCK LEVEL": "10",
       "STOCK VALUE": p.sellingPrice * p.stock,
     }));
     const ws = XLSX.utils.json_to_sheet(data);
@@ -428,7 +432,7 @@ export function LowStockSummaryReportScreen({
                   <td><strong>{p.name}</strong></td>
                   <td className="mono">{p.sku}</td>
                   <td className="right">{p.stock}.0 {p.size || "NOS"}</td>
-                  <td className="right">5</td>
+                  <td className="right">10</td>
                   <td className="right">₹ {p.sellingPrice * p.stock}</td>
                 </tr>
               ))}
@@ -448,128 +452,8 @@ export function LowStockSummaryReportScreen({
   );
 }
 
-export function ItemSalesSummaryReportScreen({
-  products,
-  invoices,
-  onBack,
-  notify,
-}: {
-  products: Product[];
-  invoices: Invoice[];
-  onBack: () => void;
-  notify: (msg: string) => void;
-}) {
-  const [categoryFilter, setCategoryFilter] = useState("All Categories");
-  const [dateFilter, setDateFilter] = useState("This Week");
-  const [customDateRange, setCustomDateRange] = useState<CustomDateRange>({ from: "", to: "" });
-  const [emailModalOpen, setEmailModalOpen] = useState(false);
-
-  const categories = useMemo(() => Array.from(new Set(products.map(p => p.category || "General"))), [products]);
-
-  const itemSalesSummary = useMemo(() => {
-    const qtyMap = new Map<string, number>();
-
-    invoices.filter(inv => isInvoiceInDateRange(inv, dateFilter, customDateRange)).forEach(inv => {
-      if (inv.lines) {
-        inv.lines.forEach(line => {
-          const key = (line.sku || line.itemName).toLowerCase();
-          qtyMap.set(key, (qtyMap.get(key) || 0) + line.quantity);
-        });
-      }
-    });
-
-    return products
-      .filter(p => categoryFilter === "All Categories" || p.category === categoryFilter)
-      .map(p => {
-        const keySku = (p.sku || "").toLowerCase();
-        const keyName = (p.name || "").toLowerCase();
-        const salesQty = qtyMap.get(keySku) || qtyMap.get(keyName) || 0;
-        return {
-          ...p,
-          salesQty,
-          purchaseQty: 0,
-        };
-      })
-      .sort((a, b) => b.salesQty - a.salesQty);
-  }, [products, invoices, categoryFilter, dateFilter, customDateRange]);
-
-  const exportToExcel = () => {
-    const data = itemSalesSummary.map(p => ({
-      "ITEM NAME": p.name,
-      "SALES QUANTITY": `${p.salesQty} ${p.size || "PCS"}`,
-      "PURCHASE QUANTITY": `${p.purchaseQty}`,
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Item Sales Summary");
-    XLSX.writeFile(wb, `happy_bonding_item_sales_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    notify("Item Sales Summary exported to Excel!");
-  };
-
-  return (
-    <div className="report-screen-wrap printable-report">
-      <div className="page-heading">
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button type="button" className="icon-button" onClick={onBack} title="Back to Items">
-            <ArrowLeft size={18} />
-          </button>
-          <h1>Item Sales and Purchase Summary</h1>
-          <button type="button" className="secondary" style={{ padding: "4px 8px", fontSize: 12 }} onClick={() => notify("Report favourites are not available yet")}>
-            <Star size={14} /> Favourite
-          </button>
-        </div>
-
-        <div className="header-actions" style={{ display: "flex", gap: 10 }}>
-          <button type="button" className="secondary" onClick={() => setEmailModalOpen(true)}>
-            <Mail size={15} /> Email Excel
-          </button>
-          <button type="button" className="secondary" onClick={exportToExcel}>
-            <Download size={15} /> Download Excel ▾
-          </button>
-          <button type="button" className="secondary" onClick={() => window.print()}>
-            <Printer size={15} /> Print PDF
-          </button>
-        </div>
-      </div>
-
-      <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-        <SearchablePicker value={categoryFilter} onChange={setCategoryFilter} placeholder="Search Categories" emptyValue="All Categories" emptyLabel="All Categories" options={categories.map(c => ({ value: c, label: c }))} />
-
-        <DateRangeFilter value={dateFilter} range={customDateRange} onChange={setDateFilter} onRangeChange={setCustomDateRange} />
-      </div>
-
-      <article className="card table-card">
-        <div className="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>ITEM NAME</th>
-                <th className="right">SALES QUANTITY</th>
-                <th className="right">PURCHASE QUANTITY</th>
-              </tr>
-            </thead>
-            <tbody>
-              {itemSalesSummary.map(p => (
-                <tr key={p.id}>
-                  <td><strong>{p.name}</strong></td>
-                  <td className="right"><strong>{p.salesQty} {p.size || "PCS"}</strong></td>
-                  <td className="right">{p.purchaseQty}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </article>
-
-      {emailModalOpen && (
-        <EmailExcelReportModal
-          reportName="Item Sales Summary"
-          onClose={() => setEmailModalOpen(false)}
-          notify={notify}
-        />
-      )}
-    </div>
-  );
+export function ItemSalesSummaryReportScreen(props: { products: Product[]; invoices: Invoice[]; onBack: () => void; notify: (message: string) => void }) {
+  return <ItemSummary onBack={props.onBack} notify={props.notify} />;
 }
 
 export function SalesSummaryReportScreen({
@@ -848,120 +732,8 @@ export function DayBookReportScreen({
   );
 }
 
-export function BillWiseProfitReportScreen({
-  invoices,
-  onBack,
-  notify,
-  initialDateSelection,
-}: {
-  invoices: Invoice[];
-  initialDateSelection?: DateRangeSelection;
-  onBack: () => void;
-  notify: (msg: string) => void;
-}) {
-  const [emailModalOpen, setEmailModalOpen] = useState(false);
-  const [dateFilter, setDateFilter] = useState(initialDateSelection?.filter || "This Week");
-  const [customDateRange, setCustomDateRange] = useState<CustomDateRange>(initialDateSelection?.range || { from: "", to: "" });
-  const filteredInvoices = useMemo(() => invoices.filter(row => isInvoiceInDateRange(row, dateFilter, customDateRange)), [invoices, dateFilter, customDateRange]);
-  const totalGrossProfit = filteredInvoices.reduce((sum, r) => sum + Math.round(r.amount * 0.25), 0);
-
-  const exportToExcel = () => {
-    const data = filteredInvoices.map(r => {
-      const cost = Math.round(r.amount * 0.75);
-      const profit = r.amount - cost;
-      return {
-        "DATE": r.date,
-        "INVOICE NO.": r.number,
-        "PARTY NAME": r.party,
-        "TOTAL AMOUNT": r.amount,
-        "TOTAL COST": cost,
-        "GROSS PROFIT": profit,
-        "PROFIT MARGIN (%)": "25%",
-      };
-    });
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Bill Wise Profit");
-    XLSX.writeFile(wb, `happy_bonding_bill_wise_profit_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    notify("Bill Wise Profit exported to Excel!");
-  };
-
-  return (
-    <div className="printable-report">
-      <div className="page-heading">
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button type="button" className="icon-button" onClick={onBack} title="Back to Sales Invoices">
-            <ArrowLeft size={18} />
-          </button>
-          <h1>Bill Wise Profit</h1>
-          <button type="button" className="secondary" style={{ padding: "4px 8px", fontSize: 12 }} onClick={() => notify("Report favourites are not available yet")}>
-            <Star size={14} /> Favourite
-          </button>
-        </div>
-
-        <div className="header-actions" style={{ display: "flex", gap: 10 }}>
-          <button type="button" className="secondary" onClick={() => setEmailModalOpen(true)}>
-            <Mail size={15} /> Email Excel
-          </button>
-          <button type="button" className="secondary" onClick={exportToExcel}>
-            <Download size={15} /> Download Excel ▾
-          </button>
-          <button type="button" className="secondary" onClick={() => window.print()}>
-            <Printer size={15} /> Print PDF
-          </button>
-        </div>
-      </div>
-
-      <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-        <select style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, background: "#fff" }}><option>All Staff ▾</option></select>
-        <DateRangeFilter value={dateFilter} range={customDateRange} onChange={setDateFilter} onRangeChange={setCustomDateRange} />
-        <select style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, background: "#fff" }}><option>All Transactions ▾</option></select>
-      </div>
-
-      <div style={{ padding: "12px 16px", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: 8, marginBottom: 16, fontSize: 13, fontWeight: 700, color: "#1e293b" }}>
-        Total Gross Profit: <span style={{ color: "#16a34a" }}>₹ {totalGrossProfit.toLocaleString("en-IN")}</span>
-      </div>
-
-      <article className="card table-card">
-        <div className="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>DATE</th>
-                <th>INVOICE NO.</th>
-                <th>PARTY NAME</th>
-                <th className="right">TOTAL AMOUNT</th>
-                <th className="right">TOTAL COST</th>
-                <th className="right">GROSS PROFIT</th>
-                <th className="right">PROFIT MARGIN (%)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredInvoices.map(r => {
-                const cost = Math.round(r.amount * 0.75);
-                const profit = r.amount - cost;
-                return (
-                  <tr key={r.id}>
-                    <td>{r.date}</td>
-                    <td className="mono"><strong>{r.number}</strong></td>
-                    <td><strong>{r.party}</strong></td>
-                    <td className="right">₹ {r.amount.toLocaleString("en-IN")}</td>
-                    <td className="right">₹ {cost.toLocaleString("en-IN")}</td>
-                    <td className="right" style={{ color: "#16a34a", fontWeight: 700 }}>₹ {profit.toLocaleString("en-IN")}</td>
-                    <td className="right" style={{ fontWeight: 700, color: "#4f46e5" }}>25%</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </article>
-
-      {emailModalOpen && (
-        <EmailExcelReportModal reportName="Bill Wise Profit" onClose={() => setEmailModalOpen(false)} notify={notify} />
-      )}
-    </div>
-  );
+export function BillWiseProfitReportScreen(props: { invoices: Invoice[]; onBack: () => void; notify: (message: string) => void; initialDateSelection?: DateRangeSelection }) {
+  return <BackendReport report={backendReports['Bill-wise profit']} onBack={props.onBack} notify={props.notify} initialDateSelection={props.initialDateSelection} />;
 }
 
 export function Reports({
@@ -987,7 +759,9 @@ export function Reports({
     }
   }, [initialReport]);
 
-  if (activeReport && !["Stock summary", "Stock valuation", "Low stock", "Sales summary", "Bill-wise profit", "Fast & slow moving", "DayBook"].includes(activeReport)) return <><button onClick={() => setActiveReport(null)}>Back</button><h2>{activeReport}</h2><p>This report is not available yet.</p></>;
+  if (activeReport && backendReports[activeReport]) return <BackendReport key={activeReport} report={backendReports[activeReport]} initialDateSelection={initialDateSelection} onBack={() => setActiveReport(null)} notify={notify} />;
+  if (activeReport === 'Rate list') return <RateListReportScreen products={products} onBack={() => setActiveReport(null)} notify={notify} />;
+  if (activeReport && !["Stock summary", "Stock valuation", "Low stock", "Sales summary", "Bill-wise profit", "Fast & slow moving", "DayBook"].includes(activeReport)) return <><button onClick={() => setActiveReport(null)}>Back</button><h2>{activeReport}</h2><p>This report needs additional accounting or tax records that are not currently captured. It cannot be calculated reliably from sales invoices alone.</p></>;
   if (activeReport === "Stock summary" || activeReport === "Stock valuation") {
     return (
       <StockSummaryReportScreen
@@ -1036,14 +810,7 @@ export function Reports({
   }
 
   if (activeReport === "Fast & slow moving") {
-    return (
-      <ItemSalesSummaryReportScreen
-        products={products}
-        invoices={invoices}
-        onBack={() => setActiveReport(null)}
-        notify={notify}
-      />
-    );
+    return <ItemSummary onBack={() => setActiveReport(null)} notify={notify} />;
   }
 
   if (
@@ -1090,11 +857,11 @@ export function Reports({
       title: "Item",
       icon: Boxes,
       items: [
-        { name: "Item Report By Party", targetKey: "Fast & slow moving", tags: ["Party", "Category", "Item"] },
+        { name: "Item Report By Party", targetKey: "Item by party", tags: ["Party", "Category", "Item"] },
         { name: "Item Sales and Purchase Summary", targetKey: "Fast & slow moving", tags: ["Category", "Item", "Summary"] },
         { name: "Low Stock Summary", targetKey: "Low stock", tags: ["Item"] },
-        { name: "Rate List", targetKey: "Stock summary", tags: ["Item"] },
-        { name: "Stock Detail Report", targetKey: "Stock valuation", tags: ["Item"] },
+        { name: "Rate List", targetKey: "Rate list", tags: ["Item"] },
+        { name: "Stock Detail Report", targetKey: "Stock detail", tags: ["Item"] },
         { name: "Stock Summary", targetKey: "Stock summary", tags: ["Category", "Item", "Summary"] },
       ],
     },
@@ -1106,13 +873,13 @@ export function Reports({
       items: [
         { name: "GSTR-2 (Purchase)", targetKey: "GSTR-2 purchases", tags: ["Invoice Details", "Summary"] },
         { name: "GSTR-3b", targetKey: "GSTR-3B summary", tags: ["Summary"] },
-        { name: "GST Purchase (With HSN)", targetKey: "GSTR-2 purchases", tags: ["Item", "Invoice Details"] },
-        { name: "GST Sales (With HSN)", targetKey: "GSTR-1 sales", tags: ["Item", "Invoice Details"] },
+        { name: "GST Purchase (With HSN)", targetKey: "GST purchases", tags: ["Item", "Invoice Details"] },
+        { name: "GST Sales (With HSN)", targetKey: "GST sales", tags: ["Item", "Invoice Details"] },
         { name: "HSN Wise Sales Summary", targetKey: "HSN-wise summary", tags: ["Item", "Summary"] },
-        { name: "TDS Payable", targetKey: "DayBook", tags: ["Transaction"] },
-        { name: "TDS Receivable", targetKey: "DayBook", tags: ["Transaction"] },
-        { name: "TCS Payable", targetKey: "DayBook", tags: ["Transaction"] },
-        { name: "TCS Receivable", targetKey: "DayBook", tags: ["Transaction"] },
+        { name: "TDS Payable", targetKey: "TDS Payable", tags: ["Transaction"] },
+        { name: "TDS Receivable", targetKey: "TDS Receivable", tags: ["Transaction"] },
+        { name: "TCS Payable", targetKey: "TCS Payable", tags: ["Transaction"] },
+        { name: "TCS Receivable", targetKey: "TCS Receivable", tags: ["Transaction"] },
       ],
     },
     {
@@ -1121,10 +888,10 @@ export function Reports({
       title: "Party",
       icon: Users,
       items: [
-        { name: "Receivable Ageing Report", targetKey: "Party outstanding", tags: ["Party", "Payment Collection"] },
-        { name: "Party Report By Item", targetKey: "Party outstanding", tags: ["Party", "Item"] },
-        { name: "Party Statement (Ledger)", targetKey: "Party outstanding", tags: ["Party"] },
-        { name: "Sales Summary - Category Wise", targetKey: "Sales summary", tags: ["Party", "Category"] },
+        { name: "Receivable Ageing Report", targetKey: "Receivable ageing", tags: ["Party", "Payment Collection"] },
+        { name: "Party Report By Item", targetKey: "Party by item", tags: ["Party", "Item"] },
+        { name: "Party Statement (Ledger)", targetKey: "Party ledger", tags: ["Party"] },
+        { name: "Sales Summary - Category Wise", targetKey: "Category sales", tags: ["Party", "Category"] },
       ],
     },
     {
@@ -1133,11 +900,11 @@ export function Reports({
       title: "Transaction",
       icon: FileText,
       items: [
-        { name: "Audit Trail", targetKey: "DayBook", tags: ["Transaction"] },
-        { name: "Daybook - Staff Wise", targetKey: "DayBook", tags: ["Transaction", "Invoice Details"] },
-        { name: "Expense Category Report", targetKey: "DayBook", tags: ["Category", "Transaction"] },
-        { name: "Expense Transaction Report", targetKey: "DayBook", tags: ["Category", "Transaction"] },
-        { name: "Purchase Summary", targetKey: "DayBook", tags: ["Invoice Details", "Summary"] },
+        { name: "Audit Trail", targetKey: "Audit trail", tags: ["Transaction"] },
+        { name: "Daybook - Staff Wise", targetKey: "Daybook by staff", tags: ["Transaction", "Invoice Details"] },
+        { name: "Expense Category Report", targetKey: "Expense categories", tags: ["Category", "Transaction"] },
+        { name: "Expense Transaction Report", targetKey: "Expense transactions", tags: ["Category", "Transaction"] },
+        { name: "Purchase Summary", targetKey: "Purchase summary", tags: ["Invoice Details", "Summary"] },
       ],
     },
   ];
@@ -1161,10 +928,7 @@ export function Reports({
               <button
                 className="report-item-row"
                 key={x.name}
-                onClick={() => {
- const supported = ["Stock Summary", "Stock Detail Report", "Low Stock Summary", "Sales Summary", "Bill Wise Profit", "DayBook"];
- if (supported.includes(x.name)) setActiveReport(x.targetKey); else notify(x.name + " is not available yet.");
-}}
+                onClick={() => setActiveReport(x.targetKey)}
               >
                 <span className="report-item-name">
                   {x.name}

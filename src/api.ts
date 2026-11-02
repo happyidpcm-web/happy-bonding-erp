@@ -103,6 +103,16 @@ async function request<T>(path: string, options?: RequestInit, timeoutMs = 30000
 }
 
 export const api = {
+  async reportTable(kind: string, filter: string, range: { from: string; to: string; fromTime?: string; toTime?: string }) {
+    const params = new URLSearchParams({ filter });
+    if (filter === 'Custom Range') for (const [key, value] of Object.entries(range)) if (value) params.set(key, value);
+    return request<{ rows: Record<string, string | number>[]; columns: string[]; moneyColumns: string[]; note: string; from: string; to: string }>(`/reports/table/${encodeURIComponent(kind)}?${params}`);
+  },
+  async itemSummary(filter: string, range: { from: string; to: string; fromTime?: string; toTime?: string }) {
+    const params = new URLSearchParams({ filter });
+    if (filter === 'Custom Range') for (const [key, value] of Object.entries(range)) if (value) params.set(key, value);
+    return request<{ rows: Array<{ id: string; name: string; sku: string; category: string; size: string; salesQty: number; purchaseQty: number; salesAmount: number; purchaseAmount: number }>; from: string; to: string }>(`/reports/item-summary?${params}`);
+  },
   async transactions(): Promise<Array<{ id: string; sourceId: string; type: string; number: string; date: string; recordedAt: string; party: string; amount: number }>> { return request("/transactions"); },
   async nextVoucherNumber(type: string, prefix: string): Promise<string> {
     const result = await request<{ number: string }>(`/vouchers/next-number?type=${encodeURIComponent(type)}&prefix=${encodeURIComponent(prefix)}`);

@@ -11,6 +11,7 @@ import { db } from "./db.js";
 import { createToken, requireAuth, requireBranch, requirePermission } from "./auth.js";
 import fs from "fs";
 import { voucherRouter } from "./vouchers.js";
+import { reportsRouter } from "./reports.js";
 import { emailRouter } from "./email.js";
 import { orderBranches } from "./branch-order.js";
 import { nextAvailableSalesNumber } from "./sales-numbering.js";
@@ -85,6 +86,7 @@ app.get("/api/auth/me", async (req, res) => {
   res.json({ ...user, isAdmin: req.session!.permissions.includes("*"), branchIds: req.session!.branchIds });
 });
 app.use("/api/vouchers", voucherRouter);
+app.use("/api/reports", reportsRouter);
 app.use("/api/email", emailRouter);
 app.use("/api/transactions", transactionsRouter);
 
