@@ -129,13 +129,13 @@ reportTablesRouter.get('/:kind', async (req, res) => {
       if (kind === 'sales-staff') { rows = group(rows, ['Staff'], moneyColumns); columns = ['Staff', ...moneyColumns]; }
       note = 'Posted sales attributed to the original posting staff member. Paid and balance reflect the current invoice state.';
     } else {
-      rows = selected.flatMap(i => i.lines.map(l => ({ Date: date(i.invoiceDate), Invoice: i.invoiceNumber, Party: i.party?.name || 'Cash Sale', Item: l.itemName, 'Item Code': l.sku, Size: l.variant.size || '', Category: l.variant.product.category, HSN: l.hsnCode, Quantity: num(l.quantity), 'Tax Rate': num(l.taxRate), Taxable: num(l.taxableAmount), CGST: num(l.cgst), SGST: num(l.sgst), IGST: num(l.igst), Amount: num(l.total) })));
+      rows = selected.flatMap(i => i.lines.map(l => ({ Date: date(i.invoiceDate), Invoice: i.invoiceNumber, Party: i.party?.name || 'Cash Sale', 'Product ID': l.variant.productId, 'Product Name': l.variant.product.name, Item: l.itemName, 'Item Code': l.sku, Size: l.variant.size || '', Category: l.variant.product.category, HSN: l.hsnCode, Quantity: num(l.quantity), 'Tax Rate': num(l.taxRate), Taxable: num(l.taxableAmount), CGST: num(l.cgst), SGST: num(l.sgst), IGST: num(l.igst), Amount: num(l.total) })));
       const sums = ['Quantity', 'Taxable', 'CGST', 'SGST', 'IGST', 'Amount']; moneyColumns = sums.slice(1);
       if (kind === 'category-sales') { rows = group(rows, ['Category'], sums); columns = ['Category', ...sums]; }
       else if (kind === 'hsn-sales') { rows = group(rows, ['HSN', 'Tax Rate'], sums); columns = ['HSN', 'Tax Rate', ...sums]; }
       else if (kind === 'item-party' || kind === 'party-item') {
         const keys = kind === 'item-party' ? ['Item', 'Item Code', 'Size', 'Party'] : ['Party', 'Item', 'Item Code', 'Size'];
-        rows = group(rows, keys, sums); columns = [...keys, ...sums];
+        rows = group(rows, kind === 'item-party' ? [...keys, 'Product ID', 'Product Name'] : keys, sums); columns = [...keys, ...sums];
         if (kind === 'item-party') rows.sort((a, b) => num(b.Quantity) - num(a.Quantity) || String(a.Item).localeCompare(String(b.Item)));
       } else columns = ['Date', 'Invoice', 'Party', 'Item', 'HSN', 'Tax Rate', ...sums];
       note = 'Posted sales line totals before returns; bill-level adjustments are excluded. Tax breakdown is not a GST filing.';
