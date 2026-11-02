@@ -40,6 +40,7 @@ export function BackendReport({ report, onBack, notify, initialDateSelection }: 
   const [refresh, setRefresh] = useState(0);
   const [search, setSearch] = useState('');
   const [emailOpen, setEmailOpen] = useState(false);
+  const isStockReport = report.kind === 'stock-detail';
   const isItemReport = report.kind === 'item-party';
   const [itemView, setItemView] = useState('items');
   const [sort, setSort] = useState<ItemReportSort>('quantity-desc');
@@ -66,7 +67,7 @@ export function BackendReport({ report, onBack, notify, initialDateSelection }: 
     XLSX.writeFile(wb, `${report.kind}_${data?.from}_${data?.to}.xlsx`);
   };
   const formatDate = (value: string) => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(value + 'T00:00:00Z'));
-  return <div className={isItemReport ? 'printable-report item-sales-report' : 'printable-report'}>
+  return <div className={isStockReport ? 'printable-report item-sales-report stock-detail-report' : isItemReport ? 'printable-report item-sales-report' : 'printable-report'}>
     <div className="page-heading"><div><button className="secondary" onClick={onBack}>Back</button><h1>{isItemReport && itemView === 'items' ? 'Item Sales Totals' : report.title}</h1></div>
       <div className="header-actions"><button className="secondary" disabled={loading || !!error || !rows.length} onClick={exportExcel}>Download Excel</button><button className="secondary" disabled={loading || !!error || !rows.length} onClick={() => setEmailOpen(true)}>Email Excel</button><button className="secondary" disabled={loading || !!error} onClick={() => window.print()}>Print PDF</button></div>
     </div>
@@ -76,18 +77,22 @@ export function BackendReport({ report, onBack, notify, initialDateSelection }: 
       <label>Sort by <select aria-label="Sort items" value={sort} onChange={e => setSort(e.target.value as ItemReportSort)}><option value="quantity-desc">Quantity: Highest first</option><option value="quantity-asc">Quantity: Lowest first</option><option value="amount-desc">Amount: Highest first</option><option value="amount-asc">Amount: Lowest first</option></select></label>
     </div>}
     {loading ? <p role="status">Loading report…</p> : error ? <p role="alert">{error} <button onClick={() => setRefresh(n => n + 1)}>Retry</button></p> : data && <>
-      {isItemReport ? <div className="item-report-period">
-        <div><span className="item-report-caption">Sales period</span><strong>{formatDate(data.from)}{data.from !== data.to && <> ? {formatDate(data.to)}</>}</strong></div>
-        <span className="item-report-count">{rows.length.toLocaleString('en-IN')} {itemView === 'items' ? 'items' : 'records'}</span>
+      {isItemReport || isStockReport ? <div className="item-report-period">
+        <div><span className="item-report-caption">{isStockReport ? 'Stock movement period' : 'Sales period'}</span><strong>{formatDate(data.from)}{data.from !== data.to && <> to {formatDate(data.to)}</>}</strong></div>
+        <span className="item-report-count">{rows.length.toLocaleString('en-IN')} {isStockReport ? 'movements' : itemView === 'items' ? 'items' : 'records'}</span>
       </div> : <><p>{data.from} to {data.to} ? {rows.length} records ? Weeks run Sunday?Saturday.</p><p>{data.note}</p></>}
+      {isStockReport && <>
+        <div className="item-report-totals">{['Stock In', 'Stock Out'].map(c => <div key={c}><span>{c} (Pieces)</span><strong>{rows.reduce((sum, row) => sum + Number(row[c] || 0), 0).toLocaleString('en-IN', { maximumFractionDigits: 3 })}</strong></div>)}</div>
+        <p className="low-stock-explanation">{data.note} Unit cost is shown only when recorded.</p>
+      </>}
       {isItemReport && <div className="item-report-totals">
         <div><span>Total pieces sold</span><strong>{totalQuantity.toLocaleString('en-IN')}</strong></div>
         <div><span>Total sales amount</span><strong>{money(totalAmount)}</strong></div>
       </div>}
-      <article className="card table-card"><div className="table-scroll"><table><thead><tr>{columns.map(c => <th key={c} className={isItemReport && (c === 'Quantity' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{columnLabel(c)}</th>)}</tr></thead><tbody>
-        {rows.map((r, index) => <tr key={index}>{columns.map(c => <td key={c} className={isItemReport && (c === 'Quantity' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{data.moneyColumns.includes(c) && typeof r[c] === 'number' ? money(r[c] as number) : r[c]}</td>)}</tr>)}
+      <article className="card table-card"><div className="table-scroll"><table><thead><tr>{columns.map(c => <th key={c} className={(isItemReport || isStockReport) && (c === 'Quantity' || c === 'Stock In' || c === 'Stock Out' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{columnLabel(c)}</th>)}</tr></thead><tbody>
+        {rows.map((r, index) => <tr key={index}>{columns.map(c => <td key={c} className={(isItemReport || isStockReport) && (c === 'Quantity' || c === 'Stock In' || c === 'Stock Out' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{data.moneyColumns.includes(c) && typeof r[c] === 'number' ? money(r[c] as number) : isStockReport && c === 'Date' ? formatDate(String(r[c])) : r[c]}</td>)}</tr>)}
         {!rows.length && <tr><td colSpan={columns.length}>No records match this date range and search.</td></tr>}
-      </tbody><tfoot><tr>{columns.map((c, index) => <th key={c} className={isItemReport && (c === 'Quantity' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{index === 0 ? 'Total' : isItemReport && c === 'Quantity' ? totalQuantity : data.moneyColumns.includes(c) ? money(rows.reduce((s, r) => s + (typeof r[c] === 'number' ? r[c] as number : 0), 0)) : ''}</th>)}</tr></tfoot></table></div></article>
+      </tbody><tfoot><tr>{columns.map((c, index) => <th key={c} className={(isItemReport || isStockReport) && (c === 'Quantity' || c === 'Stock In' || c === 'Stock Out' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{index === 0 ? 'Total' : isStockReport ? (c === 'Stock In' || c === 'Stock Out' ? rows.reduce((sum, r) => sum + Number(r[c] || 0), 0).toLocaleString('en-IN', { maximumFractionDigits: 3 }) : '') : isItemReport && c === 'Quantity' ? totalQuantity : data.moneyColumns.includes(c) ? money(rows.reduce((s, r) => s + (typeof r[c] === 'number' ? r[c] as number : 0), 0)) : ''}</th>)}</tr></tfoot></table></div></article>
     </>}
     {emailOpen && <EmailExcelReportModal reportName={`${report.title} ${data?.from} to ${data?.to}`} reportRows={exportRows} onClose={() => setEmailOpen(false)} notify={notify} />}
   </div>;

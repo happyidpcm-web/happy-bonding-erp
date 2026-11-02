@@ -67,3 +67,6 @@
   .item-sales-report .backend-report-filters { display: none; }
   .item-report-period, .item-report-totals { break-inside: avoid; }
 }
+.stock-detail-report td:first-child { white-space: nowrap; }
+.stock-detail-report table { min-width: 1050px; }
+.stock-detail-report td:last-child { overflow-wrap: anywhere; max-width: 200px; }

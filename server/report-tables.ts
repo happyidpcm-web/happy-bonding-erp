@@ -51,9 +51,11 @@ reportTablesRouter.get('/:kind', async (req, res) => {
     note = 'Recorded payment transactions. Expenses are shown in the expense reports; this is not an account balance reconciliation.';
   } else if (kind === 'stock-detail') {
     const records = await db.stockMovement.findMany({ where: { branchId, branch: { organizationId: scope.organizationId }, occurredAt: bounds.timestampWhere }, include: { variant: { include: { product: true } } }, orderBy: { occurredAt: 'desc' } });
-    columns = ['Date', 'Item', 'Item Code', 'Size', 'Movement', 'Quantity', 'Unit Cost', 'Reference']; moneyColumns = ['Unit Cost'];
-    rows = records.filter(r => matchesReportTime(storeCalendarDate(r.occurredAt), r.occurredAt, q)).map(r => ({ Date: date(storeCalendarDate(r.occurredAt)), Item: r.variant.product.name, 'Item Code': r.variant.sku, Size: r.variant.size || '', Movement: r.type, Quantity: num(r.quantity), 'Unit Cost': r.unitCost == null ? 'Not recorded' : num(r.unitCost), Reference: r.referenceId }));
-    note = 'Stock movements during the selected period; quantities retain their recorded signs.';
+    const sales = await db.salesInvoice.findMany({ where: { ...scope, id: { in: records.filter(r => r.referenceType === 'SalesInvoice').map(r => r.referenceId) } }, select: { id: true, invoiceNumber: true } });
+    const billNumbers = new Map(sales.map(i => [i.id, i.invoiceNumber]));
+    columns = ['Date', 'Item', 'Item Code', 'Size', 'Movement', 'Stock In', 'Stock Out', 'Unit Cost', 'Reference']; moneyColumns = ['Unit Cost'];
+    rows = records.filter(r => matchesReportTime(storeCalendarDate(r.occurredAt), r.occurredAt, q)).map(r => ({ Date: date(storeCalendarDate(r.occurredAt)), Item: r.variant.product.name, 'Item Code': r.variant.sku, Size: r.variant.size || '', Movement: r.type.replaceAll('_', ' '), 'Stock In': Math.max(0, num(r.quantity)), 'Stock Out': Math.max(0, -num(r.quantity)), 'Unit Cost': r.unitCost == null ? 'Not recorded' : num(r.unitCost), Reference: r.referenceType === 'SalesInvoice' ? billNumbers.get(r.referenceId) || r.referenceId : r.referenceId }));
+    note = 'Stock In adds pieces; Stock Out removes pieces. These are movements in the selected period, not the current stock balance.';
   } else if (kind === 'sales-returns') {
     const records = await db.creditNote.findMany({ where: { ...scope, date: bounds.where }, include: { party: true, salesInvoice: true }, orderBy: { date: 'desc' } });
     columns = ['Date', 'Credit Note', 'Invoice', 'Party', 'Amount']; moneyColumns = ['Amount'];
