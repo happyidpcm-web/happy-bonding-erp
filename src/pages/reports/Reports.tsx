@@ -843,6 +843,7 @@ export function Reports({
       icon: Sparkles,
       items: [
         { name: "Balance Sheet", targetKey: "Balance sheet", tags: ["Summary"], isFavourite: true },
+        { name: "Coupon Discount", targetKey: "Coupon Discount", tags: ["Summary", "Invoice Details"] },
         { name: "Bill Wise Profit", targetKey: "Bill-wise profit", tags: ["Summary", "Invoice Details"], isFavourite: true },
         { name: "Cash and Bank Report (All Payments)", targetKey: "Cash & bank report", tags: ["Payment Collection", "Transaction"], isFavourite: true },
         { name: "GSTR-1 (Sales)", targetKey: "GSTR-1 sales", tags: ["Invoice Details", "Summary"], isFavourite: true },

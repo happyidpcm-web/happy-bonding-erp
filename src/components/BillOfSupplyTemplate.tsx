@@ -192,6 +192,7 @@ export const BillOfSupplyTemplate = React.forwardRef<HTMLDivElement, { invoice: 
             {tax > 0 && <p><span>{invoice.taxTotal !== undefined ? "Tax Amount" : "GST"}</span><span>₹ {amountText(tax)}</span></p>}
             {additionalCharges > 0 && <p><span>Additional Charges</span><span>₹ {amountText(additionalCharges)}</span></p>}
             <p><span>Discount</span><span>- ₹ {amountText(discount)}</span></p>
+            {(invoice.couponDiscount ?? 0) > 0 && <p><span>Coupon Discount</span><span>- ? {amountText(invoice.couponDiscount ?? 0)}</span></p>}
             <h3 className="grand-total-row"><span>Total Amount</span><span>₹ {amountText(total)}</span></h3>
             <p><span>Received Amount</span><span>₹ {amountText(paid)}</span></p>
             <p className="balance-row"><span>Balance</span><span>₹ {amountText(balance)}</span></p>

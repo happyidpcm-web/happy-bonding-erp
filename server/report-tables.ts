@@ -5,7 +5,7 @@ import { requireBranch } from './auth.js';
 import { reportBounds, reportQuery, matchesReportTime, storeCalendarDate } from './report-data.js';
 
 type Row = Record<string, string | number>;
-const kinds = z.enum(['purchase-summary', 'expense-transactions', 'expense-category', 'cash-bank', 'stock-detail', 'item-party', 'party-item', 'category-sales', 'hsn-sales', 'gst-sales', 'gst-purchases', 'party-outstanding', 'party-ledger', 'audit-trail', 'sales-staff', 'daybook-staff', 'sales-returns', 'bill-profit', 'sales-summary', 'receivable-ageing']);
+const kinds = z.enum(['coupon-discount', 'purchase-summary', 'expense-transactions', 'expense-category', 'cash-bank', 'stock-detail', 'item-party', 'party-item', 'category-sales', 'hsn-sales', 'gst-sales', 'gst-purchases', 'party-outstanding', 'party-ledger', 'audit-trail', 'sales-staff', 'daybook-staff', 'sales-returns', 'bill-profit', 'sales-summary', 'receivable-ageing']);
 export const reportTablesRouter = Router();
 reportTablesRouter.get('/:kind', async (req, res) => {
   const branchId = requireBranch(req, res); if (!branchId) return;
@@ -108,7 +108,12 @@ reportTablesRouter.get('/:kind', async (req, res) => {
   } else {
     const invoices = await db.salesInvoice.findMany({ where: { ...scope, status: 'POSTED', invoiceDate: bounds.where }, include: { party: true, lines: { include: { variant: { include: { product: true } } } } }, orderBy: { invoiceDate: 'desc' } });
     const selected = invoices.filter(i => matchesReportTime(i.invoiceDate, i.createdAt, q));
-    if (kind === 'bill-profit') {
+    if (kind === 'coupon-discount') {
+      columns = ['Date', 'Invoice', 'Party', 'Coupon Discount', 'Amount', 'Paid', 'Balance'];
+      moneyColumns = ['Coupon Discount', 'Amount', 'Paid', 'Balance'];
+      rows = selected.filter(i => num(i.couponDiscount) > 0).map(i => ({ Date: date(i.invoiceDate), Invoice: i.invoiceNumber, Party: i.party?.name || 'Cash Sale', 'Coupon Discount': num(i.couponDiscount), Amount: num(i.grandTotal), Paid: num(i.paidAmount), Balance: num(i.grandTotal) - num(i.paidAmount) }));
+      note = 'Coupon discounts on posted invoices. Amount is the final invoice total after coupon discount.';
+    } else if (kind === 'bill-profit') {
       columns = ['Date', 'Invoice', 'Party', 'Sales Excluding Tax', 'Recorded Cost', 'Gross Profit']; moneyColumns = columns.slice(3);
       rows = selected.map(i => {
         const revenue = num(i.grandTotal) - num(i.cgstTotal) - num(i.sgstTotal) - num(i.igstTotal);

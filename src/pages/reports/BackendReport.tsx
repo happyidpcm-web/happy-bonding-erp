@@ -9,6 +9,7 @@ import { EmailExcelReportModal } from './Reports';
 import { prepareItemReport, type ItemReportSort } from '../../utils/itemReport';
 
 export const backendReports: Record<string, { kind: string; title: string }> = {
+  'Coupon Discount': { kind: 'coupon-discount', title: 'Coupon Discount' },
   'Bill-wise profit': { kind: 'bill-profit', title: 'Bill Wise Profit' },
   'Sales summary': { kind: 'sales-summary', title: 'Sales Summary' },
   'Receivable ageing': { kind: 'receivable-ageing', title: 'Receivable Ageing Report' },

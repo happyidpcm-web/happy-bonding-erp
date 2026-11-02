@@ -13,7 +13,7 @@ const end = source.indexOf('app.patch("/api/sales/:id/details",', start);
 assert.ok(start >= 0 && end > start);
 const code = stripTypeScriptTypes(source.slice(start, end));
 
-async function save({ markFullyPaid = false, quantities = [1, 2], available = 10, failAudit = false, existing = false, maximum = 9, sequenceNext = 10, partyId = undefined as string | undefined, validParty = true, committedAfterFailure = false } = {}) {
+async function save({ couponDiscount = 0, markFullyPaid = false, quantities = [1, 2], available = 10, failAudit = false, existing = false, maximum = 9, sequenceNext = 10, partyId = undefined as string | undefined, validParty = true, committedAfterFailure = false } = {}) {
   let handler: any;
   let response: any;
   let invoiceData: any;
@@ -79,7 +79,7 @@ async function save({ markFullyPaid = false, quantities = [1, 2], available = 10
   let error: unknown;
   try {
     const res = { status: () => res, json: (data: any) => { response = data; } };
-    await handler({ body: { partyId, idempotencyKey: "test-save-1", invoiceDate: "2026-10-10", placeOfSupply: "33", paidAmount: 150, markFullyPaid, lines: quantities.map(quantity => ({ variantId: "shirt", quantity, unitPrice: 100, discount: 0 })) }, session: { organizationId: "test-org", userId: "tester" } }, res);
+    await handler({ body: { couponDiscount, partyId, idempotencyKey: "test-save-1", invoiceDate: "2026-10-10", placeOfSupply: "33", paidAmount: 150, markFullyPaid, lines: quantities.map(quantity => ({ variantId: "shirt", quantity, unitPrice: 100, discount: 0 })) }, session: { organizationId: "test-org", userId: "tester" } }, res);
   } catch (e) { error = e; }
   return { response, invoiceData, movements, payments, allocations, stock, stockWrites, bulkWrites, aggregateReads, transactions, sequence, error, overlappedReads };
 }
@@ -183,4 +183,14 @@ test("number lookup keeps custom prefixes parameterized and retains rollout floo
   assert.equal(result.response.paidAmount, 300);
   assert.equal(result.payments[0].amount, 300);
   assert.equal(result.allocations[0].amount, 300);
+});
+
+test("coupon reduces saved total and fully paid receipt; excessive coupons reject", async () => {
+  const result = await save({ couponDiscount: 50, markFullyPaid: true });
+  assert.equal(result.response.grandTotal, 250);
+  assert.equal(result.response.couponDiscount, 50);
+  assert.equal(result.response.paidAmount, 250);
+  const rejected = await save({ couponDiscount: 301 });
+  assert.match(String(rejected.error), /Coupon discount cannot exceed/);
+  assert.equal(rejected.stockWrites, 0);
 });
