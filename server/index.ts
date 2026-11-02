@@ -836,8 +836,9 @@ app.delete("/api/purchases/stock-receipt/:purchaseNumber", requirePermission("pr
 
 app.get("/api/sales", async (req, res) => {
   const branchId = requireBranch(req, res); if (!branchId) return;
+  const partyId = typeof req.query.partyId === "string" ? req.query.partyId : undefined;
   const limit = req.query.limit ? Number(req.query.limit) : 50000;
-  const rows = await db.salesInvoice.findMany({ where: { organizationId: req.session!.organizationId, branchId }, include: { party: true, lines: { include: { variant: true } } }, orderBy: [{ invoiceDate: "desc" }, { createdAt: "desc" }], take: limit });
+  const rows = await db.salesInvoice.findMany({ where: { organizationId: req.session!.organizationId, branchId, ...(partyId ? { partyId } : {}) }, include: { party: true, lines: { include: { variant: true } } }, orderBy: [{ invoiceDate: "desc" }, { createdAt: "desc" }], take: partyId ? undefined : limit });
   res.json(rows);
 });
 

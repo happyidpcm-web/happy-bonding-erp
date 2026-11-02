@@ -273,8 +273,8 @@ export const api = {
       return await request(`/sales/next-number?invoiceDate=${encodeURIComponent(invoiceDate.toISOString())}`);
 
   },
-  async sales(): Promise<Invoice[]> {
-      const rows = await request<SalesRow[]>("/sales");
+  async sales(partyId?: string | number): Promise<Invoice[]> {
+      const rows = await request<SalesRow[]>(partyId === undefined ? "/sales" : `/sales?partyId=${encodeURIComponent(String(partyId))}`);
       return rows.map(saleFromApi);
 
   },

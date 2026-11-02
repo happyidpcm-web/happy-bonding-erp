@@ -5511,3 +5511,8 @@ input:checked + .slider:before {
 .back-heading { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .back-heading > .icon-button { flex-shrink: 0; }
 .back-heading > h1, .back-heading > h2 { margin: 0; }
+.party-history-link { border: 0; background: transparent; padding: 4px 0; font: inherit; font-weight: 600; color: #303d85; text-align: left; cursor: pointer; }
+.party-history-link:hover { text-decoration: underline; }
+.modal:has(.party-sales-history) { width: min(1100px, 95vw); max-height: 90vh; overflow: auto; }
+.party-sales-history { font-family: 'Manrope', sans-serif; }
+.party-sales-history td { white-space: nowrap; }
