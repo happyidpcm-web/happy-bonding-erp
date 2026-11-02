@@ -794,6 +794,8 @@ export function ShareLedgerModal({
 }
 
 export function Parties({
+  onSelectInvoice,
+  invoiceDetailOpen,
   rows,
   setRows,
   notify,
@@ -802,6 +804,8 @@ export function Parties({
   autoOpenShareLedger,
   onClearAutoOpenShareLedger,
 }: {
+  onSelectInvoice: (invoice: Invoice) => void;
+  invoiceDetailOpen: boolean;
   rows: Party[];
   setRows: (r: Party[]) => void;
   notify: (s: string) => void;
@@ -1111,7 +1115,7 @@ export function Parties({
         />
       )}
 
-      {historyParty && <PartySalesHistory party={historyParty} onClose={() => setHistoryParty(null)} />}
+      {historyParty && <PartySalesHistory onSelectInvoice={onSelectInvoice} hidden={invoiceDetailOpen} party={historyParty} onClose={() => setHistoryParty(null)} />}
       {ledgerParty && (
         <PartyLedgerModal party={ledgerParty} onClose={() => setLedgerParty(null)} />
       )}
@@ -1119,28 +1123,28 @@ export function Parties({
   );
 }
 
-function PartySalesHistory({ party, onClose }: { party: Party; onClose: () => void }) {
+function PartySalesHistory({ party, onClose, onSelectInvoice, hidden }: { party: Party; onClose: () => void; onSelectInvoice: (invoice: Invoice) => void; hidden: boolean }) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
-  const [selected, setSelected] = useState<Invoice | null>(null);
+
   const branch = api.currentBranchId();
   useEffect(() => {
     let active = true;
-    setLoading(true); setError(''); setInvoices([]); setSelected(null);
+    setLoading(true); setError(''); setInvoices([]);
     api.sales(party.id).then(rows => { if (active) setInvoices(rows); }).catch(e => { if (active) setError(e instanceof Error ? e.message : 'Unable to load invoices'); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [party.id, branch, retry]);
+  }, [party.id, branch, retry, hidden]);
+  if (hidden) return null;
   return <Modal title={party.name + ' - Sales Invoices'} onClose={onClose}>
     <div className="party-sales-history">
       <p>All dates / Current branch / {invoices.length} invoices</p>
       {loading ? <p role="status">Loading invoices...</p> : error ? <p role="alert">{error} <button onClick={() => setRetry(n => n + 1)}>Retry</button></p> : <>
         <div className="table-scroll"><table><thead><tr><th>Invoice</th><th>Date</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th></tr></thead><tbody>
-          {invoices.map(i => <tr key={i.id}><td><button className="party-history-link" onClick={() => setSelected(i)}>{i.number}</button></td><td>{i.date}</td><td>{money(i.amount)}</td><td>{money(i.paidAmount ?? 0)}</td><td>{money(Math.max(0, i.amount - (i.paidAmount ?? 0)))}</td><td>{i.status}</td></tr>)}
+          {invoices.map(i => <tr key={i.id}><td><button className="party-history-link" onClick={() => onSelectInvoice(i)}>{i.number}</button></td><td>{i.date}</td><td>{money(i.amount)}</td><td>{money(i.paidAmount ?? 0)}</td><td>{money(Math.max(0, i.amount - (i.paidAmount ?? 0)))}</td><td>{i.status}</td></tr>)}
           {!invoices.length && <tr><td colSpan={6}>No sales invoices linked to this party in this branch.</td></tr>}
         </tbody></table></div>
-        {selected && <section><h3>{selected.number} - Items</h3><div className="table-scroll"><table><thead><tr><th>Item</th><th>Quantity</th><th>Amount</th></tr></thead><tbody>{selected.lines?.map((line, index) => <tr key={index}><td>{line.itemName}</td><td>{line.quantity}</td><td>{money(line.total)}</td></tr>)}</tbody></table></div></section>}
       </>}
     </div>
   </Modal>;
