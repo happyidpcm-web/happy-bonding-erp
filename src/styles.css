@@ -5508,3 +5508,6 @@ input:checked + .slider:before {
 .low-stock-filters input:focus-visible, .low-stock-filters select:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 @media(max-width: 700px) { .low-stock-filters label { width: 100%; } }
 @media print { .low-stock-filters { display: none; } }
+.back-heading { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.back-heading > .icon-button { flex-shrink: 0; }
+.back-heading > h1, .back-heading > h2 { margin: 0; }

@@ -643,7 +643,7 @@ export function BulkAddPartiesModal({
           <tbody>{importedContacts.slice(historyPage * 100, (historyPage + 1) * 100).map(party => <tr key={party.id}><td>{party.name}</td><td>{party.phone}</td><td>{party.email || "-"}</td><td>{party.address || "-"}</td></tr>)}</tbody></table></div>
           <button type="button" className="secondary" disabled={!historyPage} onClick={() => setHistoryPage(p => p - 1)}>Previous</button>
           <button type="button" className="secondary" disabled={(historyPage + 1) * 100 >= importedContacts.length} onClick={() => setHistoryPage(p => p + 1)}>Next</button>
-          <button type="button" className="secondary" onClick={() => setSelectedImport("")}>Back to entry</button>
+          <button type="button" className="icon-button" aria-label="Back to entry" title="Back to entry" onClick={() => setSelectedImport("")}><ArrowLeft size={18} /></button>
         </div>}
       </section>
       {deleteCandidates.length > 0 && <Modal title="Confirm contact deletion" onClose={() => { if (!saving) setDeleteCandidates([]); }}>

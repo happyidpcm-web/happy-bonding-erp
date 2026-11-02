@@ -1098,7 +1098,7 @@ export function GenericVoucherPage({
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button className="secondary compact" onClick={() => setSelectedVoucher(null)}>← {type} {selectedVoucher.number}</button>
+            <button type="button" className="icon-button" onClick={() => setSelectedVoucher(null)} aria-label="Back to list" title="Back to list"><ArrowLeft size={18} /></button><span>{type} {selectedVoucher.number}</span>
             <span className={`pill ${selectedVoucher.status === "Converted" || selectedVoucher.status === "Completed" ? "success" : "danger"}`}>{selectedVoucher.status}</span>
           </div>
           <div style={{ display: "flex", gap: 10 }}>

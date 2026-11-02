@@ -1119,7 +1119,7 @@ function InvoiceDetailModal({
       <div className="full-invoice-view-container card">
         <div className="full-invoice-top-bar">
           <div className="title-left">
-            <button className="secondary compact" onClick={onClose}>← Sales Invoice {invoice.number}</button>
+            <button type="button" className="icon-button" onClick={onClose} aria-label="Back to Sales Invoices" title="Back to Sales Invoices"><ArrowLeft size={18} /></button><span>Sales Invoice {invoice.number}</span>
             <span className={`pill ${invoice.status === "Paid" ? "success" : "danger"}`}>{invoice.status}</span>
           </div>
           <div className="actions-right">

@@ -70,3 +70,14 @@
 .stock-detail-report td:first-child { white-space: nowrap; }
 .stock-detail-report table { min-width: 1050px; }
 .stock-detail-report td:last-child { overflow-wrap: anywhere; max-width: 200px; }
+.ageing-report { font-family: 'Manrope', sans-serif; }
+.ageing-report .ageing-totals { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ageing-report .ageing-totals > div:last-child { background: #fff5f3; }
+.ageing-report .ageing-totals > div:last-child strong { color: #b42318; }
+.ageing-note { font-size: 12px; line-height: 1.7; color: var(--muted); margin: 0 0 20px; max-width: 960px; }
+.ageing-report table { min-width: 1100px; }
+.ageing-report th { font-size: 10px; line-height: 1.5; }
+.ageing-report td { font-size: 13px; font-weight: 400; }
+.ageing-report td:nth-child(3), .ageing-report td:nth-child(4) { white-space: nowrap; }
+.ageing-report tfoot th { font-size: 12px; font-weight: 700; }
+@media(max-width: 700px) { .ageing-report .ageing-totals { grid-template-columns: 1fr; } }

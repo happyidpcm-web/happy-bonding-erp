@@ -1,3 +1,4 @@
+import { ArrowLeft } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import './backend-report.css';
 import * as XLSX from 'xlsx';
@@ -41,7 +42,7 @@ export function ItemSummary({ onBack, notify }: { onBack: () => void; notify: (m
   const qty = (n: number) => Number(n.toFixed(3));
   return <div className="report-screen-wrap printable-report item-sales-report">
     <div className="page-heading">
-      <div><button type="button" className="secondary" onClick={onBack}>Back</button><h1>Item Sales and Purchase Summary</h1></div>
+      <div className="back-heading"><button type="button" className="icon-button" onClick={onBack} aria-label="Back" title="Back to Reports"><ArrowLeft size={18} /></button><h1>Item Sales and Purchase Summary</h1></div>
       <div className="header-actions">
         <button className="secondary" disabled={loading || !!error || !rows.length} onClick={exportExcel}>Download Excel</button>
         <button className="secondary" disabled={loading || !!error || !rows.length} onClick={() => setEmailOpen(true)}>Email Excel</button>
