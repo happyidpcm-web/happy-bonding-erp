@@ -52,6 +52,7 @@ export function invoiceExcelDate(invoice: { date: string; dateISO?: string }): n
 }
 
 export function isInvoiceInDateRange(r: { date: string; dateISO?: string }, filter: string, customRange?: CustomDateRange, now = new Date()): boolean {
+  if (filter === "All") return true;
   const d = parseInvoiceDate(r.dateISO || r.date);
   if (isNaN(d.getTime())) return false;
 

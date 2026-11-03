@@ -30,7 +30,9 @@ test('item summary loads backend quantities, date presets, custom range, export,
   await page.getByText('Item Sales and Purchase Summary', { exact: true }).click();
   await expect(page.getByRole('cell', { name: 'Test Shirt', exact: true })).toBeVisible();
   await expect(page.getByRole('cell', { name: '12', exact: true })).toBeVisible();
-  for (const filter of ['Yesterday', 'This Week', 'Last Week', 'Today']) {
+  await expect(page.getByRole('button', { name: 'Date filter' })).toHaveText('All');
+  await expect.poll(() => queries.at(-1)?.get('filter')).toBe('All');
+  for (const filter of ['All', 'Yesterday', 'This Week', 'Last Week', 'Today']) {
     await page.getByRole('button', { name: 'Date filter' }).click();
     await page.getByRole('button', { name: filter, exact: true }).click();
     await expect.poll(() => queries.at(-1)?.get('filter')).toBe(filter);
@@ -57,6 +59,11 @@ test('item summary loads backend quantities, date presets, custom range, export,
   await page.getByRole('button', { name: 'Back', exact: true }).click();
   for (const title of ['Purchase Summary', 'Expense Category Report', 'Expense Transaction Report', 'Item Report By Party', 'Party Report By Item', 'Bill Wise Profit']) {
     await page.getByRole('button', { name: title, exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Date filter' })).toHaveText('All');
+    if (title === 'Item Report By Party') {
+      await expect(page.getByRole('heading', { name: 'Item Sales Totals', exact: true })).toBeVisible();
+      await page.getByLabel('Item report view').selectOption('parties');
+    }
     await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
     await expect(page.getByRole('cell', { name: 'Backend record', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Back', exact: true }).click();

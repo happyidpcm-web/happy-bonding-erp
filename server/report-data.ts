@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const reportQuery = z.object({
-  filter: z.enum(['Today', 'Yesterday', 'This Week', 'Last Week', 'Last 7 Days', 'This Month', 'Previous Month', 'Last 30 Days', 'This Quarter', 'Previous Quarter', 'Current Fiscal Year', 'Previous Fiscal Year', 'Last 365 Days', 'Custom Range']).default('Today'),
+  filter: z.enum(['All', 'Today', 'Yesterday', 'This Week', 'Last Week', 'Last 7 Days', 'This Month', 'Previous Month', 'Last 30 Days', 'This Quarter', 'Previous Quarter', 'Current Fiscal Year', 'Previous Fiscal Year', 'Last 365 Days', 'Custom Range']).default('All'),
   from: z.iso.date().optional(), to: z.iso.date().optional(),
   fromTime: z.iso.time({ precision: -1 }).optional(), toTime: z.iso.time({ precision: -1 }).optional(),
 }).superRefine((q, ctx) => {
@@ -38,7 +38,7 @@ export function reportBounds(q: ReportQuery, now = new Date()) {
     case 'Custom Range': from = new Date(`${q.from}T00:00:00Z`); to = new Date(`${q.to}T00:00:00Z`); break;
   }
   const end = new Date(to); day(end, 1);
-  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10), where: { gte: from, lt: end }, timestampWhere: { gte: new Date(from.getTime() - 19800000), lt: new Date(end.getTime() - 19800000) } };
+  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10), where: { gte: q.filter === 'All' ? undefined : from, lt: q.filter === 'All' ? undefined : end }, timestampWhere: { gte: q.filter === 'All' ? undefined : new Date(from.getTime() - 19800000), lt: q.filter === 'All' ? undefined : new Date(end.getTime() - 19800000) } };
 }
 
 export function storeCalendarDate(timestamp: Date) {

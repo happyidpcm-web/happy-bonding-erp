@@ -500,7 +500,7 @@ export function SalesSummaryReportScreen({
   notify: (msg: string) => void;
 }) {
   const [emailModalOpen, setEmailModalOpen] = useState(false);
-  const [dateFilter, setDateFilter] = useState(initialDateSelection?.filter || "Last 365 Days");
+  const [dateFilter, setDateFilter] = useState(initialDateSelection?.filter || "All");
   const [customDateRange, setCustomDateRange] = useState<CustomDateRange>(initialDateSelection?.range || { from: "", to: "" });
   const [partyFilter, setPartyFilter] = useState("All Parties");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -662,7 +662,7 @@ export function DayBookReportScreen({
   notify: (msg: string) => void;
 }) {
   const [emailModalOpen, setEmailModalOpen] = useState(false);
-  const [dateFilter, setDateFilter] = useState(initialDateSelection?.filter || "This Week");
+  const [dateFilter, setDateFilter] = useState(initialDateSelection?.filter || "All");
   const [customDateRange, setCustomDateRange] = useState<CustomDateRange>(initialDateSelection?.range || { from: "", to: "" });
   const filteredInvoices = useMemo(() => invoices.filter(row => isInvoiceInDateRange(row, dateFilter, customDateRange)), [invoices, dateFilter, customDateRange]);
   const netAmount = filteredInvoices.reduce((sum, r) => sum + r.amount, 0);

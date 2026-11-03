@@ -13,7 +13,7 @@ test('report presets use IST today and Sunday to Saturday weeks', () => {
   ]) {
     const actual = reportBounds(reportQuery.parse({ filter }), now);
     assert.equal(actual.from, from, filter); assert.equal(actual.to, to, filter);
-    assert.equal(actual.where.lt.getTime() - new Date(`${to}T00:00:00Z`).getTime(), 86400000);
+    assert.equal(actual.where.lt!.getTime() - new Date(`${to}T00:00:00Z`).getTime(), 86400000);
   }
 });
 
@@ -55,4 +55,15 @@ test('item totals match by variant, keep purchase-only and archived items, and a
   assert.equal(rows.find(r => r.id === 'large')?.purchaseQty, 10);
   assert.equal(rows.find(r => r.id === 'archived')?.salesAmount, 75);
   assert.deepEqual(summarizeItems(catalog, [], []), []);
+});
+
+ test('All removes both calendar and timestamp restrictions and ignores stale custom ranges', () => {
+  const q = reportQuery.parse({ filter: 'All', from: '2026-11-01', to: '2026-11-02', fromTime: '10:00' });
+  assert.equal(reportQuery.parse({}).filter, 'All');
+  const bounds = reportBounds(q);
+  assert.equal(bounds.where.gte, undefined);
+  assert.equal(bounds.where.lt, undefined);
+  assert.equal(bounds.timestampWhere.gte, undefined);
+  assert.equal(bounds.timestampWhere.lt, undefined);
+  assert.equal(matchesReportTime(new Date('2020-01-01'), new Date('2020-01-01'), q), true);
 });

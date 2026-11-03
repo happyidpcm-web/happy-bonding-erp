@@ -11,7 +11,7 @@ import { EmailExcelReportModal } from './Reports';
 export function ItemSummary({ onBack, notify }: { onBack: () => void; notify: (message: string) => void }) {
   const [sort, setSort] = useState('salesQty');
   const [category, setCategory] = useState('All Categories');
-  const [filter, setFilter] = useState('Today');
+  const [filter, setFilter] = useState('All');
   const [range, setRange] = useState<CustomDateRange>({ from: '', to: '' });
   const [data, setData] = useState<Awaited<ReturnType<typeof api.itemSummary>> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,7 +36,7 @@ export function ItemSummary({ onBack, notify }: { onBack: () => void; notify: (m
   const exportExcel = () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(excelRows), 'Item Sales Purchase');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ From: data?.from, To: data?.to, Category: category, Search: search, ...totals }]), 'Filters and Totals');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ From: filter === 'All' ? 'All' : data?.from, To: filter === 'All' ? 'All' : data?.to, Category: category, Search: search, ...totals }]), 'Filters and Totals');
     XLSX.writeFile(wb, `item_sales_purchase_${data?.from}_${data?.to}.xlsx`);
   };
   const qty = (n: number) => Number(n.toFixed(3));
@@ -56,7 +56,7 @@ export function ItemSummary({ onBack, notify }: { onBack: () => void; notify: (m
       <select aria-label="Sort summary" value={sort} onChange={e => setSort(e.target.value)}><option value="salesQty">Sales quantity: Highest first</option><option value="purchaseQty">Purchase quantity: Highest first</option><option value="salesAmount">Sales amount: Highest first</option><option value="purchaseAmount">Purchase amount: Highest first</option></select>
       <button className="secondary" disabled={loading} onClick={() => setRetry(n => n + 1)}>Refresh</button>
     </div>
-    {data && <div className="item-report-period"><div><span className="item-report-caption">Report period</span><strong>{new Date(data.from + 'T00:00:00Z').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}{data.from !== data.to && <> ? {new Date(data.to + 'T00:00:00Z').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}</>}</strong></div><span className="item-report-count">{rows.length} items</span></div>}
+    {data && <div className="item-report-period"><div><span className="item-report-caption">Report period</span><strong>{filter === 'All' ? 'All' : <>{new Date(data.from + 'T00:00:00Z').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}{data.from !== data.to && <> ? {new Date(data.to + 'T00:00:00Z').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}</>}</>}</strong></div><span className="item-report-count">{rows.length} items</span></div>}
     <p style={{ fontSize: 12, color: 'var(--muted)' }}>Purchases and sales follow the selected period. Current stock is the live balance including opening stock and adjustments. Returns are excluded from purchase/sales totals. Older stock receipts use their recorded receipt date.</p>
     {loading ? <p role="status">Loading sales and purchases…</p> : error ? <div role="alert">{error} <button onClick={() => setRetry(n => n + 1)}>Retry</button></div> : <>
       <div className="item-report-totals">

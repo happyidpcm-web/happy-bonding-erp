@@ -11,6 +11,8 @@ reportTablesRouter.get('/:kind', async (req, res) => {
   const branchId = requireBranch(req, res); if (!branchId) return;
   const kind = kinds.parse(req.params.kind);
   const q = reportQuery.parse(req.query), bounds = reportBounds(q);
+  // Balance reports use today as their snapshot date when all history is selected.
+  const asOf = reportBounds(q.filter === 'All' ? { filter: 'Today' } : q);
   const scope = { organizationId: req.session!.organizationId, branchId };
   let rows: Row[] = [], columns: string[] = [], moneyColumns: string[] = [], note = '';
   const num = (value: unknown) => Number(value || 0);
@@ -64,18 +66,18 @@ reportTablesRouter.get('/:kind', async (req, res) => {
   } else if (kind === 'party-outstanding' || kind === 'party-ledger' || kind === 'receivable-ageing') {
     const [parties, invoices, credits] = await db.$transaction([
       db.party.findMany({ where: scope }),
-      db.salesInvoice.findMany({ where: { ...scope, status: 'POSTED', invoiceDate: { lt: bounds.where.lt } }, include: { payments: { include: { payment: true } } } }),
-      db.creditNote.findMany({ where: { ...scope, date: { lt: bounds.where.lt } } }),
+      db.salesInvoice.findMany({ where: { ...scope, status: 'POSTED', invoiceDate: { lt: kind === 'party-ledger' ? bounds.where.lt : asOf.where.lt } }, include: { payments: { include: { payment: true } } } }),
+      db.creditNote.findMany({ where: { ...scope, date: { lt: kind === 'party-ledger' ? bounds.where.lt : asOf.where.lt } } }),
     ], { isolationLevel: 'RepeatableRead' });
     if (kind === 'receivable-ageing') {
       columns = ['Party', 'Invoice', 'Invoice Date', 'Due Date', 'Not Due', '1?30 Days', '31?60 Days', '61?90 Days', 'Over 90 Days']; moneyColumns = columns.slice(4);
       rows = invoices.filter(i => i.partyId).map(i => {
         const party = parties.find(p => p.id === i.partyId);
         const due = new Date(i.invoiceDate); due.setUTCDate(due.getUTCDate() + (party?.creditPeriodDays ?? 30));
-        const paid = i.payments.filter(a => a.payment.paidAt < bounds.timestampWhere.lt).reduce((s, a) => s + num(a.amount), 0);
+        const paid = i.payments.filter(a => a.payment.paidAt < asOf.timestampWhere.lt!).reduce((s, a) => s + num(a.amount), 0);
         const credited = credits.filter(c => c.salesInvoiceId === i.id).reduce((s, c) => s + num(c.amount), 0);
         const balance = Math.max(0, num(i.grandTotal) - paid - credited);
-        const days = Math.floor((bounds.where.lt.getTime() - 86400000 - due.getTime()) / 86400000);
+        const days = Math.floor((asOf.where.lt!.getTime() - 86400000 - due.getTime()) / 86400000);
         const bucket = days <= 0 ? 'Not Due' : days <= 30 ? '1?30 Days' : days <= 60 ? '31?60 Days' : days <= 90 ? '61?90 Days' : 'Over 90 Days';
         return { Party: party?.name || '', Invoice: i.invoiceNumber, 'Invoice Date': date(i.invoiceDate), 'Due Date': date(due), ...Object.fromEntries(moneyColumns.map(k => [k, k === bucket ? balance : 0])) };
       }).filter(r => moneyColumns.some(k => num((r as Row)[k]) > 0));
@@ -85,7 +87,7 @@ reportTablesRouter.get('/:kind', async (req, res) => {
       rows = parties.map(p => {
         const bills = invoices.filter(i => i.partyId === p.id);
         const invoiced = bills.reduce((s, i) => s + num(i.grandTotal), 0);
-        const collected = bills.reduce((s, i) => s + i.payments.filter(a => a.payment.paidAt < bounds.timestampWhere.lt).reduce((n, a) => n + num(a.amount), 0), 0);
+        const collected = bills.reduce((s, i) => s + i.payments.filter(a => a.payment.paidAt < asOf.timestampWhere.lt!).reduce((n, a) => n + num(a.amount), 0), 0);
         const credit = credits.filter(c => c.partyId === p.id).reduce((s, c) => s + num(c.amount), 0);
         const opening = num(p.openingBalance) * (p.openingBalanceType === 'TO_PAY' ? -1 : 1);
         return { Party: p.name, 'Opening Balance': opening, Invoiced: invoiced, Collected: collected, 'Credit Notes': credit, Outstanding: opening + invoiced - collected - credit };
@@ -94,9 +96,9 @@ reportTablesRouter.get('/:kind', async (req, res) => {
     } else {
       columns = ['Date', 'Party', 'Reference', 'Type', 'Debit', 'Credit']; moneyColumns = ['Debit', 'Credit'];
       const names = new Map(parties.map(p => [p.id, p.name]));
-      rows = invoices.filter(i => i.invoiceDate >= bounds.where.gte && matchesReportTime(i.invoiceDate, i.createdAt, q)).map(i => ({ Date: date(i.invoiceDate), Party: names.get(i.partyId || '') || 'Cash Sale', Reference: i.invoiceNumber, Type: 'Sales Invoice', Debit: num(i.grandTotal), Credit: 0 }));
-      rows.push(...invoices.flatMap(i => i.payments.filter(a => a.payment.paidAt >= bounds.timestampWhere.gte && a.payment.paidAt < bounds.timestampWhere.lt && matchesReportTime(storeCalendarDate(a.payment.paidAt), a.payment.paidAt, q)).map(a => ({ Date: date(storeCalendarDate(a.payment.paidAt)), Party: names.get(i.partyId || '') || 'Cash Sale', Reference: i.invoiceNumber, Type: 'Payment Allocation', Debit: 0, Credit: num(a.amount) }))));
-      rows.push(...credits.filter(c => c.date >= bounds.where.gte && matchesReportTime(c.date, c.createdAt, q)).map(c => ({ Date: date(c.date), Party: names.get(c.partyId) || '', Reference: c.creditNoteNumber, Type: 'Credit Note', Debit: 0, Credit: num(c.amount) })));
+      rows = invoices.filter(i => (!bounds.where.gte || i.invoiceDate >= bounds.where.gte) && matchesReportTime(i.invoiceDate, i.createdAt, q)).map(i => ({ Date: date(i.invoiceDate), Party: names.get(i.partyId || '') || 'Cash Sale', Reference: i.invoiceNumber, Type: 'Sales Invoice', Debit: num(i.grandTotal), Credit: 0 }));
+      rows.push(...invoices.flatMap(i => i.payments.filter(a => (!bounds.timestampWhere.gte || a.payment.paidAt >= bounds.timestampWhere.gte) && (!bounds.timestampWhere.lt || a.payment.paidAt < bounds.timestampWhere.lt) && matchesReportTime(storeCalendarDate(a.payment.paidAt), a.payment.paidAt, q)).map(a => ({ Date: date(storeCalendarDate(a.payment.paidAt)), Party: names.get(i.partyId || '') || 'Cash Sale', Reference: i.invoiceNumber, Type: 'Payment Allocation', Debit: 0, Credit: num(a.amount) }))));
+      rows.push(...credits.filter(c => (!bounds.where.gte || c.date >= bounds.where.gte) && matchesReportTime(c.date, c.createdAt, q)).map(c => ({ Date: date(c.date), Party: names.get(c.partyId) || '', Reference: c.creditNoteNumber, Type: 'Credit Note', Debit: 0, Credit: num(c.amount) })));
       rows.sort((a, b) => String(a.Date).localeCompare(String(b.Date)));
       note = 'Customer sales, allocated receipts and credit notes within this period. This transaction statement excludes opening balances and supplier transactions.';
     }

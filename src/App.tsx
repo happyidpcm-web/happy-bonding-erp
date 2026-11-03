@@ -1231,6 +1231,7 @@ function InvoiceDetailModal({
 }
 
 export const REPORT_DATE_OPTIONS = [
+  { label: "All", sub: "" },
   { label: "Today", sub: "" },
   { label: "Yesterday", sub: "" },
   { label: "This Week", sub: "" },

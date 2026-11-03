@@ -33,7 +33,7 @@ export const backendReports: Record<string, { kind: string; title: string }> = {
 };
 
 export function BackendReport({ report, onBack, notify, initialDateSelection }: { report: { kind: string; title: string }; onBack: () => void; notify: (message: string) => void; initialDateSelection?: DateRangeSelection }) {
-  const [filter, setFilter] = useState(initialDateSelection?.filter || 'Today');
+  const [filter, setFilter] = useState(initialDateSelection?.filter || 'All');
   const [range, setRange] = useState<CustomDateRange>(initialDateSelection?.range || { from: '', to: '' });
   const [data, setData] = useState<Awaited<ReturnType<typeof api.reportTable>> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,7 +67,7 @@ export function BackendReport({ report, onBack, notify, initialDateSelection }: 
   const exportExcel = () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportRows), 'Report');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ Report: report.title, From: data?.from, To: data?.to, Search: search, ...(isItemReport ? { View: itemView, Sort: sort } : {}), Notes: data?.note }]), 'Filters');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ Report: report.title, From: filter === 'All' ? 'All' : data?.from, To: filter === 'All' ? 'All' : data?.to, Search: search, ...(isItemReport ? { View: itemView, Sort: sort } : {}), Notes: data?.note }]), 'Filters');
     XLSX.writeFile(wb, `${report.kind}_${data?.from}_${data?.to}.xlsx`);
   };
   const formatDate = (value: string) => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(value + 'T00:00:00Z'));
@@ -90,9 +90,9 @@ export function BackendReport({ report, onBack, notify, initialDateSelection }: 
         </div>
         <p className="ageing-note">Includes unpaid invoices up to the selected end date. Overdue days use each customer's current credit period. Opening balances are excluded. Totals follow your search.</p>
       </> : isItemReport || isStockReport ? <div className="item-report-period">
-        <div><span className="item-report-caption">{isStockReport ? 'Stock movement period' : 'Sales period'}</span><strong>{formatDate(data.from)}{data.from !== data.to && <> to {formatDate(data.to)}</>}</strong></div>
+        <div><span className="item-report-caption">{isStockReport ? 'Stock movement period' : 'Sales period'}</span><strong>{filter === 'All' ? 'All' : <>{formatDate(data.from)}{data.from !== data.to && <> to {formatDate(data.to)}</>}</>}</strong></div>
         <span className="item-report-count">{rows.length.toLocaleString('en-IN')} {isStockReport ? 'movements' : itemView === 'items' ? 'items' : 'records'}</span>
-      </div> : <><p>{data.from} to {data.to} ? {rows.length} records ? Weeks run Sunday?Saturday.</p><p>{data.note}</p></>}
+      </div> : <><p>{filter === 'All' ? 'All' : `${data.from} to ${data.to}`} ? {rows.length} records ? Weeks run Sunday?Saturday.</p><p>{data.note}</p></>}
       {isStockReport && <>
         <div className="item-report-totals">{['Stock In', 'Stock Out'].map(c => <div key={c}><span>{c} (Pieces)</span><strong>{rows.reduce((sum, row) => sum + Number(row[c] || 0), 0).toLocaleString('en-IN', { maximumFractionDigits: 3 })}</strong></div>)}</div>
         <p className="low-stock-explanation">{data.note} Unit cost is shown only when recorded.</p>
