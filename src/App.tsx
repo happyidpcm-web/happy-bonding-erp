@@ -1,4 +1,5 @@
 import ownerSignatureUrl from "./assets/owner-signature.png";
+import { findInvoiceParty } from "./utils/invoiceParty";
 import { matchesItemSearch } from "./utils/itemSearch";
 import { useDismissibleDropdown } from "./hooks/useDismissibleDropdown";
 import { isInvoiceInDateRange, isValidCustomDateRange, type CustomDateRange, type DateRangeSelection } from "./utils/invoiceDateRange";
@@ -2406,8 +2407,12 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
       const product = products.find(p => String(p.id) === String((line as InvoiceLineItem & { productId?: string }).productId) || p.sku === line.sku);
       return product ? { product: { ...product, name: line.itemName, hsnCode: line.hsnCode, sellingPrice: line.unitPrice, mrp: line.mrp ?? product.mrp }, qty: line.quantity, discount: line.discount, taxRate: line.taxRate } : null;
     }).filter(Boolean) as InvoiceLineDraft[];
+    const party = findInvoiceParty(parties, inv);
+    if ((inv.partyId || inv.partyPhone) && !party) {
+      notify("The invoice customer could not be matched uniquely. Refresh the party list before continuing.");
+      return;
+    }
     setLines(copiedLines);
-    const party = parties.find(p => p.name === inv.party || p.phone === inv.partyPhone);
     setSelectedParty(party);
     setPartySearch(party ? `${party.name} ${party.phone}` : inv.party);
     setPaid(0);
@@ -2437,7 +2442,11 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
       setDetailsNotes(inv.notes ?? "");
       return;
     }
-    const party = parties.find(p => p.name === inv.party || p.phone === inv.partyPhone);
+    const party = findInvoiceParty(parties, inv);
+    if ((inv.partyId || inv.partyPhone) && !party) {
+      notify("The invoice customer could not be matched uniquely. Refresh the party list before continuing.");
+      return;
+    }
     setEditingInvoice(inv);
     setLines(editLines);
     setSelectedParty(party);

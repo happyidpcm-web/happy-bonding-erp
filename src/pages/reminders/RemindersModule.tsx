@@ -1,3 +1,4 @@
+import { invoiceBelongsToParty } from "../../utils/invoiceParty";
 import { useState } from "react";
 import { MessageCircle } from "lucide-react";
 import type { Invoice, Party } from "../../types";
@@ -9,7 +10,7 @@ export function RemindersModule({ parties, invoices, notify }: { parties: Party[
   const customersWithSpecialDays = parties.filter(p => p.type === "Customer" && (p.customBirthday || p.customKovilThiruvila));
 
   const handleSendPaymentReminder = (p: Party) => {
-    const partyInvoices = invoices.filter(inv => inv.party === p.name && (inv.status === "Unpaid" || inv.status === "Partially paid"));
+    const partyInvoices = invoices.filter(inv => invoiceBelongsToParty(inv, p) && (inv.status === "Unpaid" || inv.status === "Partially paid"));
     const invNumbers = partyInvoices.map(i => i.number).join(", ") || "Outstanding Balance";
     const text = `👔 *Happy Bonding Men's Wear - Store Reminder*
 --------------------------------------------
