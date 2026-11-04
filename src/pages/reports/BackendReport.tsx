@@ -62,7 +62,14 @@ export function BackendReport({ report, onBack, notify, initialDateSelection }: 
   const overdue = rows.reduce((sum, r) => sum + (data?.moneyColumns || []).filter(c => c !== 'Not Due').reduce((n, c) => n + Number(r[c] || 0), 0), 0);
   const totalQuantity = Number(rows.reduce((sum, row) => sum + Number(row.Quantity || 0), 0).toFixed(3));
   const totalAmount = rows.reduce((sum, row) => sum + Number(row.Amount || 0), 0);
-  const exportRows = rows.map(r => Object.fromEntries(columns.map(c => [columnLabel(c), r[c] ?? ''])));
+  const exportRows = rows.map(r => Object.fromEntries(columns.map(c => {
+    const value = r[c] ?? '';
+    // Format calendar dates explicitly so Excel exports use day/month/year.
+    const date = /(^|\s)date$/i.test(c) && typeof value === 'string'
+      ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+      : null;
+    return [columnLabel(c), date ? `${date[3]}/${date[2]}/${date[1]}` : value];
+  })));
   if (isItemReport || isAgeingReport) exportRows.push(Object.fromEntries(columns.map((c, index) => [columnLabel(c), index === 0 ? 'Total' : c === 'Quantity' ? totalQuantity : data?.moneyColumns.includes(c) ? Number(rows.reduce((sum, row) => sum + Number(row[c] || 0), 0).toFixed(2)) : ''])));
   const exportExcel = () => {
     const wb = XLSX.utils.book_new();
