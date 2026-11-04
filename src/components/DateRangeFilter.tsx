@@ -11,7 +11,7 @@ export function DateRangeFilter({ value, range, onChange, onRangeChange }: {
 }) {
   const [open, setOpen] = useState(false);
   const [customOpen, setCustomOpen] = useState(false);
-  const ref = useDismissibleDropdown(open || customOpen, () => { setOpen(false); setCustomOpen(false); });
+  const ref = useDismissibleDropdown(open, () => { setOpen(false); setCustomOpen(false); });
   return <div className="sales-date-picker-wrap" ref={ref}>
     <button type="button" className="sales-date-range-btn" aria-label="Date filter" aria-expanded={open || customOpen}
       onClick={() => { setOpen(!open); setCustomOpen(false); }}>
