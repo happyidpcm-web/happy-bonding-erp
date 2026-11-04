@@ -1,4 +1,3 @@
-import { createPortal } from "react-dom";
 import ownerSignatureUrl from "./assets/owner-signature.png";
 import { findInvoiceParty } from "./utils/invoiceParty";
 import { matchesItemSearch } from "./utils/itemSearch";
@@ -1260,54 +1259,49 @@ export function CustomDateRangePopover({
   onCancel: () => void;
 }) {
   const [draft, setDraft] = useState<CustomDateRange>(range);
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    dialog?.showModal();
-    return () => dialog?.close();
-  }, []);
   const valid = isValidCustomDateRange(draft);
-  const today = timeFilterRange("Today", { from: "", to: "" });
-  const timeControl = (label: string, key: "fromTime" | "toTime", fallback: string) => {
-    const value = draft[key] || fallback;
-    const [hour, minute] = value.split(":").map(Number);
-    const update = (h: number, m: number) => setDraft(prev => ({ ...prev, [key]: String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0") }));
-    return <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
-      <legend style={{ marginBottom: 8 }}>{label}</legend>
-      <div style={{ display: "flex", gap: 6 }}>
-        <select aria-label={label + " hour"} value={hour % 12 || 12} onChange={e => update(Number(e.target.value) % 12 + (hour >= 12 ? 12 : 0), minute)}>
-          {Array.from({ length: 12 }, (_, i) => i + 1).map(h => <option key={h} value={h}>{String(h).padStart(2, "0")}</option>)}
-        </select>
-        <select aria-label={label + " minute"} value={minute} onChange={e => update(hour, Number(e.target.value))}>
-          {Array.from({ length: 60 }, (_, m) => <option key={m} value={m}>{String(m).padStart(2, "0")}</option>)}
-        </select>
-        <select aria-label={label + " AM/PM"} value={hour >= 12 ? "PM" : "AM"} onChange={e => update(hour % 12 + (e.target.value === "PM" ? 12 : 0), minute)}>
-          <option>AM</option><option>PM</option>
-        </select>
+  return (
+    <div style={{ position: "absolute", top: "calc(100% + 8px)", left: 0, width: 344, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 6, boxShadow: "0 12px 28px rgba(15,23,42,.16)", zIndex: 1000, padding: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 18px minmax(0, 1fr)", alignItems: "end", gap: 10, marginBottom: 14, color: "#64748b", fontSize: 14 }}>
+        <label style={{ display: "grid", gap: 8 }}>
+          <span>Select Start Date</span>
+          <input
+            type="date"
+            value={draft.from}
+            onChange={e => setDraft(prev => ({ ...prev, from: e.target.value }))}
+            style={{ width: "100%", minWidth: 0, height: 36, border: "1px solid #dbe3ef", borderRadius: 6, padding: "0 8px", color: "#334155", boxSizing: "border-box" }}
+          />
+        </label>
+        <span style={{ textAlign: "center", height: 36, lineHeight: "36px", color: "#94a3b8" }}>-</span>
+        <label style={{ display: "grid", gap: 8 }}>
+          <span>End Date</span>
+          <input
+            type="date"
+            value={draft.to}
+            min={draft.from || undefined}
+            onChange={e => setDraft(prev => ({ ...prev, to: e.target.value }))}
+            style={{ width: "100%", minWidth: 0, height: 36, border: "1px solid #dbe3ef", borderRadius: 6, padding: "0 8px", color: "#334155", boxSizing: "border-box" }}
+          />
+        </label>
       </div>
-    </fieldset>;
-  };
-  return createPortal(
-    <dialog ref={dialogRef} className="invoice-time-dialog" aria-labelledby="invoice-time-title" onCancel={e => { e.preventDefault(); onCancel(); }}>
-      <h3 id="invoice-time-title">Date &amp; Time Filter</h3>
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <button type="button" onClick={() => setDraft(prev => ({ ...prev, ...today }))}>Today</button>
-        <button type="button" onClick={() => setDraft(prev => ({ ...prev, ...timeFilterRange("Yesterday", today) }))}>Yesterday</button>
-        <button type="button" onClick={() => setDraft(prev => ({ ...prev, fromTime: "", toTime: "" }))}>Full Day</button>
+      <div style={{ display: "flex", gap: 16, marginBottom: 14 }}>
+        <label>From Time<input type="time" value={draft.fromTime || ""} onChange={e => setDraft(prev => ({ ...prev, fromTime: e.target.value }))} /></label>
+        <label>To Time<input type="time" value={draft.toTime || ""} onChange={e => setDraft(prev => ({ ...prev, toTime: e.target.value }))} /></label>
       </div>
-      <div className="invoice-time-grid">
-        <label>Select Start Date<input type="date" value={draft.from} onChange={e => setDraft(prev => ({ ...prev, from: e.target.value }))} /></label>
-        <label>End Date<input type="date" value={draft.to} min={draft.from || undefined} onChange={e => setDraft(prev => ({ ...prev, to: e.target.value }))} /></label>
-        {timeControl("From Time", "fromTime", "00:00")}
-        {timeControl("To Time", "toTime", "23:59")}
-      </div>
-      <p>Times are in IST. Select your dates and times, then click Apply Filter.</p>
+      <p style={{ fontSize: 12, color: "#64748b" }}>Times are in IST, as shown on the invoice. Leave blank for the full day. Invoices without a recorded time are excluded when filtering by time.</p>
       {draft.from && draft.to && !valid && <p role="alert">End date and time must be on or after start date and time.</p>}
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-        <button type="button" onClick={onCancel}>Cancel</button>
-        <button type="button" className="primary" disabled={!valid} onClick={() => { if (valid) onApply(draft); }}>Apply Filter</button>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 14, fontSize: 12, fontWeight: 700 }}>
+        <button type="button" onClick={onCancel} style={{ border: 0, background: "transparent", color: "#475569", padding: "8px 0" }}>CANCEL</button>
+        <button
+          type="button"
+          onClick={() => { if (valid) onApply(draft); }}
+          disabled={!valid}
+          style={{ border: 0, background: "transparent", color: valid ? "#4f46e5" : "#a8b1c2", padding: "8px 0", fontWeight: 800 }}
+        >
+          OK
+        </button>
       </div>
-    </dialog>, document.body
+    </div>
   );
 }
 
@@ -1373,7 +1367,7 @@ function SalesInvoicesListView({
   const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
   const [openMenuId, setOpenMenuId] = useState<string | number | null>(null);
   const openActionsMenuRef = useDismissibleDropdown(openMenuId !== null, () => setOpenMenuId(null));
-  const datePickerRef = useDismissibleDropdown(datePickerOpen, () => {
+  const datePickerRef = useDismissibleDropdown(datePickerOpen || customRangeOpen, () => {
     setDatePickerOpen(false);
     setCustomRangeOpen(false);
   });
@@ -1643,7 +1637,7 @@ function SalesInvoicesListView({
             <button type="button" className="sales-date-range-btn" aria-label="Time filter"
               aria-expanded={customRangeOpen}
               onClick={() => {
-                setTimeRangeDraft(timeFilterRange(dateFilter === "Custom Range" || dateFilter === "Yesterday" ? dateFilter : "Today", customDateRange));
+                setTimeRangeDraft(timeFilterRange(dateFilter, customDateRange));
                 setDatePickerOpen(false);
                 setCustomRangeOpen(true);
               }}>Time Filter (IST)</button>

@@ -5520,14 +5520,3 @@ input:checked + .slider:before {
 .party-history-row:hover { background: #fff8e6; }
 .party-invoice-row { cursor: pointer; }
 .party-sales-history .party-invoice-row:hover { background: #fff5dc; }
-
-.invoice-time-dialog { width: min(460px, calc(100vw - 32px)); box-sizing: border-box; border: 1px solid #dbe3ef; border-radius: 14px; padding: 24px; color: #334155; box-shadow: 0 20px 60px #0003; }
-.invoice-time-dialog::backdrop { background: #0f172a66; }
-.invoice-time-dialog h3 { margin: 0 0 18px; }
-.invoice-time-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 14px; }
-.invoice-time-grid label { display: grid; gap: 8px; }
-.invoice-time-dialog input, .invoice-time-dialog select { min-width: 0; height: 42px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px; background: white; color: #1e293b; }
-.invoice-time-dialog select { flex: 1; }
-.invoice-time-dialog button { padding: 10px 14px; border-radius: 7px; cursor: pointer; }
-.invoice-time-dialog p { font-size: 13px; margin: 20px 0; }
-@media (max-width: 480px) { .invoice-time-grid { grid-template-columns: 1fr; } }
