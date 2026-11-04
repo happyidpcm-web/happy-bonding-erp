@@ -75,6 +75,7 @@ export interface Invoice {
   subtotal?: number;
   discountTotal?: number;
   invoiceDiscount?: number;
+  couponDiscount?: number;
   additionalCharges?: number;
   taxableTotal?: number;
   taxTotal?: number;

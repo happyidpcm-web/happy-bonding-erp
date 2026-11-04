@@ -911,7 +911,7 @@ app.post("/api/sales", requirePermission("sales.write"), async (req, res) => {
   const lineSubtotal = round2(calculated.reduce((s, x) => s + x.input.quantity * x.input.unitPrice, 0));
   const lineDiscount = round2(calculated.reduce((s, x) => s + x.input.discount, 0));
   const lineTaxable = round2(calculated.reduce((s, x) => s + x.taxable, 0));
-  const grandTotal = Math.max(0, round2(calculated.reduce((s, x) => s + x.total, 0) + input.additionalCharges));
+  const grandTotal = Math.max(0, round2(calculated.reduce((s, x) => s + x.total, 0) + input.additionalCharges - input.couponDiscount));
   const finalPaidAmount = input.markFullyPaid ? grandTotal : round2(Math.min(input.paidAmount, grandTotal));
   const row = await runSalesTransaction(options => db.$transaction(async tx => {
     // Check and decrement once per variant, using current stock in the same
@@ -942,7 +942,7 @@ app.post("/api/sales", requirePermission("sales.write"), async (req, res) => {
       });
     }
     const number = `${prefix}${numToUse}`;
-    const invoice = await tx.salesInvoice.create({ data: { organizationId, branchId, partyId: input.partyId, invoiceNumber: number, invoiceDate: input.invoiceDate, status: "POSTED", paymentStatus: paymentStatus(finalPaidAmount, grandTotal), placeOfSupply: input.placeOfSupply, subtotal: lineSubtotal, discountTotal: round2(lineDiscount + input.invoiceDiscount), invoiceDiscount: input.invoiceDiscount, additionalCharges: input.additionalCharges, taxableTotal: lineTaxable, cgstTotal: calculated.reduce((s,x)=>s+x.cgst,0), sgstTotal: calculated.reduce((s,x)=>s+x.sgst,0), igstTotal: calculated.reduce((s,x)=>s+x.igst,0), grandTotal, paidAmount: finalPaidAmount, notes: input.notes, idempotencyKey: input.idempotencyKey, postedAt: new Date(), lines: { createMany: { data: calculated.map(x => ({ variantId: x.v.id, itemName: x.v.product.name, sku: x.v.sku, hsnCode: x.v.product.hsnCode ?? "", quantity: x.input.quantity, unitPrice: x.input.unitPrice, mrp: x.input.mrp ?? x.v.mrp, purchasePriceAtSale: x.v.purchasePrice, totalCostAtSale: Number(x.v.purchasePrice) * x.input.quantity, discount: x.input.discount, taxableAmount: x.taxable, taxRate: x.rate, cgst: x.cgst, sgst: x.sgst, igst: x.igst, total: x.total })) } } } });
+    const invoice = await tx.salesInvoice.create({ data: { organizationId, branchId, partyId: input.partyId, invoiceNumber: number, invoiceDate: input.invoiceDate, status: "POSTED", paymentStatus: paymentStatus(finalPaidAmount, grandTotal), placeOfSupply: input.placeOfSupply, subtotal: lineSubtotal, discountTotal: round2(lineDiscount + input.invoiceDiscount), invoiceDiscount: input.invoiceDiscount, couponDiscount: input.couponDiscount, additionalCharges: input.additionalCharges, taxableTotal: lineTaxable, cgstTotal: calculated.reduce((s,x)=>s+x.cgst,0), sgstTotal: calculated.reduce((s,x)=>s+x.sgst,0), igstTotal: calculated.reduce((s,x)=>s+x.igst,0), grandTotal, paidAmount: finalPaidAmount, notes: input.notes, idempotencyKey: input.idempotencyKey, postedAt: new Date(), lines: { createMany: { data: calculated.map(x => ({ variantId: x.v.id, itemName: x.v.product.name, sku: x.v.sku, hsnCode: x.v.product.hsnCode ?? "", quantity: x.input.quantity, unitPrice: x.input.unitPrice, mrp: x.input.mrp ?? x.v.mrp, purchasePriceAtSale: x.v.purchasePrice, totalCostAtSale: Number(x.v.purchasePrice) * x.input.quantity, discount: x.input.discount, taxableAmount: x.taxable, taxRate: x.rate, cgst: x.cgst, sgst: x.sgst, igst: x.igst, total: x.total })) } } } });
     await tx.stockMovement.createMany({ data: calculated.map(x => ({ branchId, variantId: x.v.id, type: "SALE" as const, quantity: -x.input.quantity, referenceType: "SalesInvoice", referenceId: invoice.id })) });
     if (finalPaidAmount > 0) { const payment = await tx.payment.create({ data: { organizationId, branchId, direction: "IN", mode: input.paymentMode, amount: finalPaidAmount } }); await tx.paymentAllocation.create({ data: { paymentId: payment.id, salesInvoiceId: invoice.id, amount: finalPaidAmount } }); }
     await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: "sales.posted", entityType: "SalesInvoice", entityId: invoice.id, metadata: { invoiceNumber: number } } });
@@ -1010,7 +1010,7 @@ app.put("/api/sales/:id", requirePermission("sales.write"), async (req, res) => 
   const lineSubtotal = round2(calculated.reduce((s, x) => s + x.input.quantity * x.input.unitPrice, 0));
   const lineDiscount = round2(calculated.reduce((s, x) => s + x.input.discount, 0));
   const lineTaxable = round2(calculated.reduce((s, x) => s + x.taxable, 0));
-  const grandTotal = Math.max(0, round2(calculated.reduce((s, x) => s + x.total, 0) + input.additionalCharges));
+  const grandTotal = Math.max(0, round2(calculated.reduce((s, x) => s + x.total, 0) + input.additionalCharges - input.couponDiscount));
 
   const calculatedGrandTotal = grandTotal;
 
@@ -1025,7 +1025,7 @@ app.put("/api/sales/:id", requirePermission("sales.write"), async (req, res) => 
     // Use the committed invoice total for payment-only edits, preserving
     // historical totals even if product defaults have since changed.
     const grandTotal = changes.linesChanged ? calculatedGrandTotal
-      : changes.totalsChanged ? Math.max(0, round2(oldInvoice.lines.reduce((sum, line) => sum + Number(line.total), 0) + input.additionalCharges))
+      : changes.totalsChanged ? Math.max(0, round2(oldInvoice.lines.reduce((sum, line) => sum + Number(line.total), 0) + input.additionalCharges - input.couponDiscount))
       : Number(oldInvoice.grandTotal);
     // Settle the authoritative total, including any per-line rounding difference.
     const finalPaidAmount = input.markFullyPaid ? grandTotal : round2(Math.min(grandTotal, input.paidAmount));
@@ -1089,6 +1089,7 @@ app.put("/api/sales/:id", requirePermission("sales.write"), async (req, res) => 
         } : {}),
         ...(changes.totalsChanged ? {
           additionalCharges: input.additionalCharges,
+          couponDiscount: input.couponDiscount,
           grandTotal,
         } : {}),
         paidAmount: finalPaidAmount,
