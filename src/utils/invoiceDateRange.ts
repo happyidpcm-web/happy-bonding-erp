@@ -23,6 +23,15 @@ function parseInvoiceDate(dateStr: string): Date {
 export type CustomDateRange = { from: string; to: string; fromTime?: string; toTime?: string };
 export type DateRangeSelection = { filter: string; range: CustomDateRange };
 
+export function timeFilterRange(filter: string, range: CustomDateRange, now = new Date()): CustomDateRange {
+  if (filter === "Custom Range") return { ...range };
+  if (filter !== "Today" && filter !== "Yesterday") return { from: "", to: "" };
+  const day = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  if (filter === "Yesterday") day.setDate(day.getDate() - 1);
+  const date = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+  return { from: date, to: date };
+}
+
 // Match the billing time displayed on the invoice, not UTC midnight in dateISO.
 export function invoiceTime(invoice: { date: string }): string {
   const match = invoice.date.match(/\b(\d{1,2}):(\d{2})\s*(am|pm)?\s*$/i);

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isInvoiceInDateRange, invoiceTime, isValidCustomDateRange } from "../src/utils/invoiceDateRange.ts";
+import { timeFilterRange, isInvoiceInDateRange, invoiceTime, isValidCustomDateRange } from "../src/utils/invoiceDateRange.ts";
 import { saleFromApi } from "../src/api.ts";
 
 const now = new Date(2026, 9, 8, 12);
@@ -50,4 +50,12 @@ test("overnight ranges, optional endpoints and midnight/noon are handled correct
   assert.equal(isInvoiceInDateRange({ date: "31 Oct 2026 12:00 am" }, "Custom Range", { from: "2026-10-31", to: "2026-10-31", toTime: "02:00" }), true);
   assert.equal(invoiceTime({ date: "31 Oct 2026 12:00 pm" }), "12:00");
   assert.equal(invoiceTime({ date: "31 Oct 2026 12:00 am" }), "00:00");
+});
+
+test("time picker prefills the selected IST day and preserves custom endpoints", () => {
+  const instant = new Date("2026-10-31T20:00:00Z");
+  assert.deepEqual(timeFilterRange("Today", { from: "", to: "" }, instant), { from: "2026-11-01", to: "2026-11-01" });
+  assert.deepEqual(timeFilterRange("Yesterday", { from: "", to: "" }, instant), { from: "2026-10-31", to: "2026-10-31" });
+  const range = { from: "2026-10-30", to: "2026-10-31", fromTime: "10:00", toTime: "14:00" };
+  assert.deepEqual(timeFilterRange("Custom Range", range, instant), range);
 });

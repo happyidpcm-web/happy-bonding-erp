@@ -2,7 +2,7 @@ import ownerSignatureUrl from "./assets/owner-signature.png";
 import { findInvoiceParty } from "./utils/invoiceParty";
 import { matchesItemSearch } from "./utils/itemSearch";
 import { useDismissibleDropdown } from "./hooks/useDismissibleDropdown";
-import { isInvoiceInDateRange, isValidCustomDateRange, type CustomDateRange, type DateRangeSelection } from "./utils/invoiceDateRange";
+import { timeFilterRange, isInvoiceInDateRange, isValidCustomDateRange, type CustomDateRange, type DateRangeSelection } from "./utils/invoiceDateRange";
 export { isInvoiceInDateRange, type CustomDateRange } from "./utils/invoiceDateRange";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -1360,6 +1360,7 @@ function SalesInvoicesListView({
   const [dateFilter, setDateFilter] = useState("Last 365 Days");
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [customRangeOpen, setCustomRangeOpen] = useState(false);
+  const [timeRangeDraft, setTimeRangeDraft] = useState<CustomDateRange>({ from: "", to: "" });
   const [customDateRange, setCustomDateRange] = useState<CustomDateRange>({ from: "", to: "" });
   const [reportsDropdownOpen, setReportsDropdownOpen] = useState(false);
   const reportsDropdownRef = useDismissibleDropdown(reportsDropdownOpen, () => setReportsDropdownOpen(false));
@@ -1621,16 +1622,25 @@ function SalesInvoicesListView({
           </div>
 
           {/* Interactive Date Range Picker matching reference images 1 & 2 */}
-          <div className="sales-date-picker-wrap" ref={datePickerRef}>
+          <div className="sales-date-picker-wrap" ref={datePickerRef} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button
               type="button"
               className="sales-date-range-btn"
+              aria-label="Date filter"
               onClick={() => { setDatePickerOpen(!datePickerOpen); setCustomRangeOpen(false); }}
             >
               <Calendar size={15} color="#64748b" />
               <span>{dateFilter === "Custom Range" ? customRangeLabel(customDateRange) : dateFilter}</span>
               <Calendar size={15} color="#64748b" />
             </button>
+
+            <button type="button" className="sales-date-range-btn" aria-label="Time filter"
+              aria-expanded={customRangeOpen}
+              onClick={() => {
+                setTimeRangeDraft(timeFilterRange(dateFilter, customDateRange));
+                setDatePickerOpen(false);
+                setCustomRangeOpen(true);
+              }}>Time Filter (IST)</button>
 
             {datePickerOpen && (
               <div className="sales-date-popover-menu">
@@ -1641,6 +1651,7 @@ function SalesInvoicesListView({
                     className={`sales-date-option-row ${dateFilter === opt.label ? "selected" : ""}`}
                     onClick={() => {
                       if (opt.label === "Custom Range") {
+                        setTimeRangeDraft(timeFilterRange(dateFilter, customDateRange));
                         setDatePickerOpen(false);
                         setCustomRangeOpen(true);
                         return;
@@ -1658,7 +1669,7 @@ function SalesInvoicesListView({
             )}
             {customRangeOpen && (
               <CustomDateRangePopover
-                range={customDateRange}
+                range={timeRangeDraft}
                 onApply={range => {
                   setCustomDateRange(range);
                   setDateFilter("Custom Range");
