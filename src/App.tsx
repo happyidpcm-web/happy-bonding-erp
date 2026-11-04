@@ -1232,7 +1232,6 @@ function InvoiceDetailModal({
 }
 
 export const REPORT_DATE_OPTIONS = [
-  { label: "All", sub: "" },
   { label: "Today", sub: "" },
   { label: "Yesterday", sub: "" },
   { label: "This Week", sub: "" },
@@ -1246,6 +1245,7 @@ export const REPORT_DATE_OPTIONS = [
   { label: "Current Fiscal Year", sub: "" },
   { label: "Previous Fiscal Year", sub: "" },
   { label: "Last 365 Days", sub: "" },
+  { label: "All", sub: "" },
   { label: "Custom Range", sub: "" },
 ];
 
