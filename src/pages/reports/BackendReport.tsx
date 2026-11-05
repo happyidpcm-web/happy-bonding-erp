@@ -47,6 +47,7 @@ export function BackendReport({ report, onBack, notify, initialDateSelection }: 
   const isPartyItemReport = report.kind === 'party-item';
   const isLedgerReport = report.kind === 'party-ledger';
   const isCategoryReport = report.kind === 'category-sales';
+  const isPurchaseReport = report.kind === 'purchase-summary';
   const [itemView, setItemView] = useState('items');
   const [sort, setSort] = useState<ItemReportSort>('quantity-desc');
   const branchId = api.currentBranchId();
@@ -73,7 +74,7 @@ export function BackendReport({ report, onBack, notify, initialDateSelection }: 
       : null;
     return [columnLabel(c), date ? `${date[3]}/${date[2]}/${date[1]}` : value];
   })));
-  if (isItemReport || isPartyItemReport || isCategoryReport || isAgeingReport) exportRows.push(Object.fromEntries(columns.map((c, index) => [columnLabel(c), index === 0 ? 'Total' : c === 'Quantity' ? totalQuantity : data?.moneyColumns.includes(c) ? Number(rows.reduce((sum, row) => sum + Number(row[c] || 0), 0).toFixed(2)) : ''])));
+  if (isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport || isAgeingReport) exportRows.push(Object.fromEntries(columns.map((c, index) => [columnLabel(c), index === 0 ? 'Total' : c === 'Quantity' ? totalQuantity : data?.moneyColumns.includes(c) ? Number(rows.reduce((sum, row) => sum + Number(row[c] || 0), 0).toFixed(2)) : ''])));
   const exportExcel = () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportRows), 'Report');
@@ -81,7 +82,7 @@ export function BackendReport({ report, onBack, notify, initialDateSelection }: 
     XLSX.writeFile(wb, `${report.kind}_${data?.from}_${data?.to}.xlsx`);
   };
   const formatDate = (value: string) => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(value + 'T00:00:00Z'));
-  return <div className={isAgeingReport ? 'printable-report item-sales-report ageing-report' : isStockReport ? 'printable-report item-sales-report stock-detail-report' : isLedgerReport ? 'printable-report item-sales-report ledger-report' : isItemReport || isPartyItemReport || isCategoryReport ? 'printable-report item-sales-report' : 'printable-report'}>
+  return <div className={isAgeingReport ? 'printable-report item-sales-report ageing-report' : isStockReport ? 'printable-report item-sales-report stock-detail-report' : isLedgerReport ? 'printable-report item-sales-report ledger-report' : isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport ? 'printable-report item-sales-report' : 'printable-report'}>
     <div className="page-heading"><div className="back-heading"><button type="button" className="icon-button" onClick={onBack} aria-label="Back" title="Back to Reports"><ArrowLeft size={18} /></button><h1>{isItemReport && itemView === 'items' ? 'Item Sales Totals' : report.title}</h1></div>
       <div className="header-actions"><button className="secondary" disabled={loading || !!error || !rows.length} onClick={exportExcel}>Download Excel</button><button className="secondary" disabled={loading || !!error || !rows.length} onClick={() => setEmailOpen(true)}>Email Excel</button><button className="secondary" disabled={loading || !!error} onClick={() => window.print()}>Print PDF</button></div>
     </div>
@@ -99,9 +100,9 @@ export function BackendReport({ report, onBack, notify, initialDateSelection }: 
           <div><span>Overdue</span><strong>{money(overdue)}</strong></div>
         </div>
         <p className="ageing-note">Includes unpaid invoices up to the selected end date. Overdue days use each customer's current credit period. Invoices without an available customer and opening balances are excluded. Totals follow your search.</p>
-      </> : isItemReport || isPartyItemReport || isCategoryReport || isStockReport || isLedgerReport ? <div className="item-report-period">
-        <div><span className="item-report-caption">{isStockReport ? 'Stock movement period' : isLedgerReport ? 'Statement period' : 'Sales period'}</span><strong>{filter === 'All' ? 'All' : <>{formatDate(data.from)}{data.from !== data.to && <> to {formatDate(data.to)}</>}</>}</strong></div>
-        <span className="item-report-count">{rows.length.toLocaleString('en-IN')} {isStockReport ? 'movements' : isCategoryReport ? 'categories' : isItemReport && itemView === 'items' ? 'items' : 'records'}</span>
+      </> : isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport || isStockReport || isLedgerReport ? <div className="item-report-period">
+        <div><span className="item-report-caption">{isStockReport ? 'Stock movement period' : isLedgerReport ? 'Statement period' : isPurchaseReport ? 'Purchase period' : 'Sales period'}</span><strong>{filter === 'All' ? 'All' : <>{formatDate(data.from)}{data.from !== data.to && <> to {formatDate(data.to)}</>}</>}</strong></div>
+        <span className="item-report-count">{rows.length.toLocaleString('en-IN')} {isStockReport ? 'movements' : isCategoryReport ? 'categories' : isPurchaseReport ? 'invoices' : isItemReport && itemView === 'items' ? 'items' : 'records'}</span>
       </div> : <><p>{filter === 'All' ? 'All' : `${data.from} to ${data.to}`} ? {rows.length} records ? Weeks run Sunday?Saturday.</p><p>{data.note}</p></>}
       {isStockReport && <>
         <div className="item-report-totals">{['Stock In', 'Stock Out'].map(c => <div key={c}><span>{c} (Pieces)</span><strong>{rows.reduce((sum, row) => sum + Number(row[c] || 0), 0).toLocaleString('en-IN', { maximumFractionDigits: 3 })}</strong></div>)}</div>
@@ -111,10 +112,10 @@ export function BackendReport({ report, onBack, notify, initialDateSelection }: 
         <div><span>Total pieces sold</span><strong>{totalQuantity.toLocaleString('en-IN')}</strong></div>
         <div><span>Total sales amount</span><strong>{money(totalAmount)}</strong></div>
       </div>}
-      <article className="card table-card"><div className="table-scroll"><table><thead><tr>{columns.map(c => <th key={c} className={(isItemReport || isPartyItemReport || isCategoryReport || isStockReport || isAgeingReport || isLedgerReport) && (c === 'Quantity' || c === 'Stock In' || c === 'Stock Out' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{columnLabel(c)}</th>)}</tr></thead><tbody>
-        {rows.map((r, index) => <tr key={index}>{columns.map(c => <td key={c} className={(isItemReport || isPartyItemReport || isCategoryReport || isStockReport || isAgeingReport || isLedgerReport) && (c === 'Quantity' || c === 'Stock In' || c === 'Stock Out' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{data.moneyColumns.includes(c) && typeof r[c] === 'number' ? money(r[c] as number) : (isStockReport || isLedgerReport) && c === 'Date' ? formatDate(String(r[c])) : isAgeingReport && (c === 'Invoice Date' || c === 'Due Date') ? formatDate(String(r[c])) : isAgeingReport && c === 'Party' && !r[c] ? 'Customer unavailable' : r[c]}</td>)}</tr>)}
+      <article className="card table-card"><div className="table-scroll"><table><thead><tr>{columns.map(c => <th key={c} className={(isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport || isStockReport || isAgeingReport || isLedgerReport) && (c === 'Quantity' || c === 'Stock In' || c === 'Stock Out' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{columnLabel(c)}</th>)}</tr></thead><tbody>
+        {rows.map((r, index) => <tr key={index}>{columns.map(c => <td key={c} className={(isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport || isStockReport || isAgeingReport || isLedgerReport) && (c === 'Quantity' || c === 'Stock In' || c === 'Stock Out' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{data.moneyColumns.includes(c) && typeof r[c] === 'number' ? money(r[c] as number) : (isStockReport || isLedgerReport || isPurchaseReport) && c === 'Date' ? formatDate(String(r[c])) : isAgeingReport && (c === 'Invoice Date' || c === 'Due Date') ? formatDate(String(r[c])) : isAgeingReport && c === 'Party' && !r[c] ? 'Customer unavailable' : r[c]}</td>)}</tr>)}
         {!rows.length && <tr><td colSpan={columns.length}>No records match this date range and search.</td></tr>}
-      </tbody><tfoot><tr>{columns.map((c, index) => <th key={c} className={(isItemReport || isPartyItemReport || isCategoryReport || isStockReport || isAgeingReport || isLedgerReport) && (c === 'Quantity' || c === 'Stock In' || c === 'Stock Out' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{index === 0 ? 'Total' : isStockReport ? (c === 'Stock In' || c === 'Stock Out' ? rows.reduce((sum, r) => sum + Number(r[c] || 0), 0).toLocaleString('en-IN', { maximumFractionDigits: 3 }) : '') : (isItemReport || isPartyItemReport || isCategoryReport) && c === 'Quantity' ? totalQuantity : data.moneyColumns.includes(c) ? money(rows.reduce((s, r) => s + (typeof r[c] === 'number' ? r[c] as number : 0), 0)) : ''}</th>)}</tr></tfoot></table></div></article>
+      </tbody><tfoot><tr>{columns.map((c, index) => <th key={c} className={(isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport || isStockReport || isAgeingReport || isLedgerReport) && (c === 'Quantity' || c === 'Stock In' || c === 'Stock Out' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{index === 0 ? 'Total' : isStockReport ? (c === 'Stock In' || c === 'Stock Out' ? rows.reduce((sum, r) => sum + Number(r[c] || 0), 0).toLocaleString('en-IN', { maximumFractionDigits: 3 }) : '') : (isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport) && c === 'Quantity' ? totalQuantity : data.moneyColumns.includes(c) ? money(rows.reduce((s, r) => s + (typeof r[c] === 'number' ? r[c] as number : 0), 0)) : ''}</th>)}</tr></tfoot></table></div></article>
     </>}
     {emailOpen && <EmailExcelReportModal reportName={`${report.title} ${data?.from} to ${data?.to}`} reportRows={exportRows} onClose={() => setEmailOpen(false)} notify={notify} />}
   </div>;
