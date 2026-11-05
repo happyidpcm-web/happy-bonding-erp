@@ -110,7 +110,7 @@ reportTablesRouter.get('/:kind', async (req, res) => {
     rows = records.filter(r => matchesReportTime(storeCalendarDate(r.occurredAt), r.occurredAt, q)).map(r => ({ Date: date(storeCalendarDate(r.occurredAt)), Staff: r.actor?.name || 'System', Action: r.action, Entity: r.entityType, Reference: r.entityId }));
     note = 'Events with a verified branch reference, including sales invoice events.';
   } else {
-    const invoices = await db.salesInvoice.findMany({ where: { ...scope, status: 'POSTED', invoiceDate: bounds.where }, include: { party: true, lines: { include: { variant: { include: { product: true } } } } }, orderBy: { invoiceDate: 'desc' } });
+    const invoices = await db.salesInvoice.findMany({ where: { ...scope, status: 'POSTED', invoiceDate: bounds.where }, include: { party: true, lines: { include: { variant: { include: { product: true } } } } }, orderBy: [{ invoiceDate: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }] });
     const selected = invoices.filter(i => matchesReportTime(i.invoiceDate, i.createdAt, q));
     if (kind === 'bill-profit') {
       columns = ['Date', 'Invoice', 'Party', 'Sales Excluding Tax', 'Recorded Cost', 'Gross Profit']; moneyColumns = columns.slice(3);
@@ -131,7 +131,7 @@ reportTablesRouter.get('/:kind', async (req, res) => {
       rows = selected.map(i => ({ Date: date(i.invoiceDate), Staff: staff.get(i.id) || 'Unassigned', Invoice: i.invoiceNumber, Party: i.party?.name || 'Cash Sale', Amount: num(i.grandTotal), Paid: num(i.paidAmount), Balance: num(i.grandTotal) - num(i.paidAmount) }));
       columns = ['Date', 'Staff', 'Invoice', 'Party', 'Amount', 'Paid', 'Balance']; moneyColumns = ['Amount', 'Paid', 'Balance'];
       if (kind === 'sales-staff') { rows = group(rows, ['Staff'], moneyColumns); columns = ['Staff', ...moneyColumns]; }
-      note = 'Posted sales attributed to the original posting staff member. Paid and balance reflect the current invoice state.';
+      note = '';
     } else {
       rows = selected.flatMap(i => i.lines.map(l => ({ Date: date(i.invoiceDate), Invoice: i.invoiceNumber, Party: i.party?.name || 'Cash Sale', 'Product ID': l.variant.productId, 'Product Name': l.variant.product.name, Item: l.itemName, 'Item Code': l.sku, Size: l.variant.size || '', Category: l.variant.product.category, HSN: l.hsnCode, Quantity: num(l.quantity), 'Tax Rate': num(l.taxRate), Taxable: num(l.taxableAmount), CGST: num(l.cgst), SGST: num(l.sgst), IGST: num(l.igst), Amount: num(l.total) })));
       const sums = ['Quantity', 'Taxable', 'CGST', 'SGST', 'IGST', 'Amount']; moneyColumns = sums.slice(1);
