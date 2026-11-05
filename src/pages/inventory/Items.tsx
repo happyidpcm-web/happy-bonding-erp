@@ -1680,6 +1680,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
               <Boxes size={14} /> {lowStockOnly ? "Show All Items" : "Low Stock"}
             </button>
             <select
+              className="secondary"
               aria-label="Sort by stock quantity"
               value={stockSort}
               onChange={e => setStockSort(e.target.value)}
