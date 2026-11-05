@@ -1311,11 +1311,13 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
   const [lowStockOnly, setLowStockOnly] = useState(false);
+  const [stockSort, setStockSort] = useState("default");
   const showLowStock = () => {
     setQuery("");
     setCategoryFilter("All Categories");
     setSelectedItemIds([]);
     setLowStockOnly(true);
+    setStockSort(current => current === "default" ? "asc" : current);
   };
   const [modal, setModal] = useState(false);
   const [editingItem, setEditingItem] = useState<Product | null>(null);
@@ -1347,13 +1349,21 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
   }, [rows]);
 
   const filtered = useMemo(() => {
-    return rows.filter(r => {
+    const matchingRows = rows.filter(r => {
       const matchQuery = `${r.name} ${r.sku}`.toLowerCase().includes(query.toLowerCase());
       const matchCat = categoryFilter === "All Categories" || r.category === categoryFilter;
       const matchLowStock = !lowStockOnly || r.stock < 10;
       return matchQuery && matchCat && matchLowStock;
     });
-  }, [rows, query, categoryFilter, lowStockOnly]);
+    if (stockSort !== "default") {
+      matchingRows.sort((a, b) =>
+        (stockSort === "asc" ? a.stock - b.stock : b.stock - a.stock)
+        || a.name.localeCompare(b.name)
+        || a.sku.localeCompare(b.sku)
+      );
+    }
+    return matchingRows;
+  }, [rows, query, categoryFilter, lowStockOnly, stockSort]);
 
   const handleBulkAddSave = async (newProducts: Product[]) => {
     await api.bulkCreateProducts(newProducts);
@@ -1647,7 +1657,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
       {/* Main Items Table Card */}
       <article className="card table-card">
         <div className="table-toolbar items-toolbar" style={{ display: "flex", justifyContent: "space-between", padding: "14px 18px", gap: 12 }}>
-          <div className="items-search-container" style={{ display: "flex", gap: 10, flex: 1, maxWidth: 580 }}>
+          <div className="items-search-container" style={{ display: "flex", flexWrap: "wrap", gap: 10, flex: 1 }}>
             <div className="search-input-wrap" style={{ flex: 1 }}>
               <Search size={16} />
               <input
@@ -1669,6 +1679,16 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
             >
               <Boxes size={14} /> {lowStockOnly ? "Show All Items" : "Low Stock"}
             </button>
+            <select
+              aria-label="Sort by stock quantity"
+              value={stockSort}
+              onChange={e => setStockSort(e.target.value)}
+              style={{ width: "auto", minWidth: 210 }}
+            >
+              <option value="default">Stock Qty: Default Order</option>
+              <option value="asc">Stock Qty: Lowest to Highest</option>
+              <option value="desc">Stock Qty: Highest to Lowest</option>
+            </select>
           </div>
 
           <div style={{ display: "flex", gap: 10 }}>
