@@ -95,7 +95,7 @@ export function BackendReport({ report, onBack, notify, initialDateSelection }: 
           <div><span>Not yet overdue</span><strong>{money(notDue)}</strong></div>
           <div><span>Overdue</span><strong>{money(overdue)}</strong></div>
         </div>
-        <p className="ageing-note">Includes unpaid invoices up to the selected end date. Overdue days use each customer's current credit period. Opening balances are excluded. Totals follow your search.</p>
+        <p className="ageing-note">Includes unpaid invoices up to the selected end date. Overdue days use each customer's current credit period. Invoices without an available customer and opening balances are excluded. Totals follow your search.</p>
       </> : isItemReport || isStockReport ? <div className="item-report-period">
         <div><span className="item-report-caption">{isStockReport ? 'Stock movement period' : 'Sales period'}</span><strong>{filter === 'All' ? 'All' : <>{formatDate(data.from)}{data.from !== data.to && <> to {formatDate(data.to)}</>}</>}</strong></div>
         <span className="item-report-count">{rows.length.toLocaleString('en-IN')} {isStockReport ? 'movements' : itemView === 'items' ? 'items' : 'records'}</span>

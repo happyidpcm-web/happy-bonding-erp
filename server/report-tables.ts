@@ -71,7 +71,7 @@ reportTablesRouter.get('/:kind', async (req, res) => {
     ], { isolationLevel: 'RepeatableRead' });
     if (kind === 'receivable-ageing') {
       columns = ['Party', 'Invoice', 'Invoice Date', 'Due Date', 'Not Due', '1?30 Days', '31?60 Days', '61?90 Days', 'Over 90 Days']; moneyColumns = columns.slice(4);
-      rows = invoices.filter(i => i.partyId).map(i => {
+      rows = invoices.filter(i => i.partyId && parties.some(p => p.id === i.partyId && p.name.trim())).map(i => {
         const party = parties.find(p => p.id === i.partyId);
         const due = new Date(i.invoiceDate); due.setUTCDate(due.getUTCDate() + (party?.creditPeriodDays ?? 30));
         const paid = i.payments.filter(a => a.payment.paidAt < asOf.timestampWhere.lt!).reduce((s, a) => s + num(a.amount), 0);
@@ -81,7 +81,7 @@ reportTablesRouter.get('/:kind', async (req, res) => {
         const bucket = days <= 0 ? 'Not Due' : days <= 30 ? '1?30 Days' : days <= 60 ? '31?60 Days' : days <= 90 ? '61?90 Days' : 'Over 90 Days';
         return { Party: party?.name || '', Invoice: i.invoiceNumber, 'Invoice Date': date(i.invoiceDate), 'Due Date': date(due), ...Object.fromEntries(moneyColumns.map(k => [k, k === bucket ? balance : 0])) };
       }).filter(r => moneyColumns.some(k => num((r as Row)[k]) > 0));
-      note = 'Open customer invoices as of the end date, using the current party credit period. Opening balances are excluded because their due dates are not recorded.';
+      note = 'Open customer invoices as of the end date, using the current party credit period. Invoices without an available customer are excluded. Opening balances are excluded because their due dates are not recorded.';
     } else if (kind === 'party-outstanding') {
       columns = ['Party', 'Opening Balance', 'Invoiced', 'Collected', 'Credit Notes', 'Outstanding']; moneyColumns = columns.slice(1);
       rows = parties.map(p => {
