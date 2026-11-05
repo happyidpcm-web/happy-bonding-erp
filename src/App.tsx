@@ -2365,7 +2365,6 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   const saveInvoice=async(keepOpen=false)=>{
     if (invoiceSaveInFlight.current) return;
     if(!lines.length)return notify("Add at least one item");
-    if (!nextNumber) return notify("Invoice number is unavailable. Reopen the form after connecting to the backend.");
     invoiceSaveInFlight.current = true;
     const refreshVersion = ++stockRefreshVersion.current;
     try{
