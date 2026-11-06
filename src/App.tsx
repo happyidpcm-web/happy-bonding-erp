@@ -1732,7 +1732,7 @@ function SalesInvoicesListView({
                     />
                   </td>
                   <td>{inv.date}</td>
-                  <td className="mono" style={{ fontWeight: 600, color: "#1e293b" }}>
+                  <td className="mono" style={{ fontWeight: 600, color: "#1e293b", whiteSpace: "nowrap" }}>
                     {inv.number}
                   </td>
                   <td>
