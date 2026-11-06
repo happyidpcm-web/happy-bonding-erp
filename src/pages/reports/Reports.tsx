@@ -938,6 +938,7 @@ export function Reports({
         { name: "Daybook - Staff Wise", targetKey: "Daybook by staff", tags: ["Transaction", "Invoice Details"] },
         { name: "Expense Category Report", targetKey: "Expense categories", tags: ["Category", "Transaction"] },
         { name: "Expense Transaction Report", targetKey: "Expense transactions", tags: ["Category", "Transaction"] },
+        { name: "Coupon Report", targetKey: "Coupon report", tags: ["Party", "Invoice Details", "Summary"] },
         { name: "Purchase Summary", targetKey: "Purchase summary", tags: ["Invoice Details", "Summary"] },
       ],
     },

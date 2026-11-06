@@ -5,7 +5,7 @@ import { requireBranch } from './auth.js';
 import { reportBounds, reportQuery, matchesReportTime, storeCalendarDate } from './report-data.js';
 
 type Row = Record<string, string | number>;
-const kinds = z.enum(['purchase-summary', 'expense-transactions', 'expense-category', 'cash-bank', 'stock-detail', 'item-party', 'party-item', 'category-sales', 'hsn-sales', 'gst-sales', 'gst-purchases', 'party-outstanding', 'party-ledger', 'audit-trail', 'sales-staff', 'daybook-staff', 'sales-returns', 'bill-profit', 'sales-summary', 'receivable-ageing']);
+const kinds = z.enum(['coupon-report', 'purchase-summary', 'expense-transactions', 'expense-category', 'cash-bank', 'stock-detail', 'item-party', 'party-item', 'category-sales', 'hsn-sales', 'gst-sales', 'gst-purchases', 'party-outstanding', 'party-ledger', 'audit-trail', 'sales-staff', 'daybook-staff', 'sales-returns', 'bill-profit', 'sales-summary', 'receivable-ageing']);
 export const reportTablesRouter = Router();
 reportTablesRouter.get('/:kind', async (req, res) => {
   const branchId = requireBranch(req, res); if (!branchId) return;
@@ -27,7 +27,13 @@ reportTablesRouter.get('/:kind', async (req, res) => {
     }
     return [...grouped.values()];
   };
-  if (kind === 'purchase-summary' || kind === 'gst-purchases') {
+  if (kind === 'coupon-report') {
+    const invoices = await db.salesInvoice.findMany({ where: { ...scope, status: 'POSTED', couponDiscount: { gt: 0 }, invoiceDate: bounds.where }, include: { party: true }, orderBy: [{ invoiceDate: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }] });
+    columns = ['Date', 'Invoice', 'Customer', 'Phone', 'Coupon Discount', 'Invoice Amount'];
+    moneyColumns = ['Coupon Discount', 'Invoice Amount'];
+    rows = invoices.filter(i => matchesReportTime(i.invoiceDate, i.createdAt, q)).map(i => ({ Date: date(i.invoiceDate), Invoice: i.invoiceNumber, Customer: i.party?.name || 'Cash Sale', Phone: i.party?.phone || '', 'Coupon Discount': num(i.couponDiscount), 'Invoice Amount': num(i.grandTotal) }));
+    note = 'Posted sales invoices with a coupon discount. Invoice amount is the final total after discounts. Regular discounts are excluded from coupon totals. Returns are not deducted. Totals follow your search.';
+  } else if (kind === 'purchase-summary' || kind === 'gst-purchases') {
     const records = await db.voucher.findMany({ where: { ...scope, type: 'Purchase Invoice', date: bounds.where }, orderBy: { date: 'desc' } });
     const selected = records.filter(r => matchesReportTime(r.date, r.createdAt, q));
     if (kind === 'purchase-summary') {
@@ -116,7 +122,7 @@ reportTablesRouter.get('/:kind', async (req, res) => {
       columns = ['Date', 'Invoice', 'Party', 'Sales Excluding Tax', 'Recorded Cost', 'Gross Profit']; moneyColumns = columns.slice(3);
       rows = selected.map(i => {
         const revenue = num(i.grandTotal) - num(i.cgstTotal) - num(i.sgstTotal) - num(i.igstTotal);
-        const complete = i.lines.every(l => l.totalCostAtSale != null);
+        const complete = i.lines.length > 0 && i.lines.every(l => l.totalCostAtSale != null);
         const cost = i.lines.reduce((s, l) => s + num(l.totalCostAtSale), 0);
         return { Date: date(i.invoiceDate), Invoice: i.invoiceNumber, Party: i.party?.name || 'Cash Sale', 'Sales Excluding Tax': revenue, 'Recorded Cost': complete ? cost : 'Not recorded', 'Gross Profit': complete ? revenue - cost : 'Not available' };
       });
