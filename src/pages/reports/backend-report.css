@@ -86,3 +86,7 @@
 .coupon-invoice-link { border: 0; padding: 0; background: transparent; color: #2563eb; font: inherit; text-decoration: underline; cursor: pointer; }
 .coupon-invoice-link:disabled { cursor: wait; opacity: .65; }
 @media print { .coupon-invoice-link { color: inherit; text-decoration: none; } }
+
+.coupon-invoice-row { cursor: pointer; }
+.coupon-invoice-row:hover > td, .coupon-invoice-row:focus-within > td { background: #fff8e1; }
+.coupon-invoice-row[aria-busy="true"] { cursor: wait; }
