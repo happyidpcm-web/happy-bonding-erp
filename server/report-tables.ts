@@ -31,7 +31,7 @@ reportTablesRouter.get('/:kind', async (req, res) => {
     const invoices = await db.salesInvoice.findMany({ where: { ...scope, status: 'POSTED', couponDiscount: { gt: 0 }, invoiceDate: bounds.where }, include: { party: true }, orderBy: [{ invoiceDate: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }] });
     columns = ['Date', 'Invoice', 'Customer', 'Phone', 'Coupon Discount', 'Invoice Amount'];
     moneyColumns = ['Coupon Discount', 'Invoice Amount'];
-    rows = invoices.filter(i => matchesReportTime(i.invoiceDate, i.createdAt, q)).map(i => ({ Date: date(i.invoiceDate), Invoice: i.invoiceNumber, Customer: i.party?.name || 'Cash Sale', Phone: i.party?.phone || '', 'Coupon Discount': num(i.couponDiscount), 'Invoice Amount': num(i.grandTotal) }));
+    rows = invoices.filter(i => matchesReportTime(i.invoiceDate, i.createdAt, q)).map(i => ({ Date: date(i.invoiceDate), Invoice: i.invoiceNumber, 'Invoice ID': i.id, Customer: i.party?.name || 'Cash Sale', Phone: i.party?.phone || '', 'Coupon Discount': num(i.couponDiscount), 'Invoice Amount': num(i.grandTotal) }));
     note = 'Posted sales invoices with a coupon discount. Invoice amount is the final total after discounts. Regular discounts are excluded from coupon totals. Returns are not deducted. Totals follow your search.';
   } else if (kind === 'purchase-summary' || kind === 'gst-purchases') {
     const records = await db.voucher.findMany({ where: { ...scope, type: 'Purchase Invoice', date: bounds.where }, orderBy: { date: 'desc' } });

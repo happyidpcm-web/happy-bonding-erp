@@ -539,7 +539,7 @@ export default function App() {
 
         {page === "reminders" && <RemindersModule parties={partyRows} invoices={invoiceRows} notify={notify} />}
 
-        {page === "reports" && <Reports key={currentBranchId} products={productRows} invoices={invoiceRows} notify={notify} initialReport={activeReportSubScreen} initialDateSelection={reportDateSelection}/>}
+        {page === "reports" && <Reports onOpenInvoice={async id => { const invoice = await api.sale(id); setActiveInvoiceModal(invoice); }} key={currentBranchId} products={productRows} invoices={invoiceRows} notify={notify} initialReport={activeReportSubScreen} initialDateSelection={reportDateSelection}/>}
         {page === "cash" && <CashBank notify={notify}/>} 
         {page === "pos" && <Sales rows={invoiceRows} products={productRows} parties={partyRows} setting={invoiceSetting} setSetting={setInvoiceSetting} setRows={setInvoiceRows} setParties={setPartyRows} setProducts={setProductRows} notify={notify} key="pos" initialCreate={true} onSelectInvoice={openInvoiceDetail} onNavigateReports={handleNavigateReportsFromSales}/>}
         {page === "staff" && <Staff/>} 

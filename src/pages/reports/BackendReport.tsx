@@ -33,13 +33,21 @@ export const backendReports: Record<string, { kind: string; title: string }> = {
   'Sales returns': { kind: 'sales-returns', title: 'Sales Returns' },
 };
 
-export function BackendReport({ report, onBack, notify, initialDateSelection }: { report: { kind: string; title: string }; onBack: () => void; notify: (message: string) => void; initialDateSelection?: DateRangeSelection }) {
+export function BackendReport({ report, onBack, notify, initialDateSelection, onOpenInvoice }: { report: { kind: string; title: string }; onBack: () => void; notify: (message: string) => void; initialDateSelection?: DateRangeSelection; onOpenInvoice?: (id: string) => Promise<void> }) {
   const [filter, setFilter] = useState(initialDateSelection?.filter || 'All');
   const [range, setRange] = useState<CustomDateRange>(initialDateSelection?.range || { from: '', to: '' });
   const [data, setData] = useState<Awaited<ReturnType<typeof api.reportTable>> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
+  const [openingInvoice, setOpeningInvoice] = useState<string | null>(null);
+  const openInvoice = async (id: string) => {
+    if (!onOpenInvoice || openingInvoice) return;
+    setOpeningInvoice(id);
+    try { await onOpenInvoice(id); }
+    catch (error) { notify(error instanceof Error ? error.message : 'Unable to open invoice'); }
+    finally { setOpeningInvoice(null); }
+  };
   const [search, setSearch] = useState('');
   const [emailOpen, setEmailOpen] = useState(false);
   const isCouponReport = report.kind === 'coupon-report';
@@ -136,7 +144,7 @@ export function BackendReport({ report, onBack, notify, initialDateSelection }: 
         <div><span>Total sales amount</span><strong>{money(totalAmount)}</strong></div>
       </div>}
       <article className="card table-card"><div className="table-scroll"><table><thead><tr>{columns.map(c => <th key={c} className={(isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport || isStockReport || isAgeingReport || isLedgerReport || isExpenseReport || isProfitReport || isCouponReport) && (c === 'Quantity' || c === 'Stock In' || c === 'Stock Out' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{columnLabel(c)}</th>)}</tr></thead><tbody>
-        {rows.map((r, index) => <tr key={index}>{columns.map(c => <td key={c} className={(isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport || isStockReport || isAgeingReport || isLedgerReport || isExpenseReport || isProfitReport || isCouponReport) && (c === 'Quantity' || c === 'Stock In' || c === 'Stock Out' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{data.moneyColumns.includes(c) && typeof r[c] === 'number' ? money(r[c] as number) : (isStockReport || isLedgerReport || isPurchaseReport || isAuditReport || isStaffReport || isExpenseReport || isProfitReport || isCouponReport) && c === 'Date' ? formatDate(String(r[c])) : isAgeingReport && (c === 'Invoice Date' || c === 'Due Date') ? formatDate(String(r[c])) : isAgeingReport && c === 'Party' && !r[c] ? 'Customer unavailable' : r[c]}</td>)}</tr>)}
+        {rows.map((r, index) => <tr key={index}>{columns.map(c => <td key={c} className={(isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport || isStockReport || isAgeingReport || isLedgerReport || isExpenseReport || isProfitReport || isCouponReport) && (c === 'Quantity' || c === 'Stock In' || c === 'Stock Out' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{isCouponReport && c === 'Invoice' && r['Invoice ID'] && onOpenInvoice ? <button type="button" className="coupon-invoice-link" disabled={openingInvoice !== null} onClick={() => void openInvoice(String(r['Invoice ID']))} aria-label={`Open sales invoice ${r[c]}`}>{openingInvoice === String(r['Invoice ID']) ? 'Opening?' : r[c]}</button> : data.moneyColumns.includes(c) && typeof r[c] === 'number' ? money(r[c] as number) : (isStockReport || isLedgerReport || isPurchaseReport || isAuditReport || isStaffReport || isExpenseReport || isProfitReport || isCouponReport) && c === 'Date' ? formatDate(String(r[c])) : isAgeingReport && (c === 'Invoice Date' || c === 'Due Date') ? formatDate(String(r[c])) : isAgeingReport && c === 'Party' && !r[c] ? 'Customer unavailable' : r[c]}</td>)}</tr>)}
         {!rows.length && <tr><td colSpan={columns.length}>{isExpenseReport ? search.trim() ? 'No expenses match your search.' : filter === 'All' ? 'No store expenses recorded for this branch. Add an entry in Store Expenses to see it here.' : 'No store expenses recorded in this date range.' : 'No records match this date range and search.'}</td></tr>}
       </tbody><tfoot><tr>{columns.map((c, index) => <th key={c} className={(isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport || isStockReport || isAgeingReport || isLedgerReport || isExpenseReport || isProfitReport || isCouponReport) && (c === 'Quantity' || c === 'Stock In' || c === 'Stock Out' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{index === 0 ? 'Total' : isStockReport ? (c === 'Stock In' || c === 'Stock Out' ? rows.reduce((sum, r) => sum + Number(r[c] || 0), 0).toLocaleString('en-IN', { maximumFractionDigits: 3 }) : '') : (isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport) && c === 'Quantity' ? totalQuantity : data.moneyColumns.includes(c) ? money(rows.reduce((s, r) => s + (typeof r[c] === 'number' ? r[c] as number : 0), 0)) : ''}</th>)}</tr></tfoot></table></div></article>
     </>}
