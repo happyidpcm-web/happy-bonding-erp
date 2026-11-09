@@ -959,6 +959,9 @@ export function GenericVoucherPage({
   useEffect(() => { setSelectedIds(new Set()); setOpenMenuId(null); }, [type]);
   const purchaseDocumentRef = useRef<HTMLDivElement>(null);
   const [purchasePdfDownloading, setPurchasePdfDownloading] = useState(false);
+  const purchaseListDocumentRef = useRef<HTMLDivElement>(null);
+  const purchaseListDownloadBusy = useRef(false);
+  const [purchaseListDownloading, setPurchaseListDownloading] = useState(false);
   const [purchaseDownloadRequested, setPurchaseDownloadRequested] = useState(false);
   const [records, setRecords] = useState<VoucherRecord[]>([]);
   const branchId = api.currentBranchId();
@@ -1043,6 +1046,22 @@ export function GenericVoucherPage({
       notify("Purchase PDF download failed");
     } finally {
       setPurchasePdfDownloading(false);
+    }
+  };
+
+  const downloadPurchaseList = async () => {
+    if (!purchaseListDocumentRef.current || !filtered.length || purchaseListDownloadBusy.current) return;
+    purchaseListDownloadBusy.current = true;
+    setPurchaseListDownloading(true);
+    // Freeze the report so changing filters during PDF generation cannot alter it.
+    const snapshot = purchaseListDocumentRef.current.cloneNode(true) as HTMLDivElement;
+    try {
+      await downloadInvoicePdf(snapshot, "Purchase_Invoices_Report");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Purchase report download failed");
+    } finally {
+      purchaseListDownloadBusy.current = false;
+      setPurchaseListDownloading(false);
     }
   };
 
@@ -1206,10 +1225,31 @@ export function GenericVoucherPage({
 
   return (
     <div className="generic-voucher-wrap" style={{ minHeight: "85vh", padding: "0 4px" }}>
+      {type === "Purchase Invoice" && <div aria-hidden="true" style={{ position: "fixed", left: -10000, top: 0, pointerEvents: "none" }}>
+        <div ref={purchaseListDocumentRef} style={{ width: 794, padding: 28, boxSizing: "border-box", background: "#fff", color: "#111827", fontFamily: "Arial, sans-serif" }}>
+          <h2>{invoiceSetting.business?.name || "Happy Bonding"}</h2>
+          <h3>Purchase Invoices Report</h3>
+          <p style={{ fontSize: 12 }}>Period: {dateFilter === "Custom Range" ? `${customDateRange.from} to ${customDateRange.to}` : dateFilter} | Status: {statusFilter}{query.trim() ? ` | Search: ${query.trim()}` : ""}</p>
+          <p style={{ fontSize: 12 }}>{filtered.length} invoices | Branch: {branchId}</p>
+          <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", fontSize: 10 }}>
+            <thead><tr>{["Date", "Invoice Number", "Party", "Invoice Total", "Paid Amount", "Balance Due", "Status"].map(label => <th key={label} style={{ padding: 7, textAlign: "left", background: "#eef2ff", borderBottom: "1px solid #cbd5e1" }}>{label}</th>)}</tr></thead>
+            <tbody>{filtered.map(row => {
+              const paid = Number(row.details?.paidAmount ?? (row.status === "Paid" ? row.amount : 0));
+              return <tr key={row.id}>{[row.date, row.number, row.party, money(row.amount), money(paid), money(Math.max(0, row.amount - paid)), purchasePaymentStatus(row)].map((value, index) => <td key={index} style={{ padding: 7, overflowWrap: "anywhere", borderBottom: "1px solid #e2e8f0" }}>{value}</td>)}</tr>;
+            })}</tbody>
+          </table>
+          <div style={{ marginTop: 16, fontSize: 12, breakInside: "avoid" }}>
+            <p><strong>Total Invoice Amount: {money(filtered.reduce((sum, row) => sum + Number(row.amount), 0))}</strong></p>
+            <p>Total Paid: {money(filtered.reduce((sum, row) => sum + Number(row.details?.paidAmount ?? (row.status === "Paid" ? row.amount : 0)), 0))}</p>
+            <p>Total Balance Due: {money(filtered.reduce((sum, row) => sum + Math.max(0, row.amount - Number(row.details?.paidAmount ?? (row.status === "Paid" ? row.amount : 0))), 0))}</p>
+          </div>
+        </div>
+      </div>}
       {/* Header Bar matching Reference Image */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", margin: 0 }}>{title}</h1>
         <div style={{ display: "flex", gap: 10 }}>
+          {type === "Purchase Invoice" && <button type="button" className="secondary" onClick={downloadPurchaseList} disabled={purchaseListDownloading || !filtered.length} title="Download all purchase invoices matching the current filters as a PDF report"><Download size={16} />{purchaseListDownloading ? "Generating PDF..." : "Download Report PDF"}</button>}
           <button type="button" className="icon-button" style={{ border: "1px solid #cbd5e1", borderRadius: 8, padding: 8, background: "#fff" }} title="Settings" onClick={() => setQuickSettingsOpen(true)}>
             <Settings size={16} color="#475569" />
           </button>
