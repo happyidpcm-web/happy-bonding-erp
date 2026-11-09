@@ -959,6 +959,7 @@ export function GenericVoucherPage({
   useEffect(() => { setSelectedIds(new Set()); setOpenMenuId(null); }, [type]);
   const purchaseDocumentRef = useRef<HTMLDivElement>(null);
   const [purchasePdfDownloading, setPurchasePdfDownloading] = useState(false);
+  const [purchaseDownloadRequested, setPurchaseDownloadRequested] = useState(false);
   const [records, setRecords] = useState<VoucherRecord[]>([]);
   const branchId = api.currentBranchId();
   useEffect(() => {
@@ -1044,6 +1045,13 @@ export function GenericVoucherPage({
       setPurchasePdfDownloading(false);
     }
   };
+
+  // Wait until the selected invoice's document has mounted before exporting it.
+  useEffect(() => {
+    if (!purchaseDownloadRequested || !selectedVoucher || type !== "Purchase Invoice") return;
+    setPurchaseDownloadRequested(false);
+    void handlePurchaseDownloadPdf();
+  }, [purchaseDownloadRequested, selectedVoucher, type]);
 
   const deleteVouchers = async (targets: VoucherRecord[]) => {
     if (deleting || !targets.length) return;
@@ -1311,6 +1319,7 @@ export function GenericVoucherPage({
                       View
                     </button>
                     {type === "Purchase Invoice" && <button type="button" className="secondary compact" style={{ marginLeft: 6 }} onClick={() => { setEditingRecord(row); setCreatingFullVoucher(true); }}>Edit</button>}
+                    {type === "Purchase Invoice" && <button type="button" className="secondary compact" style={{ marginLeft: 6 }} onClick={() => { setSelectedVoucher(row); setPurchaseDownloadRequested(true); }} aria-label={`Download PDF for ${row.number}`}><Download size={14} /> Download PDF</button>}
                     <button type="button" className="icon-pencil-btn" style={{ marginLeft: 6, padding: "4px 6px" }} onClick={() => type === "Purchase Invoice" ? setSelectedVoucher(row) : notify(`${type} ${row.number} sent to print`)} title="Print">
                       <Printer size={14} />
                     </button>
