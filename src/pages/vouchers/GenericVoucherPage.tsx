@@ -1,4 +1,4 @@
-import { downloadPurchaseExcel } from "../../utils/purchaseExcel";
+import { downloadPurchaseExcel, downloadPurchaseSummaryExcel } from "../../utils/purchaseExcel";
 import ownerSignatureUrl from "../../assets/owner-signature.png";
 import { indexParties, searchParties } from "../../utils/partySearch";
 import { SearchablePicker } from "../../components/SearchablePicker";
@@ -1062,12 +1062,13 @@ export function GenericVoucherPage({
     }
   };
 
-  const downloadPurchaseList = async () => {
+  const downloadPurchaseList = async (summary = false) => {
     if (!records.length || purchaseListDownloadBusy.current) return;
     purchaseListDownloadBusy.current = true;
     setPurchaseListDownloading(true);
     try {
-      downloadPurchaseExcel(records, invoiceSetting.business?.name || "Happy Bonding");
+      if (summary) downloadPurchaseSummaryExcel(records);
+      else downloadPurchaseExcel(records, invoiceSetting.business?.name || "Happy Bonding");
     } catch (error) {
       notify(error instanceof Error ? error.message : "Purchase report download failed");
     } finally {
@@ -1240,7 +1241,10 @@ export function GenericVoucherPage({
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", margin: 0 }}>{title}</h1>
         <div style={{ display: "flex", gap: 10 }}>
-          {type === "Purchase Invoice" && <button type="button" className="secondary" onClick={downloadPurchaseList} disabled={purchaseListDownloading || !records.length} title="Download all purchase invoices with item details as Excel"><Download size={16} />{purchaseListDownloading ? "Generating Excel..." : "Download Excel"}</button>}
+          {type === "Purchase Invoice" && <>
+            <button type="button" className="secondary" onClick={() => downloadPurchaseList()} disabled={purchaseListDownloading || !records.length} title="Download all purchase invoices with item details as Excel"><Download size={16} />{purchaseListDownloading ? "Generating Excel..." : "Download Excel"}</button>
+            <button type="button" className="secondary" onClick={() => downloadPurchaseList(true)} disabled={purchaseListDownloading || !records.length} title="Download one row per purchase invoice: party name, total including tax, and tax amount"><FileSpreadsheet size={16} />Download Summary Excel</button>
+          </>}
           <button type="button" className="icon-button" style={{ border: "1px solid #cbd5e1", borderRadius: 8, padding: 8, background: "#fff" }} title="Settings" onClick={() => setQuickSettingsOpen(true)}>
             <Settings size={16} color="#475569" />
           </button>

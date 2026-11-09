@@ -44,3 +44,31 @@ export function purchaseWorkbook(records: VoucherRecord[], businessName: string)
 export function downloadPurchaseExcel(records: VoucherRecord[], businessName: string) {
   XLSX.writeFile(purchaseWorkbook(records, businessName), "Purchase_Invoices.xlsx");
 }
+
+export function purchaseSummaryWorkbook(records: VoucherRecord[]) {
+  const rows = records.map(invoice => {
+    // Match the purchase preview: tax is applied after each item's discount.
+    const tax = Math.round((invoice.items || []).reduce((sum, item) => {
+      const base = Math.max(0, item.qty * item.price - (item.discount ?? 0));
+      return sum + Math.round(base * (1 + (item.tax ?? 0) / 100) * 100) / 100 - base;
+    }, 0) * 100) / 100;
+    return [invoice.party, Number(invoice.amount), tax];
+  });
+  const sheet = XLSX.utils.aoa_to_sheet([
+    ["Party Name", "Total Amount (INR)", "Tax Amount (INR)"],
+    ...rows,
+  ]);
+  sheet["!cols"] = [{ wch: 55 }, { wch: 24 }, { wch: 24 }];
+  sheet["!rows"] = Array.from({ length: rows.length + 1 }, () => ({ hpt: 24 }));
+  if (rows.length) sheet["!autofilter"] = { ref: `A1:C${rows.length + 1}` };
+  for (let row = 1; row <= rows.length; row++) {
+    for (const col of [1, 2]) sheet[XLSX.utils.encode_cell({ r: row, c: col })].z = "#,##0.00";
+  }
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "Purchase Summary");
+  return workbook;
+}
+
+export function downloadPurchaseSummaryExcel(records: VoucherRecord[]) {
+  XLSX.writeFile(purchaseSummaryWorkbook(records), "Purchase_Invoices_Summary.xlsx");
+}
