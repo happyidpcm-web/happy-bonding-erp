@@ -17,13 +17,9 @@ export function purchaseWorkbook(records: VoucherRecord[], businessName: string)
   heading(businessName);
   heading(`All Purchase Invoices (${records.length})`);
   rows.push([]);
-  let grandTotal = 0, totalPaid = 0, totalBalance = 0;
   for (const invoice of records) {
-    const paid = Number(invoice.details?.paidAmount ?? (invoice.status === "Paid" ? invoice.amount : 0));
-    const balance = Math.max(0, Number(invoice.amount) - paid);
     heading(`Party Name: ${invoice.party}`);
     heading(`Purchase Invoice: ${invoice.number} | Date: ${invoice.date}`);
-    heading(`Status: ${balance === 0 ? "Paid" : paid > 0 ? "Partially paid" : "Unpaid"}${invoice.details?.paymentMode ? ` | Payment: ${invoice.details.paymentMode}` : ""}`);
     rows.push(["S.No", "Item Description", "HSN", "Quantity", "Price (INR)", "MRP (INR)", "Discount (INR)", "Tax (%)", "Amount (INR)"]);
     for (const [index, item] of (invoice.items || []).entries()) {
       for (const c of [4, 5, 6, 8]) moneyCells.push(XLSX.utils.encode_cell({ r: rows.length, c }));
@@ -31,19 +27,8 @@ export function purchaseWorkbook(records: VoucherRecord[], businessName: string)
     }
     if (!invoice.items?.length) heading("No item details recorded");
     total("Item Amount Total (INR)", (invoice.items || []).reduce((sum, item) => sum + Number(item.amount), 0));
-    total("Invoice Discount (INR)", Number(invoice.details?.discount ?? 0));
-    total("Additional Charges (INR)", Number(invoice.details?.additionalCharges ?? 0));
-    total("Invoice Total (INR)", Number(invoice.amount));
-    total("Paid Amount (INR)", paid);
-    total("Balance Due (INR)", balance);
-    if (invoice.notes) heading(`Notes: ${invoice.notes}`);
-    if (invoice.details?.terms) heading(`Terms: ${invoice.details.terms}`);
     rows.push([], []);
-    grandTotal += Number(invoice.amount); totalPaid += paid; totalBalance += balance;
   }
-  total("ALL INVOICES TOTAL (INR)", grandTotal);
-  total("TOTAL PAID (INR)", totalPaid);
-  total("TOTAL BALANCE DUE (INR)", totalBalance);
   const sheet = XLSX.utils.aoa_to_sheet(rows);
   sheet["!merges"] = merges;
   sheet["!cols"] = [8, 60, 16, 12, 18, 18, 20, 12, 20].map(wch => ({ wch }));
