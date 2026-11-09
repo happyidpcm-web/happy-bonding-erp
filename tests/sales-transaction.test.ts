@@ -16,10 +16,44 @@ test("rolled-back serialization conflicts retry with bounded transaction time", 
   assert.equal(attempts, 2);
 });
 
-test("persistent conflicts stop after two attempts", async () => {
+test("persistent conflicts stop after six attempts", async () => {
   let attempts = 0;
   await assert.rejects(runSalesTransaction(async () => { attempts++; throw failure("P2034"); }));
-  assert.equal(attempts, 2);
+  assert.equal(attempts, 6);
+});
+
+test("four simultaneous tills all commit distinct numbers without losing stock deductions", async () => {
+  // Model serializable snapshots: only one transaction with a given version
+  // can commit. Every other contender must replay against the new state.
+  let version = 0;
+  let stock = 20;
+  let sequence = 100;
+  let attempts = 0;
+  const invoices = await Promise.all(Array.from({ length: 4 }, () => runSalesTransaction(async () => {
+    attempts++;
+    const snapshot = version;
+    const available = stock;
+    const number = sequence;
+    await new Promise(resolve => setTimeout(resolve, 10));
+    if (snapshot !== version) throw failure("P2034");
+    stock = available - 2;
+    sequence = number + 1;
+    version++;
+    return number;
+  })));
+  assert.deepEqual(invoices.sort((a, b) => a - b), [100, 101, 102, 103]);
+  assert.equal(stock, 12);
+  assert.ok(attempts > 4, "Concurrent snapshots must exercise the retry path");
+});
+
+test("a fourth contender can succeed after three serialization conflicts", async () => {
+  let attempts = 0;
+  const result = await runSalesTransaction(async () => {
+    if (++attempts <= 3) throw failure("P2034");
+    return "saved";
+  });
+  assert.equal(result, "saved");
+  assert.equal(attempts, 4);
 });
 
 test("unknown outcomes, stock failures and transaction timeouts are not replayed", async () => {
@@ -27,5 +61,23 @@ test("unknown outcomes, stock failures and transaction timeouts are not replayed
     let attempts = 0;
     await assert.rejects(runSalesTransaction(async () => { attempts++; throw error; }), candidate => candidate === error);
     assert.equal(attempts, 1);
+  }
+});
+
+test("slow conflicts stop at the shared deadline instead of starting another transaction", async () => {
+  const originalNow = Date.now;
+  let now = originalNow();
+  let attempts = 0;
+  const error = failure("P2034");
+  Date.now = () => now;
+  try {
+    await assert.rejects(runSalesTransaction(async () => {
+      attempts++;
+      now += 49_500;
+      throw error;
+    }), candidate => candidate === error);
+    assert.equal(attempts, 1);
+  } finally {
+    Date.now = originalNow;
   }
 });

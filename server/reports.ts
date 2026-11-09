@@ -3,9 +3,11 @@ import { db } from './db.js';
 import { requireBranch, requirePermission } from './auth.js';
 import { reportQuery, reportBounds, matchesReportTime, storeCalendarDate, summarizeItems } from './report-data.js';
 import { reportTablesRouter } from './report-tables.js';
+import { balanceSummaryRouter } from './balance-summary.js';
 
 export const reportsRouter = Router();
 reportsRouter.use(requirePermission('reports.read'));
+reportsRouter.use('/balance-summary', balanceSummaryRouter);
 reportsRouter.use('/table', reportTablesRouter);
 reportsRouter.get('/item-summary', async (req, res) => {
   const branchId = requireBranch(req, res); if (!branchId) return;

@@ -1,6 +1,7 @@
 import { SearchablePicker } from "../../components/SearchablePicker";
 import { ItemSummary } from './ItemSummary';
 import { BackendReport, backendReports } from './BackendReport';
+import { BalanceSummary } from './BalanceSummary';
 import { DateRangeFilter } from "../../components/DateRangeFilter";
 import type { CustomDateRange, DateRangeSelection } from "../../utils/invoiceDateRange";
 import { invoiceExcelDate, invoiceTime } from "../../utils/invoiceDateRange";
@@ -774,10 +775,12 @@ export function Reports({
   notify,
   initialReport,
   initialDateSelection,
+  onOpenInvoice,
 }: {
   products: Product[];
   invoices: Invoice[];
   notify: (msg: string) => void;
+  onOpenInvoice?: (id: string) => Promise<void>;
   initialReport?: string | null;
   initialDateSelection?: DateRangeSelection;
 }) {
@@ -791,7 +794,8 @@ export function Reports({
     }
   }, [initialReport]);
 
-  if (activeReport && backendReports[activeReport]) return <BackendReport key={activeReport} report={backendReports[activeReport]} initialDateSelection={initialDateSelection} onBack={() => setActiveReport(null)} notify={notify} />;
+  if (activeReport === 'Balance sheet') return <BalanceSummary onBack={() => setActiveReport(null)} />;
+  if (activeReport && backendReports[activeReport]) return <BackendReport key={activeReport} report={backendReports[activeReport]} onOpenInvoice={onOpenInvoice} initialDateSelection={initialDateSelection} onBack={() => setActiveReport(null)} notify={notify} />;
   if (activeReport === 'Rate list') return <RateListReportScreen products={products} onBack={() => setActiveReport(null)} notify={notify} />;
   if (activeReport && !["Stock summary", "Stock valuation", "Low stock", "Sales summary", "Bill-wise profit", "Fast & slow moving", "DayBook"].includes(activeReport)) return <><div className="back-heading"><button type="button" className="icon-button" aria-label="Back" title="Back to Reports" onClick={() => setActiveReport(null)}><ArrowLeft size={18} /></button><h2>{activeReport}</h2></div><p>This report needs additional accounting or tax records that are not currently captured. It cannot be calculated reliably from sales invoices alone.</p></>;
   if (activeReport === "Stock summary" || activeReport === "Stock valuation") {
@@ -936,6 +940,7 @@ export function Reports({
         { name: "Daybook - Staff Wise", targetKey: "Daybook by staff", tags: ["Transaction", "Invoice Details"] },
         { name: "Expense Category Report", targetKey: "Expense categories", tags: ["Category", "Transaction"] },
         { name: "Expense Transaction Report", targetKey: "Expense transactions", tags: ["Category", "Transaction"] },
+        { name: "Coupon Report", targetKey: "Coupon report", tags: ["Party", "Invoice Details", "Summary"] },
         { name: "Purchase Summary", targetKey: "Purchase summary", tags: ["Invoice Details", "Summary"] },
       ],
     },

@@ -10,6 +10,7 @@ import { EmailExcelReportModal } from './Reports';
 import { prepareItemReport, type ItemReportSort } from '../../utils/itemReport';
 
 export const backendReports: Record<string, { kind: string; title: string }> = {
+  'Coupon report': { kind: 'coupon-report', title: 'Coupon Report' },
   'Bill-wise profit': { kind: 'bill-profit', title: 'Bill Wise Profit' },
   'Sales summary': { kind: 'sales-summary', title: 'Sales Summary' },
   'Receivable ageing': { kind: 'receivable-ageing', title: 'Receivable Ageing Report' },
@@ -32,18 +33,36 @@ export const backendReports: Record<string, { kind: string; title: string }> = {
   'Sales returns': { kind: 'sales-returns', title: 'Sales Returns' },
 };
 
-export function BackendReport({ report, onBack, notify, initialDateSelection }: { report: { kind: string; title: string }; onBack: () => void; notify: (message: string) => void; initialDateSelection?: DateRangeSelection }) {
+export function BackendReport({ report, onBack, notify, initialDateSelection, onOpenInvoice }: { report: { kind: string; title: string }; onBack: () => void; notify: (message: string) => void; initialDateSelection?: DateRangeSelection; onOpenInvoice?: (id: string) => Promise<void> }) {
   const [filter, setFilter] = useState(initialDateSelection?.filter || 'All');
   const [range, setRange] = useState<CustomDateRange>(initialDateSelection?.range || { from: '', to: '' });
   const [data, setData] = useState<Awaited<ReturnType<typeof api.reportTable>> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
+  const [openingInvoice, setOpeningInvoice] = useState<string | null>(null);
+  const openInvoice = async (id: string) => {
+    if (!onOpenInvoice || openingInvoice) return;
+    setOpeningInvoice(id);
+    try { await onOpenInvoice(id); }
+    catch (error) { notify(error instanceof Error ? error.message : 'Unable to open invoice'); }
+    finally { setOpeningInvoice(null); }
+  };
   const [search, setSearch] = useState('');
   const [emailOpen, setEmailOpen] = useState(false);
+  const isCouponReport = report.kind === 'coupon-report';
+  const isProfitReport = report.kind === 'bill-profit';
+  const isExpenseReport = report.kind === 'expense-category' || report.kind === 'expense-transactions';
+  const isExpenseCategory = report.kind === 'expense-category';
   const isAgeingReport = report.kind === 'receivable-ageing';
   const isStockReport = report.kind === 'stock-detail';
   const isItemReport = report.kind === 'item-party';
+  const isPartyItemReport = report.kind === 'party-item';
+  const isLedgerReport = report.kind === 'party-ledger';
+  const isCategoryReport = report.kind === 'category-sales';
+  const isPurchaseReport = report.kind === 'purchase-summary';
+  const isAuditReport = report.kind === 'audit-trail';
+  const isStaffReport = report.kind === 'daybook-staff' || report.kind === 'sales-staff';
   const [itemView, setItemView] = useState('items');
   const [sort, setSort] = useState<ItemReportSort>('quantity-desc');
   const branchId = api.currentBranchId();
@@ -70,7 +89,7 @@ export function BackendReport({ report, onBack, notify, initialDateSelection }: 
       : null;
     return [columnLabel(c), date ? `${date[3]}/${date[2]}/${date[1]}` : value];
   })));
-  if (isItemReport || isAgeingReport) exportRows.push(Object.fromEntries(columns.map((c, index) => [columnLabel(c), index === 0 ? 'Total' : c === 'Quantity' ? totalQuantity : data?.moneyColumns.includes(c) ? Number(rows.reduce((sum, row) => sum + Number(row[c] || 0), 0).toFixed(2)) : ''])));
+  if (isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport || isAgeingReport || isExpenseReport || isProfitReport || isCouponReport) exportRows.push(Object.fromEntries(columns.map((c, index) => [columnLabel(c), index === 0 ? 'Total' : c === 'Quantity' ? totalQuantity : data?.moneyColumns.includes(c) ? Number(rows.reduce((sum, row) => sum + (typeof row[c] === 'number' ? Number(row[c]) : 0), 0).toFixed(2)) : ''])));
   const exportExcel = () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportRows), 'Report');
@@ -78,7 +97,7 @@ export function BackendReport({ report, onBack, notify, initialDateSelection }: 
     XLSX.writeFile(wb, `${report.kind}_${data?.from}_${data?.to}.xlsx`);
   };
   const formatDate = (value: string) => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(value + 'T00:00:00Z'));
-  return <div className={isAgeingReport ? 'printable-report item-sales-report ageing-report' : isStockReport ? 'printable-report item-sales-report stock-detail-report' : isItemReport ? 'printable-report item-sales-report' : 'printable-report'}>
+  return <div className={isAgeingReport ? 'printable-report item-sales-report ageing-report' : isStockReport ? 'printable-report item-sales-report stock-detail-report' : isLedgerReport ? 'printable-report item-sales-report ledger-report' : isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport || isAuditReport || isStaffReport || isExpenseReport || isProfitReport || isCouponReport ? 'printable-report item-sales-report' : 'printable-report'}>
     <div className="page-heading"><div className="back-heading"><button type="button" className="icon-button" onClick={onBack} aria-label="Back" title="Back to Reports"><ArrowLeft size={18} /></button><h1>{isItemReport && itemView === 'items' ? 'Item Sales Totals' : report.title}</h1></div>
       <div className="header-actions"><button className="secondary" disabled={loading || !!error || !rows.length} onClick={exportExcel}>Download Excel</button><button className="secondary" disabled={loading || !!error || !rows.length} onClick={() => setEmailOpen(true)}>Email Excel</button><button className="secondary" disabled={loading || !!error} onClick={() => window.print()}>Print PDF</button></div>
     </div>
@@ -95,23 +114,43 @@ export function BackendReport({ report, onBack, notify, initialDateSelection }: 
           <div><span>Not yet overdue</span><strong>{money(notDue)}</strong></div>
           <div><span>Overdue</span><strong>{money(overdue)}</strong></div>
         </div>
-        <p className="ageing-note">Includes unpaid invoices up to the selected end date. Overdue days use each customer's current credit period. Opening balances are excluded. Totals follow your search.</p>
-      </> : isItemReport || isStockReport ? <div className="item-report-period">
-        <div><span className="item-report-caption">{isStockReport ? 'Stock movement period' : 'Sales period'}</span><strong>{filter === 'All' ? 'All' : <>{formatDate(data.from)}{data.from !== data.to && <> to {formatDate(data.to)}</>}</>}</strong></div>
-        <span className="item-report-count">{rows.length.toLocaleString('en-IN')} {isStockReport ? 'movements' : itemView === 'items' ? 'items' : 'records'}</span>
-      </div> : <><p>{filter === 'All' ? 'All' : `${data.from} to ${data.to}`} ? {rows.length} records ? Weeks run Sunday?Saturday.</p><p>{data.note}</p></>}
+        <p className="ageing-note">Includes unpaid invoices up to the selected end date. Overdue days use each customer's current credit period. Invoices without an available customer and opening balances are excluded. Totals follow your search.</p>
+      </> : isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport || isStockReport || isLedgerReport || isAuditReport || isStaffReport || isExpenseReport || isProfitReport || isCouponReport ? <div className="item-report-period">
+        <div><span className="item-report-caption">{isExpenseReport ? 'Expense period' : isStockReport ? 'Stock movement period' : isLedgerReport ? 'Statement period' : isPurchaseReport ? 'Purchase period' : isAuditReport ? 'Activity period' : 'Sales period'}</span><strong>{filter === 'All' ? 'All dates' : <>{formatDate(data.from)}{data.from !== data.to && <> to {formatDate(data.to)}</>}</>}</strong></div>
+        <span className="item-report-count">{rows.length.toLocaleString('en-IN')} {isStockReport ? 'movements' : isCategoryReport || isExpenseCategory ? 'categories' : isPurchaseReport || isProfitReport || isCouponReport || report.kind === 'daybook-staff' ? 'invoices' : isAuditReport ? 'events' : isItemReport && itemView === 'items' ? 'items' : 'records'}</span>
+      </div> : <><p>{filter === 'All' ? 'All' : `${data.from} to ${data.to}`} | {rows.length.toLocaleString('en-IN')} records</p><p>{data.note}</p></>}
+      {isCouponReport && <>
+        <div className="item-report-totals">
+          <div><span>Total coupon discount</span><strong>{money(rows.reduce((sum, row) => sum + Number(row['Coupon Discount'] || 0), 0))}</strong></div>
+          <div><span>Coupon invoices</span><strong>{rows.length.toLocaleString('en-IN')}</strong></div>
+          <div><span>Total invoice amount</span><strong>{money(rows.reduce((sum, row) => sum + Number(row['Invoice Amount'] || 0), 0))}</strong></div>
+        </div>
+        <p>{data.note}</p>
+      </>}
+      {isProfitReport && <>
+        <div className="item-report-totals">
+          <div><span>Sales excluding tax (all shown bills)</span><strong>{money(rows.reduce((s, r) => s + Number(r['Sales Excluding Tax'] || 0), 0))}</strong></div>
+          <div><span>Gross profit (bills with recorded cost)</span><strong>{money(rows.reduce((s, r) => s + (typeof r['Gross Profit'] === 'number' ? r['Gross Profit'] : 0), 0))}</strong></div>
+        </div>
+        <p>Gross profit = sales excluding tax minus cost recorded when sold. Returns and operating expenses are excluded.</p>
+        {rows.some(r => typeof r['Gross Profit'] !== 'number') && <p role="status">{rows.filter(r => typeof r['Gross Profit'] !== 'number').length} invoices have missing costs. Cost and profit totals cover only the remaining invoices; sales totals include all shown invoices.</p>}
+      </>}
       {isStockReport && <>
-        <div className="item-report-totals">{['Stock In', 'Stock Out'].map(c => <div key={c}><span>{c} (Pieces)</span><strong>{rows.reduce((sum, row) => sum + Number(row[c] || 0), 0).toLocaleString('en-IN', { maximumFractionDigits: 3 })}</strong></div>)}</div>
+        <div className="item-report-totals">{['Stock In', 'Stock Out'].map(c => <div key={c}><span>{c} (Pieces)</span><strong>{rows.reduce((sum, row) => sum + (typeof row[c] === 'number' ? Number(row[c]) : 0), 0).toLocaleString('en-IN', { maximumFractionDigits: 3 })}</strong></div>)}</div>
         <p className="low-stock-explanation">{data.note} Unit cost is shown only when recorded.</p>
       </>}
       {isItemReport && <div className="item-report-totals">
         <div><span>Total pieces sold</span><strong>{totalQuantity.toLocaleString('en-IN')}</strong></div>
         <div><span>Total sales amount</span><strong>{money(totalAmount)}</strong></div>
       </div>}
-      <article className="card table-card"><div className="table-scroll"><table><thead><tr>{columns.map(c => <th key={c} className={(isItemReport || isStockReport || isAgeingReport) && (c === 'Quantity' || c === 'Stock In' || c === 'Stock Out' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{columnLabel(c)}</th>)}</tr></thead><tbody>
-        {rows.map((r, index) => <tr key={index}>{columns.map(c => <td key={c} className={(isItemReport || isStockReport || isAgeingReport) && (c === 'Quantity' || c === 'Stock In' || c === 'Stock Out' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{data.moneyColumns.includes(c) && typeof r[c] === 'number' ? money(r[c] as number) : isStockReport && c === 'Date' ? formatDate(String(r[c])) : isAgeingReport && (c === 'Invoice Date' || c === 'Due Date') ? formatDate(String(r[c])) : isAgeingReport && c === 'Party' && !r[c] ? 'Customer unavailable' : r[c]}</td>)}</tr>)}
-        {!rows.length && <tr><td colSpan={columns.length}>No records match this date range and search.</td></tr>}
-      </tbody><tfoot><tr>{columns.map((c, index) => <th key={c} className={(isItemReport || isStockReport || isAgeingReport) && (c === 'Quantity' || c === 'Stock In' || c === 'Stock Out' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{index === 0 ? 'Total' : isStockReport ? (c === 'Stock In' || c === 'Stock Out' ? rows.reduce((sum, r) => sum + Number(r[c] || 0), 0).toLocaleString('en-IN', { maximumFractionDigits: 3 }) : '') : isItemReport && c === 'Quantity' ? totalQuantity : data.moneyColumns.includes(c) ? money(rows.reduce((s, r) => s + (typeof r[c] === 'number' ? r[c] as number : 0), 0)) : ''}</th>)}</tr></tfoot></table></div></article>
+      <article className="card table-card"><div className="table-scroll"><table><thead><tr>{columns.map(c => <th key={c} className={(isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport || isStockReport || isAgeingReport || isLedgerReport || isExpenseReport || isProfitReport || isCouponReport) && (c === 'Quantity' || c === 'Stock In' || c === 'Stock Out' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{columnLabel(c)}</th>)}</tr></thead><tbody>
+        {rows.map((r, index) => <tr key={index}
+          className={isCouponReport && r['Invoice ID'] && onOpenInvoice ? 'coupon-invoice-row' : undefined}
+          onClick={isCouponReport && r['Invoice ID'] && onOpenInvoice ? () => void openInvoice(String(r['Invoice ID'])) : undefined}
+          aria-busy={isCouponReport && openingInvoice === String(r['Invoice ID']) ? true : undefined}
+        >{columns.map(c => <td key={c} className={(isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport || isStockReport || isAgeingReport || isLedgerReport || isExpenseReport || isProfitReport || isCouponReport) && (c === 'Quantity' || c === 'Stock In' || c === 'Stock Out' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{isCouponReport && c === 'Invoice' && r['Invoice ID'] && onOpenInvoice ? <button type="button" className="coupon-invoice-link" disabled={openingInvoice !== null} onClick={event => { event.stopPropagation(); void openInvoice(String(r['Invoice ID'])); }} aria-label={`Open sales invoice ${r[c]}`}>{openingInvoice === String(r['Invoice ID']) ? 'Opening...' : r[c]}</button> : data.moneyColumns.includes(c) && typeof r[c] === 'number' ? money(r[c] as number) : (isStockReport || isLedgerReport || isPurchaseReport || isAuditReport || isStaffReport || isExpenseReport || isProfitReport || isCouponReport) && c === 'Date' ? formatDate(String(r[c])) : isAgeingReport && (c === 'Invoice Date' || c === 'Due Date') ? formatDate(String(r[c])) : isAgeingReport && c === 'Party' && !r[c] ? 'Customer unavailable' : r[c]}</td>)}</tr>)}
+        {!rows.length && <tr><td colSpan={columns.length}>{isExpenseReport ? search.trim() ? 'No expenses match your search.' : filter === 'All' ? 'No store expenses recorded for this branch. Add an entry in Store Expenses to see it here.' : 'No store expenses recorded in this date range.' : 'No records match this date range and search.'}</td></tr>}
+      </tbody><tfoot><tr>{columns.map((c, index) => <th key={c} className={(isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport || isStockReport || isAgeingReport || isLedgerReport || isExpenseReport || isProfitReport || isCouponReport) && (c === 'Quantity' || c === 'Stock In' || c === 'Stock Out' || data.moneyColumns.includes(c)) ? 'item-report-number' : undefined}>{index === 0 ? 'Total' : isStockReport ? (c === 'Stock In' || c === 'Stock Out' ? rows.reduce((sum, r) => sum + Number(r[c] || 0), 0).toLocaleString('en-IN', { maximumFractionDigits: 3 }) : '') : (isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport) && c === 'Quantity' ? totalQuantity : data.moneyColumns.includes(c) ? money(rows.reduce((s, r) => s + (typeof r[c] === 'number' ? r[c] as number : 0), 0)) : ''}</th>)}</tr></tfoot></table></div></article>
     </>}
     {emailOpen && <EmailExcelReportModal reportName={`${report.title} ${data?.from} to ${data?.to}`} reportRows={exportRows} onClose={() => setEmailOpen(false)} notify={notify} />}
   </div>;

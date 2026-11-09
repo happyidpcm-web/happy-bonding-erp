@@ -1,6 +1,7 @@
 import ownerSignatureUrl from "./assets/owner-signature.png";
 import { findInvoiceParty } from "./utils/invoiceParty";
 import { matchesItemSearch } from "./utils/itemSearch";
+import { indexParties, searchParties } from "./utils/partySearch";
 import { useDismissibleDropdown } from "./hooks/useDismissibleDropdown";
 import { timeFilterRange, isInvoiceInDateRange, isValidCustomDateRange, type CustomDateRange, type DateRangeSelection } from "./utils/invoiceDateRange";
 export { isInvoiceInDateRange, type CustomDateRange } from "./utils/invoiceDateRange";
@@ -538,7 +539,7 @@ export default function App() {
 
         {page === "reminders" && <RemindersModule parties={partyRows} invoices={invoiceRows} notify={notify} />}
 
-        {page === "reports" && <Reports key={currentBranchId} products={productRows} invoices={invoiceRows} notify={notify} initialReport={activeReportSubScreen} initialDateSelection={reportDateSelection}/>}
+        {page === "reports" && <Reports onOpenInvoice={async id => { const invoice = await api.sale(id); setActiveInvoiceModal(invoice); }} key={currentBranchId} products={productRows} invoices={invoiceRows} notify={notify} initialReport={activeReportSubScreen} initialDateSelection={reportDateSelection}/>}
         {page === "cash" && <CashBank notify={notify}/>} 
         {page === "pos" && <Sales rows={invoiceRows} products={productRows} parties={partyRows} setting={invoiceSetting} setSetting={setInvoiceSetting} setRows={setInvoiceRows} setParties={setPartyRows} setProducts={setProductRows} notify={notify} key="pos" initialCreate={true} onSelectInvoice={openInvoiceDetail} onNavigateReports={handleNavigateReportsFromSales}/>}
         {page === "staff" && <Staff/>} 
@@ -1731,7 +1732,7 @@ function SalesInvoicesListView({
                     />
                   </td>
                   <td>{inv.date}</td>
-                  <td className="mono" style={{ fontWeight: 600, color: "#1e293b" }}>
+                  <td className="mono" style={{ fontWeight: 600, color: "#1e293b", whiteSpace: "nowrap" }}>
                     {inv.number}
                   </td>
                   <td>
@@ -2288,7 +2289,8 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   }, [setting]);
 
   const list=rows.filter(x=>`${x.party} ${x.number}`.toLowerCase().includes(query.toLowerCase()));
-  const partyMatches=(partySearch.trim()?parties.filter(p=>`${p.name} ${p.phone}`.toLowerCase().includes(partySearch.toLowerCase())):parties).slice(0,8);
+  const partyIndex = useMemo(() => indexParties(parties), [parties]);
+  const partyMatches = searchParties(partyIndex, partySearch, false, 8).rows;
   const itemMatches=itemSearch.trim()?products.filter(p=>matchesItemSearch(itemSearch,[p.name,p.sku])).slice(0,5):[];
   const totalQuantity=lines.reduce((sum,line)=>sum+line.qty,0);
   const subtotal=lines.reduce((sum,line)=>sum+line.product.sellingPrice*line.qty,0);
@@ -2365,7 +2367,6 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
   const saveInvoice=async(keepOpen=false)=>{
     if (invoiceSaveInFlight.current) return;
     if(!lines.length)return notify("Add at least one item");
-    if (!nextNumber) return notify("Invoice number is unavailable. Reopen the form after connecting to the backend.");
     invoiceSaveInFlight.current = true;
     const refreshVersion = ++stockRefreshVersion.current;
     try{
@@ -2627,19 +2628,19 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
                     <input
                       ref={partySearchInputRef}
                       value={partySearch}
-                      type="tel"
-                      inputMode="numeric"
-                      maxLength={10}
+                      type="text"
+                      inputMode="text"
                       autoFocus
                       onFocus={() => setPartyOpen(true)}
                       onChange={e => {
-                        const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+                        const value = e.target.value;
                         setPartySearch(value);
                         setPartyOpen(true);
                         setSelectedParty(undefined);
-                        setNewParty({ ...newParty, phone: value });
+                        const phoneQuery = /^[+\d\s().-]+$/.test(value.trim());
+                        setNewParty({ ...newParty, name: phoneQuery ? "" : value.trim(), phone: phoneQuery ? value.replace(/\D/g, "") : "" });
                       }}
-                      placeholder="Search party by mobile number..."
+                      placeholder="Search by name or mobile number..."
                     />
                     {partyOpen && (
                       <div className="search-results party-dropdown">

@@ -5,7 +5,7 @@ import { requireBranch } from './auth.js';
 import { reportBounds, reportQuery, matchesReportTime, storeCalendarDate } from './report-data.js';
 
 type Row = Record<string, string | number>;
-const kinds = z.enum(['purchase-summary', 'expense-transactions', 'expense-category', 'cash-bank', 'stock-detail', 'item-party', 'party-item', 'category-sales', 'hsn-sales', 'gst-sales', 'gst-purchases', 'party-outstanding', 'party-ledger', 'audit-trail', 'sales-staff', 'daybook-staff', 'sales-returns', 'bill-profit', 'sales-summary', 'receivable-ageing']);
+const kinds = z.enum(['coupon-report', 'purchase-summary', 'expense-transactions', 'expense-category', 'cash-bank', 'stock-detail', 'item-party', 'party-item', 'category-sales', 'hsn-sales', 'gst-sales', 'gst-purchases', 'party-outstanding', 'party-ledger', 'audit-trail', 'sales-staff', 'daybook-staff', 'sales-returns', 'bill-profit', 'sales-summary', 'receivable-ageing']);
 export const reportTablesRouter = Router();
 reportTablesRouter.get('/:kind', async (req, res) => {
   const branchId = requireBranch(req, res); if (!branchId) return;
@@ -27,7 +27,13 @@ reportTablesRouter.get('/:kind', async (req, res) => {
     }
     return [...grouped.values()];
   };
-  if (kind === 'purchase-summary' || kind === 'gst-purchases') {
+  if (kind === 'coupon-report') {
+    const invoices = await db.salesInvoice.findMany({ where: { ...scope, status: 'POSTED', couponDiscount: { gt: 0 }, invoiceDate: bounds.where }, include: { party: true }, orderBy: [{ invoiceDate: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }] });
+    columns = ['Date', 'Invoice', 'Customer', 'Phone', 'Coupon Discount', 'Invoice Amount'];
+    moneyColumns = ['Coupon Discount', 'Invoice Amount'];
+    rows = invoices.filter(i => matchesReportTime(i.invoiceDate, i.createdAt, q)).map(i => ({ Date: date(i.invoiceDate), Invoice: i.invoiceNumber, 'Invoice ID': i.id, Customer: i.party?.name || 'Cash Sale', Phone: i.party?.phone || '', 'Coupon Discount': num(i.couponDiscount), 'Invoice Amount': num(i.grandTotal) }));
+    note = 'Posted sales invoices with a coupon discount. Invoice amount is the final total after discounts. Regular discounts are excluded from coupon totals. Returns are not deducted. Totals follow your search.';
+  } else if (kind === 'purchase-summary' || kind === 'gst-purchases') {
     const records = await db.voucher.findMany({ where: { ...scope, type: 'Purchase Invoice', date: bounds.where }, orderBy: { date: 'desc' } });
     const selected = records.filter(r => matchesReportTime(r.date, r.createdAt, q));
     if (kind === 'purchase-summary') {
@@ -71,7 +77,7 @@ reportTablesRouter.get('/:kind', async (req, res) => {
     ], { isolationLevel: 'RepeatableRead' });
     if (kind === 'receivable-ageing') {
       columns = ['Party', 'Invoice', 'Invoice Date', 'Due Date', 'Not Due', '1?30 Days', '31?60 Days', '61?90 Days', 'Over 90 Days']; moneyColumns = columns.slice(4);
-      rows = invoices.filter(i => i.partyId).map(i => {
+      rows = invoices.filter(i => i.partyId && parties.some(p => p.id === i.partyId && p.name.trim())).map(i => {
         const party = parties.find(p => p.id === i.partyId);
         const due = new Date(i.invoiceDate); due.setUTCDate(due.getUTCDate() + (party?.creditPeriodDays ?? 30));
         const paid = i.payments.filter(a => a.payment.paidAt < asOf.timestampWhere.lt!).reduce((s, a) => s + num(a.amount), 0);
@@ -81,7 +87,7 @@ reportTablesRouter.get('/:kind', async (req, res) => {
         const bucket = days <= 0 ? 'Not Due' : days <= 30 ? '1?30 Days' : days <= 60 ? '31?60 Days' : days <= 90 ? '61?90 Days' : 'Over 90 Days';
         return { Party: party?.name || '', Invoice: i.invoiceNumber, 'Invoice Date': date(i.invoiceDate), 'Due Date': date(due), ...Object.fromEntries(moneyColumns.map(k => [k, k === bucket ? balance : 0])) };
       }).filter(r => moneyColumns.some(k => num((r as Row)[k]) > 0));
-      note = 'Open customer invoices as of the end date, using the current party credit period. Opening balances are excluded because their due dates are not recorded.';
+      note = 'Open customer invoices as of the end date, using the current party credit period. Invoices without an available customer are excluded. Opening balances are excluded because their due dates are not recorded.';
     } else if (kind === 'party-outstanding') {
       columns = ['Party', 'Opening Balance', 'Invoiced', 'Collected', 'Credit Notes', 'Outstanding']; moneyColumns = columns.slice(1);
       rows = parties.map(p => {
@@ -110,13 +116,13 @@ reportTablesRouter.get('/:kind', async (req, res) => {
     rows = records.filter(r => matchesReportTime(storeCalendarDate(r.occurredAt), r.occurredAt, q)).map(r => ({ Date: date(storeCalendarDate(r.occurredAt)), Staff: r.actor?.name || 'System', Action: r.action, Entity: r.entityType, Reference: r.entityId }));
     note = 'Events with a verified branch reference, including sales invoice events.';
   } else {
-    const invoices = await db.salesInvoice.findMany({ where: { ...scope, status: 'POSTED', invoiceDate: bounds.where }, include: { party: true, lines: { include: { variant: { include: { product: true } } } } }, orderBy: { invoiceDate: 'desc' } });
+    const invoices = await db.salesInvoice.findMany({ where: { ...scope, status: 'POSTED', invoiceDate: bounds.where }, include: { party: true, lines: { include: { variant: { include: { product: true } } } } }, orderBy: [{ invoiceDate: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }] });
     const selected = invoices.filter(i => matchesReportTime(i.invoiceDate, i.createdAt, q));
     if (kind === 'bill-profit') {
       columns = ['Date', 'Invoice', 'Party', 'Sales Excluding Tax', 'Recorded Cost', 'Gross Profit']; moneyColumns = columns.slice(3);
       rows = selected.map(i => {
         const revenue = num(i.grandTotal) - num(i.cgstTotal) - num(i.sgstTotal) - num(i.igstTotal);
-        const complete = i.lines.every(l => l.totalCostAtSale != null);
+        const complete = i.lines.length > 0 && i.lines.every(l => l.totalCostAtSale != null);
         const cost = i.lines.reduce((s, l) => s + num(l.totalCostAtSale), 0);
         return { Date: date(i.invoiceDate), Invoice: i.invoiceNumber, Party: i.party?.name || 'Cash Sale', 'Sales Excluding Tax': revenue, 'Recorded Cost': complete ? cost : 'Not recorded', 'Gross Profit': complete ? revenue - cost : 'Not available' };
       });
@@ -131,11 +137,25 @@ reportTablesRouter.get('/:kind', async (req, res) => {
       rows = selected.map(i => ({ Date: date(i.invoiceDate), Staff: staff.get(i.id) || 'Unassigned', Invoice: i.invoiceNumber, Party: i.party?.name || 'Cash Sale', Amount: num(i.grandTotal), Paid: num(i.paidAmount), Balance: num(i.grandTotal) - num(i.paidAmount) }));
       columns = ['Date', 'Staff', 'Invoice', 'Party', 'Amount', 'Paid', 'Balance']; moneyColumns = ['Amount', 'Paid', 'Balance'];
       if (kind === 'sales-staff') { rows = group(rows, ['Staff'], moneyColumns); columns = ['Staff', ...moneyColumns]; }
-      note = 'Posted sales attributed to the original posting staff member. Paid and balance reflect the current invoice state.';
+      note = '';
     } else {
       rows = selected.flatMap(i => i.lines.map(l => ({ Date: date(i.invoiceDate), Invoice: i.invoiceNumber, Party: i.party?.name || 'Cash Sale', 'Product ID': l.variant.productId, 'Product Name': l.variant.product.name, Item: l.itemName, 'Item Code': l.sku, Size: l.variant.size || '', Category: l.variant.product.category, HSN: l.hsnCode, Quantity: num(l.quantity), 'Tax Rate': num(l.taxRate), Taxable: num(l.taxableAmount), CGST: num(l.cgst), SGST: num(l.sgst), IGST: num(l.igst), Amount: num(l.total) })));
       const sums = ['Quantity', 'Taxable', 'CGST', 'SGST', 'IGST', 'Amount']; moneyColumns = sums.slice(1);
-      if (kind === 'category-sales') { rows = group(rows, ['Category'], sums); columns = ['Category', ...sums]; }
+      if (kind === 'category-sales') {
+        // Combine known singular/plural labels in this report without changing products.
+        const categoryLabels: Record<string, string> = { shirt: 'Shirt', shirts: 'Shirt', pant: 'Pant', pants: 'Pant', general: 'General' };
+        rows = rows.map(row => {
+          const label = String(row.Category || '').trim();
+          return { ...row, Category: categoryLabels[label.toLowerCase()] || label || 'General' };
+        });
+        rows = group(rows, ['Category'], sums).map(row => ({
+          ...row,
+          'Rounding Difference': Number((num(row.Amount) - num(row.Taxable) - num(row.CGST) - num(row.SGST) - num(row.IGST)).toFixed(2)),
+        }));
+        rows.sort((a, b) => String(a.Category).localeCompare(String(b.Category)));
+        columns = ['Category', ...sums.slice(0, -1), 'Rounding Difference', 'Amount'];
+        moneyColumns = [...sums.slice(1, -1), 'Rounding Difference', 'Amount'];
+      }
       else if (kind === 'hsn-sales') { rows = group(rows, ['HSN', 'Tax Rate'], sums); columns = ['HSN', 'Tax Rate', ...sums]; }
       else if (kind === 'item-party' || kind === 'party-item') {
         const keys = kind === 'item-party' ? ['Item', 'Item Code', 'Size', 'Party'] : ['Party', 'Item', 'Item Code', 'Size'];
