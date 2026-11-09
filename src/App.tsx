@@ -1465,6 +1465,35 @@ function SalesInvoicesListView({
     setOpenMenuId(null);
   };
 
+  const downloadFilteredSalesExcel = () => {
+    if (!filtered.length) return;
+    try {
+      const data = filtered.map(invoice => {
+        const received = invoice.paidAmount ?? (invoice.status === "Paid" ? invoice.amount : 0);
+        return [invoice.date, invoice.number, invoice.party, invoice.amount, received, Math.max(0, invoice.amount - received), invoice.status];
+      });
+      const totals = filtered.reduce((sum, invoice) => {
+        const received = invoice.paidAmount ?? (invoice.status === "Paid" ? invoice.amount : 0);
+        return [sum[0] + invoice.amount, sum[1] + received, sum[2] + Math.max(0, invoice.amount - received)];
+      }, [0, 0, 0]);
+      const sheet = XLSX.utils.aoa_to_sheet([
+        ["Date", "Invoice Number", "Party Name", "Invoice Total (INR)", "Received (INR)", "Balance Due (INR)", "Status"],
+        ...data,
+        ["", "", "TOTAL", ...totals, ""],
+      ]);
+      sheet["!cols"] = [28, 26, 48, 22, 22, 22, 20].map(wch => ({ wch }));
+      sheet["!autofilter"] = { ref: `A1:G${data.length + 1}` };
+      for (let row = 1; row <= data.length + 1; row++) {
+        for (const col of [3, 4, 5]) sheet[XLSX.utils.encode_cell({ r: row, c: col })].z = "#,##0.00";
+      }
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, sheet, "Sales Invoices");
+      XLSX.writeFile(workbook, `Sales_Invoices_${statusFilter}.xlsx`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Sales Excel download failed");
+    }
+  };
+
   const toggleSelectAll = () => {
     if (filtered.every(row => selectedIds.has(row.id))) setSelectedIds(new Set());
     else setSelectedIds(new Set(filtered.map(x => x.id)));
@@ -1484,6 +1513,9 @@ function SalesInvoicesListView({
       <div className="sales-page-top-header">
         <h1>Sales Invoices</h1>
         <div className="sales-header-tools">
+          <button type="button" className="sales-reports-dropdown-btn" disabled={!filtered.length} onClick={downloadFilteredSalesExcel} title="Download invoices matching the selected status, date, time and search filters">
+            <Download size={15} /> {statusFilter === "unpaid" ? "Download Unpaid Excel" : "Download Excel"}
+          </button>
           {/* Reports Dropdown matching Image 1 */}
           <div ref={reportsDropdownRef} style={{ position: "relative" }}>
             <button
