@@ -986,18 +986,30 @@ export function GenericVoucherPage({
   const [dateFilter, setDateFilter] = useState("Last 365 Days");
   const [customDateRange, setCustomDateRange] = useState<CustomDateRange>({ from: "", to: "" });
 
-  const filtered = useMemo(() => {
+  const matchingRecords = useMemo(() => {
     return records.filter(r => {
       if (!isInvoiceInDateRange(r, dateFilter, customDateRange)) return false;
-      const status = type === "Purchase Invoice" ? purchasePaymentStatus(r) : r.status;
-      if (statusFilter !== "All" && status !== statusFilter) return false;
       if (query.trim()) {
         const q = query.toLowerCase();
         if (!`${r.number} ${r.party} ${r.notes}`.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [records, query, statusFilter, dateFilter, customDateRange, type]);
+  }, [records, query, dateFilter, customDateRange]);
+
+  const filtered = useMemo(() => matchingRecords.filter(row => {
+    const status = type === "Purchase Invoice" ? purchasePaymentStatus(row) : row.status;
+    return statusFilter === "All" || status === statusFilter;
+  }), [matchingRecords, statusFilter, type]);
+
+  const purchaseTotals = useMemo(() => matchingRecords.reduce((totals, row) => {
+    const amount = Number(row.amount);
+    const paid = Number(row.details?.paidAmount ?? (row.status === "Paid" ? amount : 0));
+    totals.total += amount;
+    totals.paid += paid;
+    totals.unpaid += Math.max(0, amount - paid);
+    return totals;
+  }, { total: 0, paid: 0, unpaid: 0 }), [matchingRecords]);
 
   const handleSaveNewRecord = async (record: VoucherRecord) => {
     const saved = editingRecord ? await api.updatePurchaseVoucher(record) : await api.saveVoucher(type, record);
@@ -1239,6 +1251,20 @@ export function GenericVoucherPage({
       </div>
 
       {/* Subtab Bar matching Image 1 */}
+      {type === "Purchase Invoice" && <div className="sales-summary-cards-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+        <div className="sales-summary-card active-purple-card" style={{ cursor: "default" }}>
+          <div className="sales-summary-card-head purple-text"><Receipt size={16} /><span>Total Purchases</span></div>
+          <h2 className="sales-summary-card-val">{money(purchaseTotals.total)}</h2>
+        </div>
+        <div className="sales-summary-card" style={{ cursor: "default" }}>
+          <div className="sales-summary-card-head green-text"><CheckSquare size={16} /><span>Paid</span></div>
+          <h2 className="sales-summary-card-val">{money(purchaseTotals.paid)}</h2>
+        </div>
+        <div className="sales-summary-card" style={{ cursor: "default" }}>
+          <div className="sales-summary-card-head red-text"><Calendar size={16} /><span>Unpaid</span></div>
+          <h2 className="sales-summary-card-val">{money(purchaseTotals.unpaid)}</h2>
+        </div>
+      </div>}
       <div style={{ borderBottom: "1px solid #e2e8f0", marginBottom: 16, display: "flex", gap: 24 }}>
         <div style={{ borderBottom: "2px solid #4f46e5", paddingBottom: 8, color: "#4f46e5", fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
           <Icon size={16} /> All {title}
