@@ -4,10 +4,11 @@ import { useDismissibleDropdown } from "../hooks/useDismissibleDropdown";
 import { CustomDateRangePopover, customRangeLabel, REPORT_DATE_OPTIONS } from "../App";
 import type { CustomDateRange } from "../utils/invoiceDateRange";
 
-export function DateRangeFilter({ value, range, onChange, onRangeChange }: {
+export function DateRangeFilter({ value, range, onChange, onRangeChange, showTime = true }: {
   value: string; range: CustomDateRange;
   onChange: (value: string) => void;
   onRangeChange: (range: CustomDateRange) => void;
+  showTime?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [customOpen, setCustomOpen] = useState(false);
@@ -28,7 +29,7 @@ export function DateRangeFilter({ value, range, onChange, onRangeChange }: {
           else onChange(option.label);
         }}><span>{option.label}</span></button>)}
     </div>}
-    {customOpen && <CustomDateRangePopover range={range} onCancel={() => setCustomOpen(false)} onApply={next => {
+    {customOpen && <CustomDateRangePopover showTime={showTime} range={range} onCancel={() => setCustomOpen(false)} onApply={next => {
       onRangeChange(next); onChange("Custom Range"); setCustomOpen(false);
     }} />}
   </div>;

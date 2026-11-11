@@ -5,6 +5,8 @@ import { api } from "../../api";
 import { money } from "../../data";
 import type { Invoice, OwnerBranchSummary, Party, Product } from "../../types";
 import { PageHeading, Metric, Modal } from "../../App";
+import { DateRangeFilter } from "../../components/DateRangeFilter";
+import { isInvoiceInDateRange, type CustomDateRange } from "../../utils/invoiceDateRange";
 
 export function SalesReportChartCard({ invoices }: { invoices: Invoice[] }) {
   const [viewMode, setViewMode] = useState<"Daily" | "Weekly">("Daily");
@@ -237,13 +239,14 @@ export function DashboardLive({
   const [transactions, setTransactions] = useState<Awaited<ReturnType<typeof api.transactions>>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [showAll, setShowAll] = useState(false);
-  const [showToday, setShowToday] = useState(false);
+  const [showLatest, setShowLatest] = useState(false);
+  const [dateFilter, setDateFilter] = useState("Today");
+  const [customRange, setCustomRange] = useState<CustomDateRange>({ from: "", to: "" });
   const [reload, setReload] = useState(0);
   const branchId = api.currentBranchId();
   useEffect(() => {
     let active = true;
-    setTransactions([]); setLoading(true); setError(""); setShowAll(false); setShowToday(false);
+    setTransactions([]); setLoading(true); setError("");
     const load = () => api.transactions().then(rows => { if (active) { setTransactions(rows); setError(""); } }).catch(e => { if (active) setError(e.message || "Could not load transactions"); }).finally(() => { if (active) setLoading(false); });
     void load();
     const refresh = () => { void load(); };
@@ -253,10 +256,12 @@ export function DashboardLive({
   const salesTransactions = transactions.filter(transaction => transaction.type === "Sales Invoice");
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   // Transaction dates are the invoice calendar date, not the time the record was created.
-  const todayTransactions = salesTransactions.filter(transaction => transaction.date.slice(0, 10) === today);
-  const todayTotalAmount = todayTransactions.reduce((sum, transaction) => sum + transaction.amount, 0);
-  const displayList = showToday ? todayTransactions : showAll ? salesTransactions : salesTransactions.slice(0, 3);
-  const onSeeAllTransactions = () => { setShowToday(false); setShowAll(value => !value); };
+  const filteredTransactions = salesTransactions.filter(transaction => isInvoiceInDateRange(
+    { date: transaction.date.slice(0, 10) }, dateFilter, customRange, new Date(`${today}T12:00:00`)
+  ));
+  const filteredTotalAmount = filteredTransactions.reduce((sum, transaction) => sum + transaction.amount, 0);
+  const displayList = showLatest ? filteredTransactions.slice(0, 3) : filteredTransactions;
+  const onSeeAllTransactions = () => setShowLatest(value => !value);
 
   return (
     <>
@@ -285,31 +290,30 @@ export function DashboardLive({
       <div className="dashboard-grid" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* 1. Latest Transactions Card FIRST */}
         <div style={{ display: "flex", gap: 10 }}>
-          <button type="button" className={showToday ? "primary" : "secondary"} aria-pressed={showToday} onClick={() => { setShowToday(value => !value); setShowAll(false); }}>Today</button>
-          {showToday && <button type="button" className="text-button" onClick={() => setShowToday(false)}>Show Latest Transactions</button>}
+          <DateRangeFilter showTime={false} value={dateFilter} range={customRange} onChange={value => { setDateFilter(value); setShowLatest(false); }} onRangeChange={setCustomRange} />
         </div>
         <article className="card transactions" style={{ gridColumn: "1 / -1" }}>
           <div className="card-title">
             <div>
-              <h2>{showToday ? "Today's Transactions" : showAll ? "All Transactions" : "Latest Transactions"}</h2>
+              <h2>{dateFilter === "Custom Range" ? "Custom Range Transactions" : `${dateFilter} Transactions`}</h2>
               <p role="status" style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0" }}>
-                {loading ? "Loading…" : showToday ? `Showing all ${displayList.length} sales invoice transactions for today` : `Showing ${displayList.length} of ${salesTransactions.length} sales invoice transactions`}
+                {loading ? "Loading…" : `Showing ${displayList.length} of ${filteredTransactions.length} sales invoice transactions in the selected period`}
               </p>
             </div>
             <button className="text-button" style={{ font: "700 13px Manrope", color: "#2563eb" }} onClick={onSeeAllTransactions}>
-              {showAll ? "Show Latest Transactions" : "See All Transactions →"}
+              {showLatest ? "Show All Matching Transactions →" : "Show Latest 3 Transactions"}
             </button>
           </div>
 
-          {showToday && !loading && !error && (
+          {!loading && !error && (
             <div role="status" style={{ display: "flex", flexWrap: "wrap", gap: 16, padding: "16px 20px", background: "#fffbeb", borderBottom: "1px solid #fde68a" }}>
               <div style={{ flex: "1 1 180px" }}>
-                <span style={{ display: "block", fontSize: 12, color: "#64748b", marginBottom: 4 }}>Today Total Invoices</span>
-                <strong style={{ fontSize: 22 }}>{todayTransactions.length.toLocaleString("en-IN")}</strong>
+                <span style={{ display: "block", fontSize: 12, color: "#64748b", marginBottom: 4 }}>Total Invoices</span>
+                <strong style={{ fontSize: 22 }}>{filteredTransactions.length.toLocaleString("en-IN")}</strong>
               </div>
               <div style={{ flex: "1 1 180px" }}>
-                <span style={{ display: "block", fontSize: 12, color: "#64748b", marginBottom: 4 }}>Today Total Amount</span>
-                <strong style={{ fontSize: 22 }}>{money(todayTotalAmount)}</strong>
+                <span style={{ display: "block", fontSize: 12, color: "#64748b", marginBottom: 4 }}>Total Amount</span>
+                <strong style={{ fontSize: 22 }}>{money(filteredTotalAmount)}</strong>
               </div>
             </div>
           )}
@@ -339,7 +343,7 @@ export function DashboardLive({
                 {!loading && !error && !displayList.length && (
                   <tr>
                     <td colSpan={5} style={{ textAlign: "center", padding: "20px", color: "#64748b" }}>
-                      {showToday ? "No sales invoices for today in this branch." : "No sales invoice transactions recorded for this branch yet."}
+                      No sales invoice transactions for the selected period in this branch.
                     </td>
                   </tr>
                 )}
@@ -349,7 +353,7 @@ export function DashboardLive({
 
           <div style={{ textAlign: "center", padding: "14px 0" }}>
             <button className="text-button" style={{ font: "700 13px Manrope", color: "#2563eb" }} onClick={onSeeAllTransactions}>
-              {showAll ? "Show Latest Transactions" : "See All Transactions →"}
+              {showLatest ? "Show All Matching Transactions →" : "Show Latest 3 Transactions"}
             </button>
           </div>
         </article>

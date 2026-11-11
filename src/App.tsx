@@ -1254,10 +1254,12 @@ export function CustomDateRangePopover({
   range,
   onApply,
   onCancel,
+  showTime = true,
 }: {
   range: CustomDateRange;
   onApply: (range: CustomDateRange) => void;
   onCancel: () => void;
+  showTime?: boolean;
 }) {
   const [draft, setDraft] = useState<CustomDateRange>(range);
   const valid = isValidCustomDateRange(draft);
@@ -1285,11 +1287,11 @@ export function CustomDateRangePopover({
           />
         </label>
       </div>
-      <div style={{ display: "flex", gap: 16, marginBottom: 14 }}>
+      {showTime && <><div style={{ display: "flex", gap: 16, marginBottom: 14 }}>
         <label>From Time<input type="time" value={draft.fromTime || ""} onChange={e => setDraft(prev => ({ ...prev, fromTime: e.target.value }))} /></label>
         <label>To Time<input type="time" value={draft.toTime || ""} onChange={e => setDraft(prev => ({ ...prev, toTime: e.target.value }))} /></label>
       </div>
-      <p style={{ fontSize: 12, color: "#64748b" }}>Times are in IST, as shown on the invoice. Leave blank for the full day. Invoices without a recorded time are excluded when filtering by time.</p>
+      <p style={{ fontSize: 12, color: "#64748b" }}>Times are in IST, as shown on the invoice. Leave blank for the full day. Invoices without a recorded time are excluded when filtering by time.</p></>}
       {draft.from && draft.to && !valid && <p role="alert">End date and time must be on or after start date and time.</p>}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 14, fontSize: 12, fontWeight: 700 }}>
         <button type="button" onClick={onCancel} style={{ border: 0, background: "transparent", color: "#475569", padding: "8px 0" }}>CANCEL</button>
