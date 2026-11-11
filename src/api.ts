@@ -104,6 +104,11 @@ async function request<T>(path: string, options?: RequestInit, timeoutMs = 30000
 }
 
 export const api = {
+  async itemSalesHistory(id: string | number) {
+    return request<{ stock: number; soldQuantity: number; salesAmount: number; transactions: Array<{
+      id: string; number: string; date: string; party: string; status: string; quantity: number; amount: number;
+    }> }>(`/products/${encodeURIComponent(id)}/sales-history`);
+  },
   async balanceSummary() {
     return request<{ stockValue: number; negativeStockItems: number; invoiceDue: number; invoiceCredit: number; openingReceivable: number; openingPayable: number; purchaseDue: number; missingPurchasePayments: number; received: number; paid: number; netMovement: number; generatedAt: string }>('/reports/balance-summary');
   },

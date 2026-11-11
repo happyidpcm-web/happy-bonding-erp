@@ -608,6 +608,37 @@ app.get("/api/products", async (req, res) => {
   res.json(rows);
 });
 
+app.get("/api/products/:id/sales-history", async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  const organizationId = req.session!.organizationId;
+  const variantId = String(req.params.id);
+  const result = await db.$transaction(async tx => {
+    const variant = await tx.productVariant.findFirst({
+      where: { id: variantId, product: { organizationId, branchId } },
+      include: { balances: { where: { branchId } } },
+    });
+    if (!variant) return null;
+    const invoices = await tx.salesInvoice.findMany({
+      where: { organizationId, branchId, status: "POSTED", lines: { some: { variantId } } },
+      orderBy: [{ invoiceDate: "desc" }, { id: "desc" }],
+      select: { id: true, invoiceNumber: true, invoiceDate: true, paymentStatus: true,
+        party: { select: { name: true } },
+        lines: { where: { variantId }, select: { quantity: true, total: true } } },
+    });
+    const transactions = invoices.map(invoice => ({
+      id: invoice.id, number: invoice.invoiceNumber, date: invoice.invoiceDate.toISOString(),
+      party: invoice.party?.name || "Walk-in Customer", status: invoice.paymentStatus,
+      quantity: invoice.lines.reduce((sum, line) => sum + Number(line.quantity), 0),
+      amount: invoice.lines.reduce((sum, line) => sum + Number(line.total), 0),
+    }));
+    return { stock: variant.balances.reduce((sum, balance) => sum + Number(balance.quantity), 0),
+      soldQuantity: transactions.reduce((sum, row) => sum + row.quantity, 0),
+      salesAmount: transactions.reduce((sum, row) => sum + row.amount, 0), transactions };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+  if (!result) return res.status(404).json({ error: "Item not found" });
+  res.json(result);
+});
+
 app.post("/api/products", requirePermission("products.write"), async (req, res) => {
   const branchId = requireBranch(req, res); if (!branchId) return;
   const input = parseInput(productInput, req.body);

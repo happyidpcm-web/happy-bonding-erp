@@ -1,4 +1,5 @@
 import { SearchablePicker } from "../../components/SearchablePicker";
+import { ItemSalesHistory } from "./ItemSalesHistory";
 import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -1307,7 +1308,8 @@ export function ItemsLibraryScreen({
   );
 }
 
-export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows: Product[]; invoices?: Invoice[]; setRows: (r: Product[] | ((prev: Product[]) => Product[])) => void; notify: (s: string) => void; apiMode: boolean }) {
+export function Items({ rows, invoices = [], setRows, notify, apiMode, onOpenInvoice, invoiceDetailOpen }: { rows: Product[]; invoices?: Invoice[]; setRows: (r: Product[] | ((prev: Product[]) => Product[])) => void; notify: (s: string) => void; apiMode: boolean; onOpenInvoice: (id: string) => Promise<void>; invoiceDetailOpen: boolean }) {
+  const [historyItem, setHistoryItem] = useState<Product | null>(null);
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
   const [lowStockOnly, setLowStockOnly] = useState(false);
@@ -1876,8 +1878,8 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
             </thead>
             <tbody>
               {filtered.map(p => (
-                <tr key={p.id}>
-                  <td>
+                <tr key={p.id} onClick={() => setHistoryItem(p)} style={{ cursor: "pointer" }}>
+                  <td onClick={e => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={selectedItemIds.includes(p.id)}
@@ -1890,14 +1892,14 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
                       }}
                     />
                   </td>
-                  <td><strong>{p.name}</strong></td>
+                  <td><button className="text-button" onClick={e => { e.stopPropagation(); setHistoryItem(p); }} title="View stock and sales transactions"><strong>{p.name}</strong></button></td>
                   <td className="mono">{p.sku}</td>
                   <td><span className="inventory-size-badge">{!p.size || /^(pieces\s*(\(pcs\))?|pcs|-)$/i.test(p.size.trim()) ? "—" : p.size}</span></td>
                   <td className="right"><span className="inventory-stock-quantity"><strong>{p.stock.toLocaleString("en-IN")}</strong><span>PCS</span></span></td>
                   <td className="right">₹ {p.sellingPrice}</td>
                   <td className="right">₹ {p.purchasePrice}</td>
                   <td className="right">₹ {p.mrp || p.sellingPrice}</td>
-                  <td className="right" style={{ whiteSpace: "nowrap" }}>
+                  <td className="right" style={{ whiteSpace: "nowrap" }} onClick={e => e.stopPropagation()}>
                     <button
                       className="secondary"
                       onClick={() => { setEditingItem(p); setModal(true); }}
@@ -1922,6 +1924,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode }: { rows:
         </div>
       </article>
 
+      {historyItem && <div hidden={invoiceDetailOpen}><ItemSalesHistory key={String(historyItem.id)} item={historyItem} onClose={() => setHistoryItem(null)} onOpenInvoice={onOpenInvoice} /></div>}
       {modal && (
         <ItemModal
           initialItem={editingItem}
