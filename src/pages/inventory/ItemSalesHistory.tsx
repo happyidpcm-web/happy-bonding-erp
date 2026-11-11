@@ -28,32 +28,33 @@ export function ItemSalesHistory({ item, onClose, onOpenInvoice }: {
     finally { setOpening(null); }
   };
   return <Modal title={item.name} onClose={onClose} wide>
-    <p>{item.sku}{item.size ? ` · ${item.size}` : ""} · Current branch · All time</p>
+    <div className="item-sales-history">
+    <div className="item-history-meta"><span>{item.sku}{item.size ? ` · ${item.size}` : ""}</span><span>Current branch · All time</span></div>
     {!data && !error && <p role="status">Loading stock and sales transactions...</p>}
     {error && <div role="alert"><p>{error}</p><button className="secondary" onClick={() => setAttempt(n => n + 1)}>Retry</button></div>}
     {data && <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "16px 0" }}>
+      <div className="item-history-summary">
         {[["Current stock", `${data.stock.toLocaleString("en-IN")} PCS`],
           ["Sold quantity", `${data.soldQuantity.toLocaleString("en-IN")} PCS`],
           ["Item sales amount", money(data.salesAmount)],
           ["Sales invoices", data.transactions.length.toLocaleString("en-IN")]].map(([label, value]) =>
-          <article className="card" key={label} style={{ padding: 16 }}><div>{label}</div><strong style={{ fontSize: 22 }}>{value}</strong></article>)}
+          <article className="item-history-stat" key={label}><div>{label}</div><strong>{value}</strong></article>)}
       </div>
-      <p>Saved sales invoices only. Sold quantity excludes cancelled invoices and is before returns. Item amounts include line discounts and tax; invoice-wide charges and payments are shown in the full invoice.</p>
       <h3>Sales invoice transactions</h3>
       {invoiceError && <p role="alert">{invoiceError}</p>}
-      <div className="table-scroll" style={{ maxHeight: "45vh", overflow: "auto" }}>
+      <div className="table-scroll item-history-table">
         <table>
           <thead><tr><th>Date</th><th>Invoice number</th><th>Customer</th><th className="right">Item quantity</th><th className="right">Item amount</th><th>Payment status</th></tr></thead>
           <tbody>{data.transactions.map(row => <tr key={row.id}>
             <td>{new Date(row.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })}</td>
             <td><button className="text-button" disabled={opening !== null} onClick={() => openInvoice(row.id)}>{opening === row.id ? "Opening..." : row.number}</button></td>
             <td>{row.party}</td><td className="right">{row.quantity.toLocaleString("en-IN")}</td><td className="right">{money(row.amount)}</td>
-            <td>{row.status === "PAID" ? "Paid" : row.status === "PARTIALLY_PAID" ? "Partially paid" : "Unpaid"}</td>
+            <td><span className={`item-history-status ${row.status === "PAID" ? "paid" : "pending"}`}>{row.status === "PAID" ? "Paid" : row.status === "PARTIALLY_PAID" ? "Partially paid" : "Unpaid"}</span></td>
           </tr>)}{!data.transactions.length && <tr><td colSpan={6}>No sales invoices for this item yet.</td></tr>}</tbody>
         </table>
       </div>
     </>}
     <div className="modal-actions"><button className="secondary" onClick={onClose}>Close</button></div>
+    </div>
   </Modal>;
 }

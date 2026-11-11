@@ -5520,3 +5520,30 @@ input:checked + .slider:before {
 .party-history-row:hover { background: #fff8e6; }
 .party-invoice-row { cursor: pointer; }
 .party-sales-history .party-invoice-row:hover { background: #fff5dc; }
+
+.modal:has(.item-sales-history) { max-height: 90vh; overflow: auto; }
+.item-sales-history { padding: 18px 20px 16px; font-family: 'Manrope', sans-serif; font-size: 13px; line-height: 1.5; }
+.item-sales-history table, .item-sales-history button { font-family: inherit; }
+.item-history-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; color: var(--muted); font-size: 12px; }
+.item-history-meta > span:first-child { font-weight: 600; }
+.item-history-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 18px 0 24px; }
+.item-history-stat { padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; background: #fffdf7; }
+.item-history-stat > div { color: var(--muted); font-size: 12px; font-weight: 500; }
+.item-history-stat strong { display: block; margin-top: 6px; font-size: 21px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.item-sales-history h3 { margin: 0 0 12px; font-family: inherit; font-size: 14px; font-weight: 700; }
+.item-history-table { max-height: 45vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+.item-history-table th { position: sticky; top: 0; z-index: 1; background: #fff9ed; }
+.item-history-table td { font-size: 12px; }
+.item-history-table td:first-child, .item-history-table .text-button { white-space: nowrap; }
+.item-history-table .text-button { padding: 4px 0; font-size: 12px; font-weight: 600; }
+.item-history-table tbody tr:hover { background: #fffdf7; }
+.item-history-status { display: inline-block; padding: 3px 9px; border-radius: 6px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.item-history-status.paid { background: #edf8f1; color: #187347; }
+.item-history-status.pending { background: #fff4db; color: #936212; }
+.item-sales-history .modal-actions { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+@media (max-width: 640px) {
+  .item-sales-history { padding: 14px; }
+  .item-history-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .item-history-stat { padding: 12px; }
+  .item-history-stat strong { font-size: 18px; }
+}
