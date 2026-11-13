@@ -40,6 +40,19 @@ export function ItemSalesHistory({ item, onClose, onOpenInvoice }: {
           ["Sales invoices", data.transactions.length.toLocaleString("en-IN")]].map(([label, value]) =>
           <article className="item-history-stat" key={label}><div>{label}</div><strong>{value}</strong></article>)}
       </div>
+      <h3>Stock adjustments</h3>
+      <div className="item-history-summary">
+        <article className="item-history-stat"><div>Total increased</div><strong className="stock-increase">+{(data.adjustments || []).reduce((sum, row) => sum + Math.max(0, row.quantity), 0).toLocaleString("en-IN")} PCS</strong></article>
+        <article className="item-history-stat"><div>Total decreased</div><strong className="stock-decrease">-{(data.adjustments || []).reduce((sum, row) => sum + Math.max(0, -row.quantity), 0).toLocaleString("en-IN")} PCS</strong></article>
+      </div>
+      <div className="table-scroll item-history-table"><table>
+        <thead><tr><th>Date / Time</th><th>Adjustment</th><th className="right">Quantity (PCS)</th></tr></thead>
+        <tbody>{(data.adjustments || []).map(row => <tr key={row.id}>
+          <td>{new Date(row.date).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</td>
+          <td>{row.quantity > 0 ? "Stock increased" : "Stock decreased"}</td>
+          <td className={`right ${row.quantity > 0 ? "stock-increase" : "stock-decrease"}`}>{row.quantity > 0 ? "+" : ""}{row.quantity.toLocaleString("en-IN")}</td>
+        </tr>)}{!data.adjustments?.length && <tr><td colSpan={3}>No stock adjustments for this item yet.</td></tr>}</tbody>
+      </table></div>
       <h3>Sales invoice transactions</h3>
       {invoiceError && <p role="alert">{invoiceError}</p>}
       <div className="table-scroll item-history-table">

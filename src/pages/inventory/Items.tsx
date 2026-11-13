@@ -1,4 +1,6 @@
 import { SearchablePicker } from "../../components/SearchablePicker";
+import { AdjustStock } from "./AdjustStock";
+import { ItemActions } from "./ItemActions";
 import { ItemSalesHistory } from "./ItemSalesHistory";
 import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import React, { useEffect, useMemo, useState } from "react";
@@ -1309,6 +1311,7 @@ export function ItemsLibraryScreen({
 }
 
 export function Items({ rows, invoices = [], setRows, notify, apiMode, onOpenInvoice, invoiceDetailOpen }: { rows: Product[]; invoices?: Invoice[]; setRows: (r: Product[] | ((prev: Product[]) => Product[])) => void; notify: (s: string) => void; apiMode: boolean; onOpenInvoice: (id: string) => Promise<void>; invoiceDetailOpen: boolean }) {
+  const [adjustItem, setAdjustItem] = useState<Product | null>(null);
   const [historyItem, setHistoryItem] = useState<Product | null>(null);
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
@@ -1900,22 +1903,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode, onOpenInv
                   <td className="right">₹ {p.purchasePrice}</td>
                   <td className="right">₹ {p.mrp || p.sellingPrice}</td>
                   <td className="right" style={{ whiteSpace: "nowrap" }} onClick={e => e.stopPropagation()}>
-                    <button
-                      className="secondary"
-                      onClick={() => { setEditingItem(p); setModal(true); }}
-                      style={{ padding: "4px 10px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4, marginRight: 6, cursor: "pointer" }}
-                      title="Edit Item"
-                    >
-                      <Pencil size={13} color="#d97706" /> Edit
-                    </button>
-                    <button
-                      className="secondary"
-                      onClick={() => handleDeleteProduct(p)}
-                      style={{ padding: "4px 10px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4, color: "#dc2626", borderColor: "#fca5a5", cursor: "pointer" }}
-                      title="Delete Item"
-                    >
-                      <Trash2 size={13} color="#dc2626" /> Delete
-                    </button>
+                    <ItemActions name={p.name} onEdit={() => { setEditingItem(p); setModal(true); }} onAdjust={() => setAdjustItem(p)} onDelete={() => handleDeleteProduct(p)} />
                   </td>
                 </tr>
               ))}
@@ -1924,6 +1912,11 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode, onOpenInv
         </div>
       </article>
 
+      {adjustItem && <AdjustStock item={adjustItem} onClose={() => setAdjustItem(null)} onSaved={stock => {
+        setRows(prev => prev.map(row => row.id === adjustItem.id ? { ...row, stock } : row));
+        setAdjustItem(null);
+        notify("Stock adjusted successfully");
+      }} />}
       {historyItem && <div hidden={invoiceDetailOpen}><ItemSalesHistory key={String(historyItem.id)} item={historyItem} onClose={() => setHistoryItem(null)} onOpenInvoice={onOpenInvoice} /></div>}
       {modal && (
         <ItemModal

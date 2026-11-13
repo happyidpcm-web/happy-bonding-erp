@@ -104,8 +104,11 @@ async function request<T>(path: string, options?: RequestInit, timeoutMs = 30000
 }
 
 export const api = {
+  async adjustStock(id: string | number, direction: "increase" | "decrease", quantity: number) {
+    return request<{ stock: number }>(`/products/${encodeURIComponent(id)}/adjust-stock`, { method: "POST", body: JSON.stringify({ direction, quantity }) });
+  },
   async itemSalesHistory(id: string | number) {
-    return request<{ stock: number; soldQuantity: number; salesAmount: number; transactions: Array<{
+    return request<{ stock: number; soldQuantity: number; salesAmount: number; adjustments?: Array<{ id: string; date: string; quantity: number }>; transactions: Array<{
       id: string; number: string; date: string; party: string; status: string; quantity: number; amount: number;
     }> }>(`/products/${encodeURIComponent(id)}/sales-history`);
   },

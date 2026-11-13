@@ -608,6 +608,24 @@ app.get("/api/products", async (req, res) => {
   res.json(rows);
 });
 
+app.post("/api/products/:id/adjust-stock", requirePermission("products.write"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  const organizationId = req.session!.organizationId;
+  const variantId = String(req.params.id);
+  const input = parseInput(z.object({ direction: z.enum(["increase", "decrease"]), quantity: z.number().positive().max(99999999999).multipleOf(0.001) }), req.body);
+  const result = await db.$transaction(async tx => {
+    const variant = await tx.productVariant.findFirst({ where: { id: variantId, active: true, product: { organizationId, branchId, active: true } } });
+    if (!variant) return null;
+    const quantity = input.direction === "increase" ? input.quantity : -input.quantity;
+    const balance = await tx.stockBalance.upsert({ where: { branchId_variantId: { branchId, variantId } }, create: { branchId, variantId, quantity }, update: { quantity: { increment: quantity } } });
+    const movement = await tx.stockMovement.create({ data: { branchId, variantId, type: quantity > 0 ? "ADJUSTMENT_IN" : "ADJUSTMENT_OUT", quantity, unitCost: variant.purchasePrice, referenceType: "StockAdjustment", referenceId: randomUUID() } });
+    await tx.auditEvent.create({ data: { organizationId, actorId: req.session!.userId, action: "stock.adjusted", entityType: "StockMovement", entityId: movement.id, metadata: { variantId, branchId, quantity, stock: Number(balance.quantity) } } });
+    return { stock: Number(balance.quantity) };
+  });
+  if (!result) return res.status(404).json({ error: "Item not found" });
+  res.json(result);
+});
+
 app.get("/api/products/:id/sales-history", async (req, res) => {
   const branchId = requireBranch(req, res); if (!branchId) return;
   const organizationId = req.session!.organizationId;
@@ -625,6 +643,8 @@ app.get("/api/products/:id/sales-history", async (req, res) => {
         party: { select: { name: true } },
         lines: { where: { variantId }, select: { quantity: true, total: true } } },
     });
+    const movements = await tx.stockMovement.findMany({ where: { branchId, variantId, referenceType: "StockAdjustment" }, orderBy: [{ occurredAt: "desc" }, { id: "desc" }] });
+    const adjustments = movements.map(row => ({ id: row.id, date: row.occurredAt.toISOString(), quantity: Number(row.quantity) }));
     const transactions = invoices.map(invoice => ({
       id: invoice.id, number: invoice.invoiceNumber, date: invoice.invoiceDate.toISOString(),
       party: invoice.party?.name || "Walk-in Customer", status: invoice.paymentStatus,
@@ -633,7 +653,7 @@ app.get("/api/products/:id/sales-history", async (req, res) => {
     }));
     return { stock: variant.balances.reduce((sum, balance) => sum + Number(balance.quantity), 0),
       soldQuantity: transactions.reduce((sum, row) => sum + row.quantity, 0),
-      salesAmount: transactions.reduce((sum, row) => sum + row.amount, 0), transactions };
+      salesAmount: transactions.reduce((sum, row) => sum + row.amount, 0), transactions, adjustments };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   if (!result) return res.status(404).json({ error: "Item not found" });
   res.json(result);
