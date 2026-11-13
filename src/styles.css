@@ -5547,6 +5547,7 @@ input:checked + .slider:before {
   .item-history-stat { padding: 12px; }
   .item-history-stat strong { font-size: 18px; }
 }
+.item-actions-menu { display: flex; justify-content: flex-end; align-items: center; }
 .item-row-menu { position: fixed; z-index: 1000; width: 180px; padding: 6px; background: white; border: 1px solid #ead9b5; border-radius: 10px; box-shadow: 0 8px 24px #0002; text-align: left; }
 .item-row-menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px; border: 0; background: transparent; border-radius: 6px; text-align: left; cursor: pointer; }
 .item-row-menu button:hover, .item-row-menu button:focus-visible { background: #fff6df; }
