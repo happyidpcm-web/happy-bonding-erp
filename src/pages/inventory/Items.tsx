@@ -1,3 +1,4 @@
+import { matchesItemSearch } from "../../utils/itemSearch";
 import { SearchablePicker } from "../../components/SearchablePicker";
 import { AdjustStock } from "./AdjustStock";
 import { ItemActions } from "./ItemActions";
@@ -50,7 +51,7 @@ export function CreateOfferModal({
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
-      const matchSearch = `${p.name} ${p.sku}`.toLowerCase().includes(searchItem.toLowerCase());
+      const matchSearch = matchesItemSearch(searchItem, [p.name, p.sku, p.hsnCode, p.size]);
       const matchCat = categoryFilter === "All Categories" || p.category === categoryFilter;
       return matchSearch && matchCat;
     });
@@ -474,7 +475,7 @@ export function BulkEditGSTRateScreen({
 
   const filteredProducts = useMemo(() => {
     return editableProducts.filter(p => {
-      const matchSearch = `${p.name} ${p.sku} ${p.hsnCode || ""}`.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchSearch = matchesItemSearch(searchQuery, [p.name, p.sku, p.hsnCode]);
       const pRate = String(p.taxRate || 0);
       const matchRate = rateFilter === "All Rates" || (rateFilter === "None" ? p.taxRate === 0 : pRate === rateFilter.replace("%", ""));
       return matchSearch && matchRate;
@@ -1238,7 +1239,7 @@ export function ItemsLibraryScreen({
 
   const sampleLibraryBrands = ["Raymond", "Peter England", "Allen Solly", "Park Avenue", "FabIndia", "Van Heusen"];
 
-  const filteredBrands = sampleLibraryBrands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase()));
+  const filteredBrands = sampleLibraryBrands.filter(b => matchesItemSearch(brandSearch, [b]));
 
   return (
     <div className="items-library-wrapper" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -1355,7 +1356,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode, onOpenInv
 
   const filtered = useMemo(() => {
     const matchingRows = rows.filter(r => {
-      const matchQuery = `${r.name} ${r.sku}`.toLowerCase().includes(query.toLowerCase());
+      const matchQuery = matchesItemSearch(query, [r.name, r.sku, r.hsnCode, r.size]);
       const matchCat = categoryFilter === "All Categories" || r.category === categoryFilter;
       const matchLowStock = !lowStockOnly || r.stock < 10;
       return matchQuery && matchCat && matchLowStock;
@@ -1668,7 +1669,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode, onOpenInv
               <input
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder="Search by SKU Code..."
+                placeholder="Search by Item Name, SKU, HSN or Size..."
               />
             </div>
             <div className="category-select-wrap">

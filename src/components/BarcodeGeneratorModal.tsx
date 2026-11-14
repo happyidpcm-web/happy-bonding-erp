@@ -1,3 +1,4 @@
+import { matchesItemSearch } from "../utils/itemSearch";
 import React, { useState } from "react";
 import { Printer, X, Search, Tag } from "lucide-react";
 import type { Product } from "../types";
@@ -25,7 +26,7 @@ export function BarcodeGeneratorModal({
   const [quantity, setQuantity] = useState(10);
 
   const matchedProducts = products.filter(p =>
-    `${p.name} ${p.sku} ${p.size} ${p.category}`.toLowerCase().includes(searchQuery.toLowerCase())
+    matchesItemSearch(searchQuery, [p.name, p.sku, p.size, p.category])
   ).slice(0, 15);
 
   const handlePrintTags = () => {

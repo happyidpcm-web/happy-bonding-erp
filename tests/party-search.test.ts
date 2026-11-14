@@ -5,6 +5,13 @@ import type { Party } from "../src/types.ts";
 
 const party = (id: number, name: string, phone = "", type: Party["type"] = "Customer"): Party => ({ id, name, phone, type, balance: 0 });
 
+test("party names match reordered words and spacing", () => {
+  const index = indexParties([party(1, "Sri Ganesh Textiles"), party(2, "Sri Kumar")]);
+  assert.deepEqual(searchParties(index, "textiles sri").rows.map(p => p.id), [1]);
+  assert.deepEqual(searchParties(index, "sriganesh").rows.map(p => p.id), [1]);
+  assert.equal(searchParties(index, "textiles kumar").total, 0);
+});
+
 test("F20 matches the supplier name without unrelated phone matches", () => {
   const index = indexParties([party(1, "Subramani", "6369386020"), party(2, "F20", "", "Supplier"), party(3, "F20 Shirts")]);
   assert.deepEqual(searchParties(index, " F20 ", true).rows.map(p => p.id), [2, 3]);

@@ -1,3 +1,4 @@
+import { matchesItemSearch } from "./itemSearch";
 type Row = Record<string, string | number>;
 export type ItemReportSort = 'quantity-desc' | 'quantity-asc' | 'amount-desc' | 'amount-asc';
 
@@ -12,10 +13,10 @@ export function prepareItemReport(source: Row[], search: string, groupItems: boo
       for (const column of ['Quantity', 'Taxable', 'CGST', 'SGST', 'IGST', 'Amount']) target[column] = Number(target[column]) + Number(row[column] || 0);
       groups.set(key, target);
     }
-    const matchingKeys = new Set(source.filter(row => [row.Item, row['Product Name'], row['Item Code']].some(value => String(value || '').toLowerCase().includes(query))).map(row => String(row['Product ID'] || row.Item)));
+    const matchingKeys = new Set(source.filter(row => matchesItemSearch(query, [row.Item, row['Product Name'], row['Item Code']].map(value => String(value || '')))).map(row => String(row['Product ID'] || row.Item)));
     rows = [...groups.entries()].filter(([key]) => matchingKeys.has(key)).map(([, row]) => row);
   } else {
-    rows = source.filter(row => Object.entries(row).some(([key, value]) => !key.startsWith('Product ') && String(value).toLowerCase().includes(query)));
+    rows = source.filter(row => matchesItemSearch(query, Object.entries(row).filter(([key]) => !key.startsWith('Product ')).map(([, value]) => String(value))));
   }
   const column = sort.startsWith('quantity') ? 'Quantity' : 'Amount';
   const direction = sort.endsWith('desc') ? -1 : 1;

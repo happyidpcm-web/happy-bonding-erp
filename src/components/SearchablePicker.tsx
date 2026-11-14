@@ -1,3 +1,4 @@
+import { matchesItemSearch } from "../utils/itemSearch";
 import { useEffect, useId, useState } from "react";
 import { useDismissibleDropdown } from "../hooks/useDismissibleDropdown";
 
@@ -13,7 +14,7 @@ export function SearchablePicker({ value, onChange, options, placeholder, emptyV
   const id = useId();
   const ref = useDismissibleDropdown(open, () => { setOpen(false); setQuery(selectedLabel); });
   useEffect(() => { setQuery(selectedLabel); }, [selectedLabel]);
-  const matches = options.filter(option => option.label.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 100);
+  const matches = options.filter(option => matchesItemSearch(query, [option.label])).slice(0, 100);
   const choose = (option: Option) => { onChange(option.value); setQuery(option.label); setOpen(false); setActive(-1); };
   return <div ref={ref} style={{ position: "relative", minWidth: 200, maxWidth: "100%" }}>
     <input role="combobox" aria-label={placeholder} aria-expanded={open} aria-controls={id} aria-autocomplete="list"

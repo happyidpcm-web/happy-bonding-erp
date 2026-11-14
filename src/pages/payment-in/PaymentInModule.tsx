@@ -1,3 +1,4 @@
+import { matchesItemSearch } from "../../utils/itemSearch";
 import { DateRangeFilter } from "../../components/DateRangeFilter";
 import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import React, { useState, useEffect, useRef, useMemo } from "react";
@@ -244,7 +245,7 @@ export function PaymentInModule({
     return records.filter(r => {
       if (query.trim()) {
         const q = query.toLowerCase();
-        if (!`${r.number} ${r.partyName} ${r.mode} ${r.notes}`.toLowerCase().includes(q)) return false;
+        if (!matchesItemSearch(q, [r.number, r.partyName, r.mode, r.notes])) return false;
       }
       if (!isInvoiceInDateRange(r, dateFilter, customDateRange)) return false;
       return true;
@@ -256,7 +257,7 @@ export function PaymentInModule({
     const q = invoiceQuery.trim().toLowerCase();
     return invoices.filter(inv => {
       if (inv.party !== partyInput) return false;
-      if (q && !`${inv.number} ${inv.party} ${inv.status}`.toLowerCase().includes(q)) return false;
+      if (q && !matchesItemSearch(q, [inv.number, inv.party, inv.status])) return false;
       return isInvoiceInDateRange(inv, invoiceDateFilter, invoiceCustomDateRange);
     });
   }, [invoices, partyInput, invoiceQuery, invoiceDateFilter, invoiceCustomDateRange]);
@@ -270,7 +271,7 @@ export function PaymentInModule({
   const partyMatches = useMemo(() => {
     const q = partySearch.trim().toLowerCase();
     return parties
-      .filter(p => !q || `${p.name} ${p.phone}`.toLowerCase().includes(q))
+      .filter(p => !q || matchesItemSearch(q, [p.name, p.phone]))
       .slice(0, 20);
   }, [parties, partySearch]);
 

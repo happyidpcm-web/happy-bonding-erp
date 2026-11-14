@@ -1,3 +1,4 @@
+import { matchesItemSearch } from "../../utils/itemSearch";
 import { SearchablePicker } from "../../components/SearchablePicker";
 import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -854,7 +855,7 @@ export function Parties({
 
   const filtered = useMemo(() => {
     return rows.filter(r => {
-      const matchQuery = `${r.name} ${r.phone}`.toLowerCase().includes(query.toLowerCase());
+      const matchQuery = matchesItemSearch(query, [r.name, r.phone]);
       const matchCat = categoryFilter === "All Categories" || r.category === categoryFilter;
       return matchQuery && matchCat && (balanceFilter === "all" || (balanceFilter === "collect" ? r.balance > 0 : r.balance < 0));
     });

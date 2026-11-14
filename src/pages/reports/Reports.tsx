@@ -1,3 +1,4 @@
+import { matchesItemSearch } from "../../utils/itemSearch";
 import { SearchablePicker } from "../../components/SearchablePicker";
 import { ItemSummary } from './ItemSummary';
 import { BackendReport, backendReports } from './BackendReport';
@@ -236,7 +237,7 @@ export function StockSummaryReportScreen({
   const categories = useMemo(() => Array.from(new Set(products.map(p => p.category || "General"))), [products]);
 
   const filteredProducts = useMemo(() => {
-    return products.filter(p => (categoryFilter === "All Categories" || (p.category || 'General') === categoryFilter) && [p.name, p.sku, p.size].join(' ').toLowerCase().includes(search.trim().toLowerCase())).sort((a,b) => (sort === 'low' ? a.stock-b.stock : sort === 'high' ? b.stock-a.stock : 0) || a.name.localeCompare(b.name));
+    return products.filter(p => (categoryFilter === "All Categories" || (p.category || 'General') === categoryFilter) && matchesItemSearch(search, [p.name, p.sku, p.size])).sort((a,b) => (sort === 'low' ? a.stock-b.stock : sort === 'high' ? b.stock-a.stock : 0) || a.name.localeCompare(b.name));
   }, [products, categoryFilter, search, sort]);
 
   const totalStockVal = useMemo(() => filteredProducts.reduce((sum, p) => sum + (p.sellingPrice * p.stock), 0), [filteredProducts]);
@@ -379,7 +380,7 @@ export function LowStockSummaryReportScreen({
   const categories = [...new Set(products.filter(p => p.stock < 10).map(p => p.category))].sort();
   const lowStockItems = useMemo(() => products.filter(p => {
     if (p.stock >= 10 || (category && p.category !== category)) return false;
-    if (![p.name, p.sku, p.size].join(' ').toLowerCase().includes(search.trim().toLowerCase())) return false;
+    if (!matchesItemSearch(search, [p.name, p.sku, p.size])) return false;
     if (stockFilter === 'out') return p.stock <= 0;
     if (stockFilter === 'critical') return p.stock > 0 && p.stock <= 5;
     if (stockFilter === 'low') return p.stock > 5;
@@ -949,7 +950,7 @@ export function Reports({
   const renderSection = (sec: typeof sections[0]) => {
     const filteredItems = sec.items.filter(item => {
       const matchesTag = activeFilterTag ? item.tags.includes(activeFilterTag) : true;
-      const matchesQuery = searchQuery.trim() ? item.name.toLowerCase().includes(searchQuery.toLowerCase()) : true;
+      const matchesQuery = searchQuery.trim() ? matchesItemSearch(searchQuery, [item.name]) : true;
       return matchesTag && matchesQuery;
     });
 

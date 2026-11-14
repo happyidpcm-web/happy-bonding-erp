@@ -1,3 +1,4 @@
+import { matchesItemSearch } from "../../utils/itemSearch";
 import { ArrowLeft } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import './backend-report.css';
@@ -74,7 +75,7 @@ export function BackendReport({ report, onBack, notify, initialDateSelection, on
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [report.kind, filter, range, branchId, refresh]);
-  const rows = isItemReport ? prepareItemReport(data?.rows || [], search, itemView === 'items', sort) : (data?.rows || []).filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(search.toLowerCase())));
+  const rows = isItemReport ? prepareItemReport(data?.rows || [], search, itemView === 'items', sort) : (data?.rows || []).filter(r => matchesItemSearch(search, Object.values(r).map(String)));
   const columns = isItemReport && itemView === 'items' ? ['Item', 'Quantity', 'Amount'] : (data?.columns || []);
   const columnLabel = (column: string) => isItemReport && itemView === 'items' ? ({ Quantity: 'Total quantity sold', Amount: 'Total sales amount' }[column] || column) : isAgeingReport ? column.replace(/(\d)\?(\d)/g, '$1-$2') : column;
   const notDue = rows.reduce((sum, r) => sum + Number(r['Not Due'] || 0), 0);

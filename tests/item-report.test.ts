@@ -8,6 +8,12 @@ const rows = [
   { Item: 'Shirt', 'Item Code': 'S', Size: 'M', Party: 'Bob', Quantity: 12, Amount: 1200 },
   { Item: 'Shirt', 'Item Code': 'S-L', Size: 'L', Party: 'Bob', Quantity: 1, Amount: 100 },
 ];
+
+test('report search matches reordered terms across visible fields', () => {
+  assert.deepEqual(prepareItemReport(rows, 'Bob Shirt', false, 'quantity-desc').map(r => r.Quantity), [12, 1]);
+  assert.deepEqual(prepareItemReport(rows, 'L Shirt', true, 'quantity-desc').map(r => r.Quantity), [15]);
+  assert.deepEqual(prepareItemReport(rows, 'Bob missing', false, 'quantity-desc'), []);
+});
 test('item ranking combines parties, combines sizes, and preserves totals', () => {
   const result = prepareItemReport(rows, '', true, 'quantity-desc');
   assert.deepEqual(result.map(r => r.Quantity), [15, 10]);

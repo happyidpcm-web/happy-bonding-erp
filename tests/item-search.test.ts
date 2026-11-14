@@ -2,6 +2,15 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { matchesItemSearch } from "../src/utils/itemSearch.ts";
 
+test("inventory searches combine reordered name, code and size terms and exclude unrelated items", () => {
+  const fields = ["LINEN BAGGY PANT", "LIN-BGY-001", "XL"];
+  for (const query of ["pant linen", "BAGGY linen", "xl pant linbgy001", "  PANT   LINEN "]) {
+    assert.equal(matchesItemSearch(query, fields), true, query);
+  }
+  assert.equal(matchesItemSearch("pant shirt", fields), false);
+  assert.equal(matchesItemSearch("linen 789", fields), false);
+});
+
 test("item names match regardless of spacing, case and word order", () => {
   for (const query of ["MOMFIT", "mom fit", "PANT MOMFIT", "pant mom fit", "  FIT   PANT MOM  "]) {
     assert.equal(matchesItemSearch(query, ["MOM FIT PANT"]), true, query);

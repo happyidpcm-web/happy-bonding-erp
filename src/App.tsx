@@ -1392,7 +1392,7 @@ function SalesInvoicesListView({
     // Search within the selected date range.
     if (q) {
       const qNum = parseInt(q, 10);
-      const isNumeric = !isNaN(qNum);
+      const isNumeric = /^\d+$/.test(q);
 
       const matched = dateRows.filter(r => {
         const num = (r.number || "").toLowerCase();
@@ -1404,7 +1404,7 @@ function SalesInvoicesListView({
         const seqStr = num.split("/").pop() || "";
         const seqNum = parseInt(seqStr, 10);
 
-        if (num.includes(q) || party.includes(q) || phone.includes(q) || amt.includes(q)) {
+        if (matchesItemSearch(q, [num, party, phone, amt])) {
           return true;
         }
 
@@ -2322,7 +2322,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
     return list;
   }, [setting]);
 
-  const list=rows.filter(x=>`${x.party} ${x.number}`.toLowerCase().includes(query.toLowerCase()));
+  const list=rows.filter(x=>matchesItemSearch(query, [x.party, x.number]));
   const partyIndex = useMemo(() => indexParties(parties), [parties]);
   const partyMatches = searchParties(partyIndex, partySearch, false, 8).rows;
   const itemMatches=itemSearch.trim()?products.filter(p=>matchesItemSearch(itemSearch,[p.name,p.sku])).slice(0,5):[];

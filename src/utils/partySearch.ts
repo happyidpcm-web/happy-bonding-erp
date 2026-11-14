@@ -1,3 +1,4 @@
+import { matchesItemSearch } from "./itemSearch";
 import type { Party } from "../types";
 
 export function indexParties(parties: Party[], created: Party[] = []) {
@@ -15,7 +16,7 @@ export function searchParties(index: ReturnType<typeof indexParties>, query: str
   const buckets: Party[][] = Array.from({ length: 6 }, () => []);
   let total = 0;
   for (const row of index) {
-    const nameMatch = row.name.includes(q);
+    const nameMatch = matchesItemSearch(q, [row.name]);
     if (!nameMatch && !(digits && row.phone.includes(digits))) continue;
     total++;
     const rank = q && row.name === q ? 0 : q && row.name.startsWith(q) ? 1 : 2;

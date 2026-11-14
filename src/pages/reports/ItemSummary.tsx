@@ -1,3 +1,4 @@
+import { matchesItemSearch } from "../../utils/itemSearch";
 import { ArrowLeft } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import './backend-report.css';
@@ -30,7 +31,7 @@ export function ItemSummary({ onBack, notify }: { onBack: () => void; notify: (m
   }, [filter, range, branchId, retry]);
   const categories = [...new Set((data?.rows || []).map(r => r.category))].sort();
   const rows = (data?.rows || []).filter(r => (category === 'All Categories' || r.category === category) &&
-    `${r.name} ${r.sku} ${r.size}`.toLowerCase().includes(search.toLowerCase())).sort((a, b) => Number(b[sort as 'salesQty' | 'purchaseQty' | 'salesAmount' | 'purchaseAmount']) - Number(a[sort as 'salesQty' | 'purchaseQty' | 'salesAmount' | 'purchaseAmount']) || a.name.localeCompare(b.name));
+    matchesItemSearch(search, [r.name, r.sku, r.size])).sort((a, b) => Number(b[sort as 'salesQty' | 'purchaseQty' | 'salesAmount' | 'purchaseAmount']) - Number(a[sort as 'salesQty' | 'purchaseQty' | 'salesAmount' | 'purchaseAmount']) || a.name.localeCompare(b.name));
   const totals = rows.reduce((s, r) => ({ salesQty: s.salesQty + r.salesQty, purchaseQty: s.purchaseQty + r.purchaseQty, salesAmount: s.salesAmount + r.salesAmount, purchaseAmount: s.purchaseAmount + r.purchaseAmount }), { salesQty: 0, purchaseQty: 0, salesAmount: 0, purchaseAmount: 0 });
   const excelRows = rows.map(r => ({ 'Item Name': r.name, 'Item Code': r.sku, Category: r.category, 'Sales Quantity': r.salesQty, 'Purchase Quantity': r.purchaseQty, 'Current Stock': r.currentStock, 'Sales Amount': r.salesAmount, 'Purchase Amount': r.purchaseAmount }));
   const exportExcel = () => {

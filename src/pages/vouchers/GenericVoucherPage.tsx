@@ -1,3 +1,4 @@
+import { matchesItemSearch } from "../../utils/itemSearch";
 import { downloadPurchaseExcel, downloadPurchaseSummaryExcel } from "../../utils/purchaseExcel";
 import ownerSignatureUrl from "../../assets/owner-signature.png";
 import { indexParties, searchParties } from "../../utils/partySearch";
@@ -276,7 +277,7 @@ export function CreateQuotationScreen({
     setItemQuery("");
   };
 
-  const matchedProducts = itemQuery ? products.filter(p => `${p.name} ${p.sku}`.toLowerCase().includes(itemQuery.toLowerCase())) : products.slice(0, 8);
+  const matchedProducts = itemQuery ? products.filter(p => matchesItemSearch(itemQuery, [p.name, p.sku, p.hsnCode, p.size])) : products.slice(0, 8);
 
   const [partyDropdownOpen, setPartyDropdownOpen] = useState(false);
   const partyDropdownRef = useDismissibleDropdown(partyDropdownOpen, () => setPartyDropdownOpen(false));
@@ -991,7 +992,7 @@ export function GenericVoucherPage({
       if (!isInvoiceInDateRange(r, dateFilter, customDateRange)) return false;
       if (query.trim()) {
         const q = query.toLowerCase();
-        if (!`${r.number} ${r.party} ${r.notes}`.toLowerCase().includes(q)) return false;
+        if (!matchesItemSearch(q, [r.number, r.party, r.notes])) return false;
       }
       return true;
     });
