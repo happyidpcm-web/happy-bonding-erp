@@ -14,12 +14,19 @@
     "db:seed": "tsx prisma/seed.ts",
     "preview": "vite preview --config vite.config.ts",
     "typecheck": "tsc -b",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "android:sync": "vite build --config vite.config.ts && cap sync android",
+    "android:open": "cap open android"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.6.2",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/share": "^8.0.3",
     "@prisma/client": "^6.19.0",
     "@vitejs/plugin-react": "latest",
     "bcryptjs": "^3.0.3",
@@ -37,6 +44,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.6.2",
     "@playwright/test": "^1.62.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

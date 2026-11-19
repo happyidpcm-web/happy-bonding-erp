@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./styles.css";
+import "./mobile.css";
 
 localStorage.removeItem("hb_brevo_api_key");
 

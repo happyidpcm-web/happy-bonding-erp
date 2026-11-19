@@ -1,12 +1,18 @@
+import { getMobileServer, isAndroidApp } from "./utils/mobileServer";
 import type { Branch, Expense, Invoice, InvoiceSetting, OwnerBranchSummary, Party, Product, StaffUser, VoucherRecord } from "./types";
 
 const getBaseUrl = () => {
+  if (isAndroidApp()) {
+    const server = getMobileServer();
+    if (!server) throw new Error('Enter your store website address on the sign-in screen.');
+    return server.replace(/\/+$/, '');
+  }
   if (typeof window !== "undefined" && import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
   return "/api";
 };
-const baseUrl = getBaseUrl();
+
 const TOKEN_KEY = "hb_erp_token";
 const BRANCH_KEY = "hb_erp_branch";
 
@@ -87,7 +93,7 @@ async function request<T>(path: string, options?: RequestInit, timeoutMs = 30000
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const branch = localStorage.getItem(BRANCH_KEY);
-    const response = await fetch(baseUrl + path, { ...options, signal: controller.signal, headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}), ...(branch ? { "x-branch-id": branch } : {}), ...options?.headers }});
+    const response = await fetch(getBaseUrl() + path, { ...options, signal: controller.signal, headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}), ...(branch ? { "x-branch-id": branch } : {}), ...options?.headers }});
     if (response.status === 401 && path !== "/auth/login") {
       localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(BRANCH_KEY);
       window.dispatchEvent(new Event("hb-session-expired"));

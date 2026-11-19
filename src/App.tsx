@@ -1,3 +1,5 @@
+import { useAndroidBack } from "./hooks/useAndroidBack";
+import { getMobileServer, isAndroidApp, saveMobileServer } from "./utils/mobileServer";
 import ownerSignatureUrl from "./assets/owner-signature.png";
 import { findInvoiceParty } from "./utils/invoiceParty";
 import { matchesItemSearch } from "./utils/itemSearch";
@@ -100,6 +102,7 @@ export default function App() {
   const [authenticated, setAuthenticated] = useState(api.hasSession());
   const [page, setPage] = useState<Page>("dashboard");
   const [sidebar, setSidebar] = useState(false);
+  useAndroidBack(sidebar, () => setSidebar(false));
   const [productRows, setProductRows] = useState<Product[]>([]);
   const [partyRows, setPartyRows] = useState<Party[]>([]);
   const [invoiceRows, setInvoiceRows] = useState<Invoice[]>([]);
@@ -498,7 +501,7 @@ export default function App() {
     </aside>
     <main>
       <header className="topbar">
-        <button className="icon-button menu-button" onClick={() => setSidebar(true)}><Menu/></button>
+        <button aria-label="Open navigation" className="icon-button menu-button" onClick={() => setSidebar(true)}><Menu/></button>
         <div><strong>Happy Bonding ERP</strong><span>{new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"long",year:"numeric",weekday:"long"})} · {currentBranch?.name || "Branch"} Store</span></div>
         <div className="top-actions">
           <button className="icon-button" title="Sync Offline Changes" onClick={handleSyncNow}><CheckSquare size={19}/></button>
@@ -811,6 +814,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
     const passVal = String(form.get("password")).trim();
 
     try {
+      if (isAndroidApp()) saveMobileServer(String(form.get("serverUrl") || ""));
       const loginRes = await api.login(emailVal, passVal);
       if (loginRes?.branchIds?.[0]) {
         api.setCurrentBranch(loginRes.branchIds[0]);
@@ -834,6 +838,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
           <p>Sign in to Happy Bonding ERP</p>
         </div>
         <form onSubmit={submit}>
+          {isAndroidApp() && <details className="mobile-server-settings"><summary>Connection settings</summary><label>Store website address<input name="serverUrl" type="url" defaultValue={getMobileServer()} placeholder="https://billing.yourdomain.com" autoCapitalize="none" autoCorrect="off" required /><small>Use the secure website address provided by your store admin.</small></label></details>}
           <label>
             Email address
             <input name="email" type="email" placeholder="e.g. admin@happybonding.in" required />
@@ -2755,7 +2760,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
         </div>
 
         <div className="items-table-container">
-          <table className="invoice-items-table font-img3">
+          <div className="invoice-line-scroll"><table className="invoice-items-table font-img3">
             <thead>
               <tr>
                 <th style={{ width: 36 }}>NO</th>
@@ -2829,6 +2834,7 @@ function Sales({rows,products,parties,setting,setSetting,setRows,setParties,setP
             </tbody>
           </table>
 
+          </div>
           <div className="item-add-row polished" style={{ display: "grid", gridTemplateColumns: "220px 1fr 200px", gap: 12 }}>
             <div ref={itemSuggestionsRef} className="party-picker item-search" style={{ margin: 0, width: "100%" }}>
               <Search size={14} color="#94a3b8" />
@@ -3654,7 +3660,7 @@ function Purchases({notify}:{notify:(s:string)=>void}) { return <><PageHeading t
 
 
 
-export function Modal({title,onClose,children,wide=false}:{title:string;onClose:()=>void;children:React.ReactNode;wide?:boolean}){return <div className="modal-backdrop"><div className={`modal ${wide?"wide":""}`}><div className="modal-head"><h2>{title}</h2><button className="icon-button" onClick={onClose}><X/></button></div>{children}</div></div>}
+export function Modal({title,onClose,children,wide=false}:{title:string;onClose:()=>void;children:React.ReactNode;wide?:boolean}){return <div className="modal-backdrop"><div className={`modal ${wide?"wide":""}`}><div className="modal-head"><h2>{title}</h2><button data-native-back aria-label="Close dialog" className="icon-button" onClick={onClose}><X/></button></div>{children}</div></div>}
 
 
 
@@ -3782,7 +3788,7 @@ export function AddItemModal({ products: initialProducts, priceMode = "sales", d
         {/* Header */}
         <div className="add-items-modal-head">
           <h2>Add Items to Bill</h2>
-          <button type="button" className="icon-close-btn" onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#64748b" }}>
+          <button type="button" data-native-back aria-label="Close dialog" className="icon-close-btn" onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#64748b" }}>
             <X size={20} />
           </button>
         </div>

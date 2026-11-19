@@ -1,3 +1,4 @@
+import { canShareNativeFiles, shareNativeFile } from "./nativeFiles";
 // Remote fonts or images must not leave Download/Share waiting indefinitely.
 async function waitForAssets(promise: Promise<unknown>, timeout = 3000): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -42,7 +43,8 @@ export async function createInvoicePdf(element: HTMLElement, filename: string): 
   return new File([blob], opt.filename, { type: "application/pdf" });
 }
 
-export function downloadPdfFile(file: File) {
+export async function downloadPdfFile(file: File) {
+  if (canShareNativeFiles()) { await shareNativeFile(file); return; }
   const url = URL.createObjectURL(file);
   const link = document.createElement("a");
   link.href = url;
@@ -54,5 +56,5 @@ export function downloadPdfFile(file: File) {
 }
 
 export async function downloadInvoicePdf(element: HTMLElement, filename: string) {
-  downloadPdfFile(await createInvoicePdf(element, filename));
+  await downloadPdfFile(await createInvoicePdf(element, filename));
 }

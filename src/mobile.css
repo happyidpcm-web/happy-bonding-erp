@@ -1,0 +1,69 @@
+/* Loaded after desktop styles; wide tables scroll within their own containers. */
+@media screen and (max-width: 768px) {
+  .app-shell, .app-shell > main, .page { width: 100% !important; min-width: 0; }
+  .app-shell .topbar { height: auto !important; min-height: 60px; flex-wrap: wrap; padding: 8px 12px !important; }
+  .topbar > div:first-of-type { flex-direction: column; align-items: flex-start !important; gap: 2px !important; }
+  .topbar .top-actions { width: 100%; justify-content: flex-end; flex-wrap: wrap; }
+  .top-actions .user-profile-badge { display: none; }
+  .top-actions > .icon-button[title="Search ERP"] { display: none; }
+  .top-actions button { min-height: 40px; }
+  .menu-button, .close-menu { min-width: 44px; min-height: 44px; flex-shrink: 0; }
+  .sidebar { max-width: calc(100vw - 40px); overflow-y: auto; }
+  .table-toolbar { min-width: 0 !important; width: 100%; }
+  .table-toolbar > *, .items-search-container > *, .items-toolbar > *, .page-heading > * { min-width: 0; max-width: 100%; }
+  .items-search-container { flex-direction: column; width: 100%; }
+  .items-search-container .search-input-wrap { flex: auto !important; }
+  .items-search-container input { min-width: 0; width: 100%; }
+  .items-search-container .category-select-wrap { width: 100%; }
+  .items-search-container .category-select-wrap > div { width: 100%; min-width: 0 !important; }
+  .party-metrics-row { flex-wrap: wrap; }
+  .party-metric-box { min-width: 0 !important; flex: 1 1 100% !important; }
+  .table-scroll { max-width: 100% !important; overscroll-behavior-x: contain; }
+  .search-input-wrap input, .login-panel input { font-size: 16px !important; }
+  .login-panel { min-width: 0; padding: 28px 20px; }
+  .login-page { min-height: 100dvh; }
+  .modal-backdrop { padding: 8px !important; }
+  .modal, .modal.wide { max-height: calc(100dvh - 16px) !important; border-radius: 14px !important; }
+  .modal-head { gap: 12px; }
+  .modal-head h2 { min-width: 0; overflow-wrap: anywhere; }
+  .modal-head button { flex-shrink: 0; min-width: 44px; min-height: 44px; }
+  .add-items-bill-modal { display: flex; flex-direction: column; width: 100% !important; max-height: calc(100dvh - 16px); }
+  .add-items-modal-head, .add-items-filter-strip, .add-items-footer-bar { padding: 12px; flex-shrink: 0; }
+  .add-items-filter-strip { flex-wrap: wrap; gap: 8px; }
+  .add-items-search-box { flex: 1 1 100%; min-width: 0; }
+  .add-items-category-select { flex: 1; min-width: 0; max-width: 100%; }
+  .add-items-table-wrap { min-height: 100px; flex: 1 1 auto; overflow: auto; }
+  .add-items-footer-bar, .add-items-summary-strip { flex-wrap: wrap; gap: 10px; }
+  .add-items-shortcuts { display: none; }
+  .add-items-footer-actions { display: flex; width: 100%; gap: 8px; }
+  .add-items-footer-actions button { flex: 1; min-height: 44px; }
+  .add-items-stepper-btn, .add-items-qty-add-btn { min-height: 44px; min-width: 44px; }
+  .invoice-pdf-share { width: calc(100% - 24px); max-height: calc(100dvh - 24px); overflow: auto; }
+}
+
+@media screen and (max-width: 768px) {
+  .ref-top-header-bar { flex-direction: column; align-items: stretch !important; gap: 12px; padding: 12px !important; }
+  .top-title-left { min-width: 0; }
+  .top-title-left h2 { font-size: 18px !important; }
+  .top-header-actions { flex-wrap: wrap; justify-content: flex-end; }
+  .top-header-actions button { min-height: 44px; }
+  .top-header-actions .icon-shortcut-btn { display: none !important; }
+  .invoice-builder-full-width { width: 100% !important; margin: 12px 0 !important; }
+  .invoice-top-three-panel, .mybillbook-ref-bottom { grid-template-columns: minmax(0, 1fr) !important; }
+  .bill-panel-col, .ship-panel-col, .invoice-meta-box { min-width: 0; padding: 14px !important; border-right: 0 !important; border-bottom: 1px solid var(--line); }
+  .meta-fields-grid, .meta-terms-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+  .meta-fields-grid label, .meta-terms-grid label { min-width: 0; }
+  .meta-fields-grid input, .meta-terms-grid input { min-width: 0; width: 100%; }
+  .invoice-line-scroll { width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+  .invoice-line-scroll table { min-width: 960px !important; }
+  .items-table-container { min-width: 0; }
+  .subtotal-strip { display: flex !important; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 12px !important; }
+  .ref-left-section, .ref-right-section { min-width: 0; padding: 14px !important; border-left: 0 !important; }
+  .ref-right-section { border-top: 1px solid var(--line); }
+  .ref-calc-row { flex-wrap: wrap; gap: 10px; }
+  .ref-calc-row > * { min-width: 0; max-width: 100%; }
+  .ref-actions-row { flex-wrap: wrap; gap: 8px; }
+  .ref-actions-row button { flex: 1 1 100%; min-height: 44px; }
+  .ref-sig-title { overflow-wrap: anywhere; }
+  .app-shell .top-actions .user-profile-badge { display: none !important; }
+}

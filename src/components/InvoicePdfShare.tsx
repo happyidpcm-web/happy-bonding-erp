@@ -1,3 +1,4 @@
+import { canShareNativeFiles, shareNativeFile } from "../utils/nativeFiles";
 import { useEffect, useRef, useState } from "react";
 import { Download, MessageCircle, X } from "lucide-react";
 import type { Invoice } from "../types";
@@ -27,7 +28,7 @@ export function InvoicePdfShare({ invoice, businessName, element, onClose }: {
   }, [element, invoice, attempt]);
 
   let canShare = false;
-  try { canShare = Boolean(file && !nativeUnavailable && typeof navigator.share === "function" && navigator.canShare?.({ files: [file] })); } catch { /* Use download fallback. */ }
+  try { canShare = Boolean(file && !nativeUnavailable && (canShareNativeFiles() || (typeof navigator.share === "function" && navigator.canShare?.({ files: [file] })))); } catch { /* Use download fallback. */ }
   const digits = (invoice.partyPhone ?? "").replace(/\D/g, "").replace(/^00/, "");
   const localDigits = digits.length === 11 && digits.startsWith("0") ? digits.slice(1) : digits;
   const phone = localDigits.length === 10 ? `91${localDigits}` : /^[1-9]\d{10,14}$/.test(localDigits) ? localDigits : "";
@@ -38,7 +39,8 @@ export function InvoicePdfShare({ invoice, businessName, element, onClose }: {
     setSharing(true); setError("");
     try {
       // A fresh click after generation retains the required user activation.
-      await navigator.share({ files: [file], title: `${businessName} - Invoice ${invoice.number}` });
+      if (canShareNativeFiles()) await shareNativeFile(file, `${businessName} - Invoice ${invoice.number}`);
+      else await navigator.share({ files: [file], title: `${businessName} - Invoice ${invoice.number}` });
     } catch (failure) {
       if (!(failure instanceof DOMException && failure.name === "AbortError")) {
         setNativeUnavailable(true);
@@ -64,7 +66,7 @@ export function InvoicePdfShare({ invoice, businessName, element, onClose }: {
         <p>If WhatsApp is not listed, download the PDF and attach it in the customer chat.</p>
       </> : <p>This browser cannot share PDF files directly. Download the bill, open the customer chat, then choose <strong>Attach → Document</strong> and select the downloaded PDF.</p>}
       <div className="pdf-share-actions">
-        <button type="button" className="secondary" onClick={() => { downloadPdfFile(file); setDownloaded(true); }}><Download size={16} />Download PDF</button>
+        <button type="button" className="secondary" onClick={async () => { try { await downloadPdfFile(file); setDownloaded(true); } catch { setError("Could not save or share the PDF. Please retry."); } }}><Download size={16} />{canShareNativeFiles() ? "Save / Share PDF" : "Download PDF"}</button>
         {phone && <a className="secondary" href={whatsappUrl} target="_blank" rel="noopener noreferrer">Open Customer WhatsApp</a>}
       </div>
       {downloaded && <p role="status">PDF download started. Attach {file.name} in WhatsApp.</p>}

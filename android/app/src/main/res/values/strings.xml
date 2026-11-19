@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Happy Bonding</string>
+    <string name="title_activity_main">Happy Bonding</string>
+    <string name="package_name">in.happybonding.erp</string>
+    <string name="custom_url_scheme">in.happybonding.erp</string>
+</resources>

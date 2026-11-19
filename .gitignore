@@ -8,3 +8,9 @@ backups/
 happy-bonding-erp/
 *.tsbuildinfo
 test-results/
+
+# Android signing material and local packages
+*.jks
+*.keystore
+android/keystore.properties
+artifacts/
