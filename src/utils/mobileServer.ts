@@ -14,7 +14,12 @@ export function normalizeServerUrl(value: string): string {
 }
 
 export function getMobileServer() {
-  return localStorage.getItem(SERVER_KEY) || import.meta.env.VITE_API_URL || 'https://admin.happybonding.co.in/api';
+  // Web deployments commonly use /api. A bundled Android app needs an absolute URL.
+  for (const candidate of [localStorage.getItem(SERVER_KEY), import.meta.env?.VITE_API_URL]) {
+    if (!candidate) continue;
+    try { return normalizeServerUrl(candidate); } catch { /* Ignore obsolete or web-only configuration. */ }
+  }
+  return 'https://admin.happybonding.co.in/api';
 }
 
 export function saveMobileServer(value: string) {

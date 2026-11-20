@@ -1,13 +1,377 @@
 /* Loaded after desktop styles; wide tables scroll within their own containers. */
+.bill-preview-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.bill-preview-panel .bill-document-preview-wrapper { touch-action: pan-x pan-y; }
+.full-invoice-content-grid, .bill-document-preview-wrapper { overflow-anchor: none; }
+.bill-preview-panel .bill-document-preview-wrapper { display: block; min-height: 0; flex: 1; }
+.bill-preview-size { position: relative; flex-shrink: 0; margin: 0 auto; }
+.bill-preview-scale { transform-origin: top left; }
+@media print {
+  .bill-preview-size { width: auto !important; height: auto !important; }
+  .bill-preview-scale { transform: none !important; }
+}
+
+/* Final compact pass — Parties should feel like a fast, professional CRM list. */
+@media screen and (max-width: 768px) {
+  .parties-page-heading { margin-bottom: 12px !important; gap: 8px !important; }
+  .parties-page-heading h1 { font-size: 25px !important; letter-spacing: -.03em !important; }
+  .parties-header-actions { grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr) 40px !important; gap: 7px !important; }
+  .parties-header-actions .secondary { min-height: 39px !important; height: 39px !important; padding: 6px 7px !important; font-size: 11px !important; border-radius: 10px !important; }
+  .parties-header-actions > .icon-button { width: 40px !important; min-width: 40px !important; min-height: 39px !important; height: 39px !important; padding: 5px !important; border-radius: 10px !important; }
+  .parties-header-actions > .icon-button svg { width: 17px !important; height: 17px !important; }
+
+  .parties-metrics-row { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 7px !important; margin-bottom: 12px !important; }
+  .party-metric-box,
+  .party-metric-box:first-child { grid-column: auto !important; min-height: 74px !important; padding: 10px 9px !important; display: flex !important; flex-direction: column !important; align-items: flex-start !important; justify-content: center !important; border-radius: 12px !important; }
+  .party-metric-box span { font-size: 10px !important; line-height: 1.2 !important; }
+  .party-metric-box strong,
+  .party-metric-box:first-child strong { margin-top: 5px !important; font-size: 19px !important; line-height: 1.05 !important; letter-spacing: -.035em !important; }
+
+  .parties-table-card { border-radius: 13px !important; }
+  .parties-toolbar { padding: 10px !important; gap: 8px !important; }
+  .parties-search-container { gap: 8px !important; }
+  .parties-search-container .search-input-wrap,
+  .parties-search-container .category-select-wrap { min-height: 41px !important; height: 41px !important; border-radius: 10px !important; }
+  .parties-search-container .search-input-wrap { padding: 0 11px !important; }
+  .parties-search-container .search-input-wrap input { font-size: 13px !important; }
+  .parties-toolbar-right { gap: 8px !important; }
+  .parties-toolbar-right button { min-height: 40px !important; height: 40px !important; padding: 6px 8px !important; border-radius: 10px !important; font-size: 12px !important; }
+  .parties-toolbar-right button svg { width: 16px !important; height: 16px !important; }
+
+  .parties-table-card .table-scroll .party-history-row { gap: 5px 10px !important; padding: 12px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(1) .party-history-link { font-size: 13px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(3) { font-size: 13px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(5) { font-size: 12px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) { gap: 7px !important; padding-top: 4px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) .secondary { min-height: 34px !important; height: 34px !important; padding: 5px 10px !important; border-radius: 9px !important; font-size: 11px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) .icon-button,
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) .whatsapp-icon-btn { width: 34px !important; height: 34px !important; min-height: 34px !important; border-radius: 9px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) svg { width: 17px !important; height: 17px !important; }
+  .parties-table-card .pagination-strip { padding: 9px 12px !important; font-size: 11px !important; }
+
+  /* Keep monetary summary values on one clean line in compact cards. */
+  .party-metric-box:nth-child(2) strong,
+  .party-metric-box:nth-child(3) strong { white-space: nowrap !important; font-size: 14px !important; letter-spacing: -.075em !important; }
+
+  /* Party invoice history: turn the clipped desktop table into mobile invoice cards. */
+  .modal:has(.party-sales-history) { width: calc(100vw - 28px) !important; max-height: calc(100dvh - 48px) !important; padding: 17px 14px !important; border-radius: 18px !important; }
+  .modal:has(.party-sales-history) .modal-head { padding-bottom: 13px !important; }
+  .modal:has(.party-sales-history) .modal-head h2 { max-width: calc(100% - 46px); font-size: 18px !important; line-height: 1.25 !important; }
+  .party-sales-history { padding-top: 2px; }
+  .party-sales-history > p:first-child { margin: 10px 0 12px !important; color: #64748b !important; font-size: 11px !important; font-weight: 700 !important; }
+  .party-sales-history > p:first-child::first-letter { color: inherit; }
+  .party-sales-history .table-scroll { overflow: visible !important; border: 0 !important; }
+  .party-sales-history table { width: 100% !important; min-width: 0 !important; }
+  .party-sales-history thead { display: none !important; }
+  .party-sales-history tbody { display: grid !important; gap: 8px !important; }
+  .party-sales-history .party-invoice-row { display: grid !important; grid-template-columns: minmax(0, 1fr) auto !important; gap: 5px 10px !important; padding: 12px !important; border: 1px solid #eee4c4 !important; border-radius: 12px !important; background: #fffdf8 !important; }
+  .party-sales-history .party-invoice-row td { display: none !important; min-width: 0 !important; padding: 0 !important; border: 0 !important; white-space: normal !important; }
+  .party-sales-history .party-invoice-row td:nth-child(1) { display: block !important; min-width: 0 !important; }
+  .party-sales-history .party-invoice-row td:nth-child(1) .party-history-link { display: block !important; max-width: 100% !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; color: #243775 !important; font-size: 13px !important; font-weight: 800 !important; }
+  .party-sales-history .party-invoice-row td:nth-child(3) { display: block !important; align-self: center !important; color: #172033 !important; font-size: 14px !important; font-weight: 800 !important; white-space: nowrap !important; font-variant-numeric: tabular-nums; }
+  .party-sales-history .party-invoice-row td:nth-child(2) { display: block !important; grid-column: 1 / -1 !important; color: #748194 !important; font-size: 11px !important; }
+  .party-sales-history .party-invoice-row td:nth-child(6) { display: inline-flex !important; grid-column: 1 !important; align-items: center !important; width: max-content !important; padding: 3px 8px !important; border-radius: 999px !important; background: #e9f8ef !important; color: #187347 !important; font-size: 10px !important; font-weight: 800 !important; }
+  .party-sales-history .party-invoice-row td:nth-child(7) { display: block !important; grid-column: 2 !important; grid-row: 3 !important; }
+  .party-sales-history .party-invoice-row td:nth-child(7) .secondary { min-height: 30px !important; height: 30px !important; padding: 5px 9px !important; border-radius: 8px !important; font-size: 10px !important; }
+  .party-sales-history .party-invoice-row td:nth-child(4),
+  .party-sales-history .party-invoice-row td:nth-child(5) { display: none !important; }
+
+  /* Bulk menu opens from the button toward the visible right side, never behind the card. */
+  .parties-table-card { overflow: visible !important; }
+  .parties-table-card .table-scroll { overflow: hidden !important; border-radius: 0 0 13px 13px !important; }
+  .parties-toolbar-right .bulk-action-wrap { position: relative !important; }
+  .parties-toolbar-right .bulk-dropdown-menu { left: 0 !important; right: auto !important; width: min(290px, calc(100vw - 52px)) !important; z-index: 250 !important; border-radius: 12px !important; box-shadow: 0 16px 32px rgba(23, 32, 51, .18) !important; }
+}
+
+/* Dashboard final compact pass. */
+@media screen and (max-width: 768px) {
+  .app-shell .topbar { padding: 5px 12px !important; gap: 4px !important; }
+  .topbar .top-actions { grid-template-columns: 36px minmax(0, 1fr) 70px !important; gap: 6px !important; }
+  .top-actions button { min-height: 32px !important; height: 32px !important; padding: 4px 6px !important; font-size: 10px !important; border-radius: 9px !important; }
+  .top-actions > .icon-button { width: 36px !important; min-width: 36px !important; padding: 4px !important; }
+  .top-actions > .icon-button svg { width: 16px !important; height: 16px !important; }
+  .menu-button, .close-menu { min-width: 36px !important; min-height: 36px !important; }
+
+  main:has(.dashboard-transactions-card) .metrics-grid.three { gap: 10px !important; margin-bottom: 12px !important; }
+  main:has(.dashboard-transactions-card) .metric { min-height: 82px !important; padding: 12px 14px !important; gap: 11px !important; border-radius: 14px !important; }
+  main:has(.dashboard-transactions-card) .metric-icon { width: 36px !important; height: 36px !important; border-radius: 11px !important; }
+  main:has(.dashboard-transactions-card) .metric-icon svg { width: 19px !important; height: 19px !important; }
+  main:has(.dashboard-transactions-card) .metric span { font-size: 11px !important; }
+  main:has(.dashboard-transactions-card) .metric strong { margin: 3px 0 0 !important; font-size: 20px !important; line-height: 1.15 !important; }
+
+  .dashboard-transactions-title { align-items: center !important; padding: 12px 14px !important; }
+  .dashboard-transactions-title > div { min-width: 0 !important; }
+  .dashboard-transactions-title h2 { font-size: 16px !important; line-height: 1.2 !important; white-space: nowrap !important; }
+  .dashboard-transactions-title .text-button { padding: 5px 0 !important; font-size: 11px !important; color: #2563eb !important; }
+  .dashboard-transaction-status { font-size: 11px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+  .dashboard-transactions-card [role="status"]:not(.dashboard-transaction-status) { padding: 10px 14px !important; }
+  .dashboard-transactions-card [role="status"] strong { font-size: 18px !important; }
+}
+@media screen and (max-width: 768px) {
+  /* Parties: every summary, filter and action stays within the phone width. */
+  .parties-page-heading { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 12px !important; }
+  .parties-header-actions { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px !important; gap: 8px !important; width: 100% !important; }
+  .parties-header-actions > * { min-width: 0 !important; }
+  .parties-header-actions .secondary { width: 100% !important; min-height: 44px !important; padding: 8px !important; font-size: 12px !important; overflow-wrap: anywhere; }
+  .parties-header-actions > .icon-button { width: 44px !important; min-width: 44px !important; min-height: 44px !important; border: 1px solid #f0d47a; }
+  .parties-metrics-row { display: grid !important; grid-template-columns: 1fr !important; gap: 10px !important; width: 100% !important; margin-bottom: 14px !important; }
+  .party-metric-box { width: 100% !important; min-width: 0 !important; min-height: 74px !important; padding: 13px 16px !important; }
+  .party-metric-box strong { overflow-wrap: anywhere; }
+  .parties-toolbar { display: flex !important; flex-direction: column !important; align-items: stretch !important; min-width: 0 !important; gap: 10px !important; padding: 12px !important; }
+  .parties-search-container { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; width: 100% !important; min-width: 0 !important; max-width: none !important; gap: 10px !important; }
+  .parties-search-container .search-input-wrap, .parties-search-container .category-select-wrap { width: 100% !important; min-width: 0 !important; }
+  .parties-search-container .category-select-wrap > *:first-child { width: 100% !important; min-width: 0 !important; }
+  .parties-toolbar-right { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) !important; width: 100% !important; min-width: 0 !important; gap: 10px !important; }
+  .parties-toolbar-right > *, .parties-toolbar-right button { min-width: 0 !important; width: 100% !important; }
+  .parties-toolbar-right button { min-height: 44px !important; padding: 8px 10px !important; font-size: 12px !important; }
+  .parties-toolbar-right .bulk-dropdown-menu { width: min(300px, calc(100vw - 48px)) !important; }
+  .parties-toolbar-right .purple-party-btn { white-space: nowrap; }
+  /* Party lists become touch-friendly cards instead of a clipped desktop table. */
+  .parties-table-card .table-scroll { width: 100% !important; max-width: 100% !important; overflow-x: hidden !important; }
+  .parties-table-card .table-scroll table { min-width: 0 !important; width: 100% !important; }
+  .parties-table-card .table-scroll thead { display: none !important; }
+  .parties-table-card .table-scroll .party-history-row { display: grid !important; grid-template-columns: minmax(0, 1fr) auto !important; gap: 5px 12px !important; padding: 14px !important; border-bottom: 1px solid #e5e7eb !important; }
+  .parties-table-card .table-scroll .party-history-row td { display: none !important; min-width: 0 !important; padding: 0 !important; border: 0 !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(1) { display: block !important; grid-column: 1 !important; overflow: hidden; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(1) .party-history-link { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(3) { display: block !important; grid-column: 2 !important; align-self: center; text-align: right; white-space: nowrap; font-size: 13px; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(5) { display: flex !important; grid-column: 1 / -1 !important; justify-content: space-between; align-items: center; color: #334155; font-size: 12px; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(5)::before { content: "Balance"; color: #64748b; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) { display: flex !important; grid-column: 1 / -1 !important; justify-content: flex-start !important; flex-wrap: wrap; gap: 7px !important; padding-top: 5px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) button { min-height: 36px !important; }
+
+  /* Parties: compact, polished CRM-style layout for phone screens. */
+  .parties-page-heading { margin-bottom: 16px !important; gap: 10px !important; }
+  .parties-page-heading h1 { font-size: 28px !important; line-height: 1.1 !important; }
+  .parties-header-actions { grid-template-columns: minmax(0, 1.16fr) minmax(0, .94fr) 44px !important; gap: 8px !important; }
+  .parties-header-actions .secondary { min-height: 42px !important; height: 42px !important; padding: 7px 8px !important; font-size: 12px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .parties-header-actions > .icon-button { min-height: 42px !important; height: 42px !important; border-radius: 12px !important; }
+  .share-ledger-btn { background: #f7f5ff !important; border-color: #cfcafa !important; color: #5146ca !important; }
+  .parties-reports-menu { width: min(250px, calc(100vw - 44px)) !important; border-radius: 12px !important; box-shadow: 0 14px 30px rgba(23, 32, 51, .16) !important; }
+  .parties-metrics-row { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; margin-bottom: 16px !important; }
+  .party-metric-box { min-height: 92px !important; padding: 14px !important; border-radius: 16px !important; box-shadow: 0 7px 20px rgba(52, 38, 10, .05) !important; text-align: left; }
+  .party-metric-box:first-child { grid-column: 1 / -1; min-height: 72px !important; flex-direction: row !important; align-items: center !important; justify-content: space-between !important; }
+  .party-metric-box span { font-size: 12px !important; color: #65758a !important; }
+  .party-metric-box strong { margin-top: 5px !important; font-size: 23px !important; letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
+  .party-metric-box:first-child strong { margin-top: 0 !important; }
+  .party-metric-box:nth-child(2) { border-color: #cbead8 !important; background: linear-gradient(145deg, #ffffff, #f4fcf7) !important; }
+  .party-metric-box:nth-child(3) { border-color: #f2d6d8 !important; background: linear-gradient(145deg, #ffffff, #fff7f7) !important; }
+  .parties-table-card { overflow: hidden !important; border-radius: 16px !important; box-shadow: 0 10px 26px rgba(52, 38, 10, .06) !important; }
+  .parties-toolbar { padding: 14px !important; gap: 9px !important; background: linear-gradient(180deg, #fffdf7, #fffaf0) !important; }
+  .parties-search-container { gap: 9px !important; }
+  .parties-search-container .search-input-wrap { height: 46px !important; border-radius: 13px !important; padding: 0 14px !important; border-color: #dedee3 !important; }
+  .parties-search-container .search-input-wrap input { font-size: 14px !important; min-width: 0; }
+  .parties-search-container .category-select-wrap { min-height: 46px !important; border: 1px solid #dedee3 !important; border-radius: 13px !important; background: #fff !important; padding: 0 13px !important; }
+  .parties-search-container .category-select-wrap svg { right: 14px !important; }
+  .parties-toolbar-right { gap: 9px !important; }
+  .parties-toolbar-right button { min-height: 44px !important; height: 44px !important; border-radius: 12px !important; font-size: 13px !important; }
+  .parties-toolbar-right .purple-party-btn { background: linear-gradient(135deg, #dd213d, #bd102b) !important; border: 0 !important; box-shadow: 0 8px 16px rgba(202, 24, 50, .2) !important; }
+  .parties-table-card .table-scroll .party-history-row { gap: 7px 12px !important; padding: 16px 14px !important; background: #fff !important; }
+  .parties-table-card .table-scroll .party-history-row:nth-child(even) { background: #fffefb !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(1) .party-history-link { color: #263a74 !important; font-size: 14px !important; font-weight: 800 !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(3) { color: #293342 !important; font-size: 14px !important; font-variant-numeric: tabular-nums; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(5) { padding: 2px 0 1px !important; font-size: 13px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(5)::before { font-size: 12px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) { gap: 8px !important; padding-top: 7px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) .secondary { min-height: 38px !important; padding: 7px 12px !important; border-radius: 10px !important; font-size: 12px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) .icon-button,
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) .whatsapp-icon-btn { width: 38px !important; height: 38px !important; min-height: 38px !important; padding: 0 !important; border-radius: 10px !important; }
+  .parties-table-card .pagination-strip { min-width: 0 !important; padding: 12px 14px !important; background: #fffaf0 !important; font-size: 12px !important; }
+
+  /* Items: keep the important stock and pricing values visible on a phone. */
+  .items-page-heading { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 12px !important; }
+  .items-header-actions { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; width: 100% !important; gap: 8px !important; }
+  .items-header-actions > * { min-width: 0 !important; }
+  .items-header-actions button { width: 100% !important; min-height: 44px !important; padding: 8px !important; font-size: 12px !important; justify-content: center !important; overflow-wrap: anywhere; }
+  .items-metrics-grid { grid-template-columns: 1fr !important; gap: 10px !important; margin-bottom: 14px !important; }
+  .items-metrics-grid .party-metric-box { min-height: 96px !important; }
+  .items-toolbar > div:last-child { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; width: 100% !important; gap: 10px !important; }
+  .items-toolbar > div:last-child > * { width: 100% !important; min-width: 0 !important; }
+  .inventory-table-scroll { overflow-x: hidden !important; }
+  .inventory-table-scroll table { min-width: 0 !important; width: 100% !important; }
+  .inventory-table-scroll thead { display: none !important; }
+  .inventory-table-scroll tbody tr { display: grid !important; grid-template-columns: 32px minmax(0, 1fr) !important; gap: 8px 12px !important; padding: 14px !important; border-bottom: 1px solid #e5e7eb !important; }
+  .inventory-table-scroll tbody td { display: none !important; min-width: 0 !important; padding: 0 !important; border: 0 !important; }
+  .inventory-table-scroll tbody td:nth-child(1) { display: block !important; grid-column: 1 !important; grid-row: 1 !important; padding-top: 3px !important; }
+  .inventory-table-scroll tbody td:nth-child(2) { display: block !important; grid-column: 2 !important; overflow: hidden; }
+  .inventory-table-scroll tbody td:nth-child(2) .text-button { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+  .inventory-table-scroll tbody td:nth-child(5), .inventory-table-scroll tbody td:nth-child(6), .inventory-table-scroll tbody td:nth-child(8) { display: flex !important; grid-column: 1 / -1 !important; justify-content: space-between; align-items: center; font-size: 13px; }
+  .inventory-table-scroll tbody td:nth-child(5)::before { content: "Stock qty"; color: #64748b; }
+  .inventory-table-scroll tbody td:nth-child(6)::before { content: "Selling price"; color: #64748b; }
+  .inventory-table-scroll tbody td:nth-child(8)::before { content: "MRP"; color: #64748b; }
+  .inventory-table-scroll tbody td:nth-child(9) { display: flex !important; grid-column: 1 / -1 !important; justify-content: flex-start !important; flex-wrap: wrap; padding-top: 4px !important; }
+
+  /* Sales invoices: compact controls and clear invoice cards with no side clipping. */
+  .sales-page-top-header { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 12px !important; margin-bottom: 14px !important; }
+  .sales-page-top-header h1 { font-size: 25px !important; }
+  .sales-header-tools { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px 40px !important; gap: 8px !important; width: 100% !important; }
+  .sales-header-tools > * { min-width: 0 !important; }
+  .sales-reports-dropdown-btn { width: 100% !important; min-height: 42px !important; padding: 7px 8px !important; font-size: 12px !important; justify-content: center !important; }
+  .sales-icon-tool-btn { width: 40px !important; height: 42px !important; }
+  .sales-summary-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; margin-bottom: 14px !important; }
+  .sales-summary-card { min-width: 0 !important; min-height: 92px !important; padding: 11px 12px !important; gap: 4px !important; }
+  .sales-summary-card-head { font-size: 12px !important; gap: 6px !important; }
+  .sales-summary-card-val { font-size: 17px !important; line-height: 1.15 !important; overflow-wrap: anywhere; }
+  .sales-toolbar-controls { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 10px !important; }
+  .sales-toolbar-left-group { display: grid !important; grid-template-columns: 1fr !important; width: 100% !important; gap: 10px !important; }
+  .sales-search-field-wrap, .sales-search-input-field, .sales-date-picker-wrap { width: 100% !important; min-width: 0 !important; }
+  .sales-search-input-field { height: 44px !important; font-size: 14px !important; }
+  .sales-date-picker-wrap { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; gap: 8px !important; }
+  .sales-date-range-btn { min-width: 0 !important; min-height: 42px !important; padding: 7px 9px !important; font-size: 12px !important; justify-content: center !important; overflow: hidden; }
+  .sales-date-range-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Keep the shared date-filter menu compact on both sales and purchase screens. */
+  .sales-date-popover-menu { width: min(260px, calc(100vw - 42px)) !important; max-height: 280px !important; padding: 4px 0 !important; border-radius: 8px !important; }
+  .sales-date-option-row { min-height: 34px !important; padding: 7px 12px !important; font-size: 12px !important; }
+  .sales-toolbar-right-group, .sales-create-purple-btn { width: 100% !important; }
+  .sales-create-purple-btn { min-height: 46px !important; justify-content: center !important; }
+  .sales-invoices-table-card .table-scroll { overflow-x: hidden !important; }
+  .sales-invoices-table-card .sales-invoices-main-table { min-width: 0 !important; width: 100% !important; }
+  .sales-invoices-table-card .sales-invoices-main-table thead { display: none !important; }
+  .sales-invoices-table-card .sales-invoices-main-table tbody tr { display: grid !important; grid-template-columns: 28px minmax(0, 1fr) auto 32px !important; gap: 5px 9px !important; padding: 13px !important; border-bottom: 1px solid #e5e7eb !important; }
+  .sales-invoices-table-card .sales-invoices-main-table tbody td { display: none !important; min-width: 0 !important; padding: 0 !important; border: 0 !important; }
+  .sales-invoices-table-card .sales-invoices-main-table tbody td:nth-child(1) { display: block !important; grid-column: 1 !important; grid-row: 1 / span 2 !important; padding-top: 2px !important; }
+  .sales-invoices-table-card .sales-invoices-main-table tbody td:nth-child(2) { display: block !important; grid-column: 2 !important; color: #64748b !important; font-size: 12px !important; }
+  .sales-invoices-table-card .sales-invoices-main-table tbody td:nth-child(3) { display: block !important; grid-column: 2 !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px !important; }
+  .sales-invoices-table-card .sales-invoices-main-table tbody td:nth-child(6) { display: block !important; grid-column: 3 !important; grid-row: 1 !important; align-self: center; text-align: right !important; white-space: nowrap; font-size: 13px !important; }
+  .sales-invoices-table-card .sales-invoices-main-table tbody td:nth-child(9) { display: block !important; grid-column: 3 !important; grid-row: 2 !important; text-align: right; }
+  .sales-invoices-table-card .sales-invoices-main-table tbody td:nth-child(10) { display: flex !important; grid-column: 4 !important; grid-row: 1 / span 2 !important; padding: 0 !important; align-items: center; justify-content: flex-end; text-align: right !important; }
+  .sales-invoices-table-card .sales-dots-menu-btn { width: 32px !important; height: 36px !important; padding: 4px !important; }
+  /* A cleaner, more responsive invoice list for day-to-day phone use. */
+  .sales-invoices-screen-wrap { padding-bottom: 8px; }
+  .sales-invoices-table-card { border-color: #d8dee9 !important; border-radius: 14px !important; box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06) !important; }
+  .sales-invoices-table-card .sales-invoices-main-table tbody tr { min-height: 76px; transition: background-color 120ms ease; }
+  .sales-invoices-table-card .sales-invoices-main-table tbody tr:has(input[type="checkbox"]:checked) { background: #f5f7ff !important; }
+  .sales-invoices-table-card input[type="checkbox"] { width: 21px !important; height: 21px !important; margin: 0 !important; accent-color: #2563eb; touch-action: manipulation; }
+  .sales-invoices-table-card .sales-invoices-main-table tbody td:nth-child(2) { line-height: 1.25 !important; }
+  .sales-invoices-table-card .sales-invoices-main-table tbody td:nth-child(3) { font-weight: 700 !important; color: #273449 !important; letter-spacing: .01em; }
+  .sales-invoices-table-card .sales-invoices-main-table tbody td:nth-child(6) { font-weight: 800 !important; color: #172033 !important; }
+  .sales-invoices-table-card .status-pill-green, .sales-invoices-table-card .status-pill-amber, .sales-invoices-table-card .status-pill-red, .sales-invoices-table-card .status-pill-gray { padding: 5px 10px !important; font-size: 11px !important; }
+
+  /* Purchase invoices use the same compact phone layout as sales, while keeping payable details visible. */
+  .purchase-page-top-header { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 10px !important; margin-bottom: 14px !important; }
+  .purchase-page-top-header h1 { font-size: 25px !important; }
+  .purchase-header-tools { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px 40px !important; gap: 8px !important; width: 100% !important; }
+  .purchase-header-tools > * { min-width: 0 !important; }
+  .purchase-header-tools .secondary { min-height: 42px !important; padding: 7px 8px !important; justify-content: center !important; font-size: 12px !important; }
+  .purchase-header-tools .icon-button { width: 40px !important; height: 42px !important; padding: 6px !important; }
+  .purchase-invoices-page .sales-summary-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .purchase-invoices-page .sales-summary-card { min-height: 88px !important; }
+  .purchase-toolbar-card { padding: 12px !important; overflow: visible !important; position: relative !important; z-index: 20 !important; }
+  .purchase-toolbar-controls { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 10px !important; overflow: visible !important; }
+  .purchase-toolbar-left { display: grid !important; grid-template-columns: 1fr !important; width: 100% !important; gap: 9px !important; overflow: visible !important; }
+  .purchase-toolbar-left > * { width: 100% !important; min-width: 0 !important; }
+  .purchase-toolbar-left > div:first-child { width: 100% !important; }
+  .purchase-toolbar-left input, .purchase-toolbar-left select { width: 100% !important; box-sizing: border-box !important; }
+  .purchase-toolbar-left > div:nth-child(2) { display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; gap: 8px !important; }
+  .purchase-toolbar-left > div:nth-child(2) > * { min-width: 0 !important; }
+  .purchase-toolbar-card .sales-date-picker-wrap { overflow: visible !important; z-index: 30 !important; }
+  .purchase-toolbar-card .sales-date-popover-menu { z-index: 100 !important; }
+  .purchase-create-purple-btn { width: 100% !important; min-height: 46px !important; justify-content: center !important; }
+  .purchase-invoices-table-card .table-scroll { overflow-x: hidden !important; }
+  .purchase-invoices-table-card .purchase-invoices-main-table { min-width: 0 !important; width: 100% !important; }
+  .purchase-invoices-table-card .purchase-invoices-main-table thead { display: none !important; }
+  .purchase-invoices-table-card .purchase-invoices-main-table tbody tr { display: grid !important; grid-template-columns: 27px minmax(0, 1fr) auto !important; gap: 3px 8px !important; padding: 10px 12px !important; border-bottom: 1px solid #e5e7eb !important; }
+  .purchase-invoices-table-card .purchase-invoices-main-table tbody td { display: none !important; min-width: 0 !important; padding: 0 !important; border: 0 !important; }
+  .purchase-invoices-table-card .purchase-invoices-main-table tbody td:nth-child(1) { display: block !important; grid-column: 1 !important; grid-row: 1 / span 3 !important; padding-top: 2px !important; }
+  .purchase-invoices-table-card .purchase-invoices-main-table tbody td:nth-child(2) { display: block !important; grid-column: 2 !important; grid-row: 1 !important; color: #64748b !important; font-size: 11px !important; }
+  .purchase-invoices-table-card .purchase-invoices-main-table tbody td:nth-child(3) { display: block !important; grid-column: 2 !important; grid-row: 2 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; font-size: 12px !important; }
+  .purchase-invoices-table-card .purchase-invoices-main-table tbody td:nth-child(4) { display: block !important; grid-column: 2 !important; grid-row: 3 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; font-size: 11px !important; color: #475569 !important; }
+  .purchase-invoices-table-card .purchase-invoices-main-table tbody td:nth-child(6) { display: block !important; grid-column: 3 !important; grid-row: 1 !important; text-align: right !important; white-space: nowrap !important; font-size: 12px !important; }
+  .purchase-invoices-table-card .purchase-invoices-main-table tbody td:nth-child(8) { display: block !important; grid-column: 3 !important; grid-row: 2 !important; text-align: right !important; white-space: nowrap !important; font-size: 11px !important; }
+  .purchase-invoices-table-card .purchase-invoices-main-table tbody td:nth-child(8)::before { content: "Due "; color: #64748b; font-weight: 400; }
+  .purchase-invoices-table-card .purchase-invoices-main-table tbody td:nth-child(9) { display: block !important; grid-column: 3 !important; grid-row: 3 !important; text-align: right !important; }
+  .purchase-invoices-table-card .purchase-invoices-main-table tbody td:nth-child(10) { display: flex !important; grid-column: 1 / -1 !important; flex-wrap: wrap !important; gap: 6px !important; padding-top: 5px !important; }
+  .purchase-invoices-table-card .purchase-invoices-main-table tbody td:nth-child(10) button { min-height: 30px !important; margin-left: 0 !important; }
+  .purchase-invoices-table-card .purchase-row-action { padding: 3px 9px !important; font-size: 11px !important; line-height: 1 !important; }
+  .purchase-invoices-table-card .purchase-download-action { width: 32px !important; min-width: 32px !important; padding: 3px !important; justify-content: center !important; }
+  .purchase-invoices-table-card .purchase-download-action span { display: none !important; }
+  .purchase-invoices-table-card .purchase-row-icon-action { width: 30px !important; min-width: 30px !important; height: 30px !important; min-height: 30px !important; padding: 3px !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; }
+  .purchase-invoices-table-card .purchase-invoices-main-table tbody td:nth-child(10) > div { margin-left: 0 !important; }
+
+  /* Purchase invoice document: fit the whole bill on screen and support pinch zoom. */
+  .purchase-invoice-detail { min-width: 0 !important; padding: 10px !important; overflow: hidden !important; }
+  .purchase-invoice-detail-header { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 8px !important; margin-bottom: 10px !important; }
+  .purchase-invoice-detail-title { min-width: 0 !important; gap: 8px !important; }
+  .purchase-invoice-detail-title > span:not(.pill) { min-width: 0 !important; flex: 1 !important; overflow-wrap: anywhere !important; font-size: 14px !important; }
+  .purchase-invoice-detail-actions { display: flex !important; flex-wrap: wrap !important; gap: 5px !important; }
+  .purchase-invoice-detail-actions button { min-height: 34px !important; padding: 5px 7px !important; font-size: 11px !important; line-height: 1.1 !important; }
+  .purchase-invoice-detail-actions button svg { width: 14px !important; height: 14px !important; }
+  .purchase-invoice-detail-actions .icon-button { width: 34px !important; min-width: 34px !important; padding: 5px !important; }
+  .purchase-document-preview-wrapper { width: 100% !important; min-width: 0 !important; max-height: calc(100dvh - 185px) !important; padding: 8px !important; overflow: auto !important; overscroll-behavior: contain; touch-action: pan-x pan-y; background: #eef1f6; border-radius: 10px; }
+  .purchase-document-preview-size { position: relative; margin: 0 auto; flex-shrink: 0; }
+  .purchase-document-preview-scale { transform-origin: top left; }
+
+  /* Dashboard transaction summary: concise copy and phone-friendly rows. */
+  .dashboard-verbose-status { display: none !important; }
+  .dashboard-transaction-status { margin: 4px 0 0 !important; color: #64748b !important; font-size: 12px !important; }
+  .dashboard-transactions-title { padding: 14px 16px !important; gap: 8px !important; }
+  .dashboard-transactions-title h2 { font-size: 17px !important; }
+  .dashboard-transactions-title .text-button { flex: 0 0 auto !important; padding: 6px 0 !important; font-size: 12px !important; white-space: nowrap !important; }
+  .dashboard-transactions-card > div:last-child { display: none !important; }
+  .dashboard-transactions-card [role="status"]:not(.dashboard-transaction-status) { padding: 12px 16px !important; gap: 10px !important; }
+  .dashboard-transactions-card [role="status"] strong { font-size: 20px !important; }
+  .dashboard-transactions-table-scroll { overflow-x: hidden !important; }
+  .dashboard-transactions-table { width: 100% !important; min-width: 0 !important; }
+  .dashboard-transactions-table thead { display: none !important; }
+  .dashboard-transactions-table tbody tr { display: grid !important; grid-template-columns: minmax(0, 1fr) auto !important; gap: 5px 10px !important; padding: 12px 16px !important; border-bottom: 1px solid #e5e7eb !important; }
+  .dashboard-transactions-table tbody td { display: none !important; padding: 0 !important; border: 0 !important; min-width: 0 !important; }
+  .dashboard-transactions-table tbody td:nth-child(1) { display: block !important; grid-column: 1 !important; grid-row: 1 !important; color: #64748b !important; font-size: 12px !important; }
+  .dashboard-transactions-table tbody td:nth-child(3) { display: block !important; grid-column: 1 !important; grid-row: 2 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; font-size: 13px !important; }
+  .dashboard-transactions-table tbody td:nth-child(5) { display: block !important; grid-column: 2 !important; grid-row: 1 !important; text-align: right !important; white-space: nowrap !important; font-size: 14px !important; }
+  .dashboard-transactions-table tbody td:nth-child(2) { display: block !important; grid-column: 2 !important; grid-row: 2 !important; text-align: right !important; }
+  .dashboard-transactions-table tbody td:nth-child(4) { display: block !important; grid-column: 1 / -1 !important; font-size: 12px !important; color: #475569 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+
+  /* Store expenses: show the amount first instead of letting it disappear off-screen. */
+  .expenses-filter-card { display: grid !important; grid-template-columns: 1fr !important; gap: 7px !important; padding: 12px !important; }
+  .expenses-filter-card select { width: 100% !important; min-width: 0 !important; }
+  .expenses-table-card { overflow: hidden !important; }
+  .expenses-main-table { width: 100% !important; min-width: 0 !important; }
+  .expenses-main-table thead { display: none !important; }
+  .expenses-main-table tbody tr { display: grid !important; grid-template-columns: minmax(0, 1fr) auto !important; gap: 5px 10px !important; padding: 12px !important; border-bottom: 1px solid #e5e7eb !important; }
+  .expenses-main-table tbody td { display: none !important; min-width: 0 !important; padding: 0 !important; border: 0 !important; }
+  .expenses-main-table tbody td:nth-child(1) { display: block !important; grid-column: 1 !important; grid-row: 1 !important; color: #64748b !important; font-size: 12px !important; }
+  .expenses-main-table tbody td:nth-child(2) { display: block !important; grid-column: 1 !important; grid-row: 2 !important; overflow: hidden !important; white-space: nowrap !important; text-overflow: ellipsis !important; }
+  .expenses-main-table tbody td:nth-child(3) { display: block !important; grid-column: 1 !important; grid-row: 3 !important; overflow: hidden !important; white-space: nowrap !important; text-overflow: ellipsis !important; font-size: 12px !important; }
+  .expenses-main-table tbody td:nth-child(6) { display: block !important; grid-column: 2 !important; grid-row: 1 !important; text-align: right !important; white-space: nowrap !important; font-size: 14px !important; }
+  .expenses-main-table tbody td:nth-child(4), .expenses-main-table tbody td:nth-child(5) { display: flex !important; grid-column: 1 / -1 !important; justify-content: space-between !important; gap: 12px !important; color: #475569 !important; font-size: 11px !important; }
+  .expenses-main-table tbody td:nth-child(4)::before { content: "Payment"; color: #64748b; }
+  .expenses-main-table tbody td:nth-child(5)::before { content: "Notes"; color: #64748b; }
+  .expenses-main-table tbody td:nth-child(7) { display: flex !important; grid-column: 2 !important; grid-row: 2 / span 2 !important; align-items: center !important; justify-content: flex-end !important; }
+
+  .bill-preview-panel { flex: 0 0 auto; overflow: visible; }
+  .bill-preview-panel .bill-document-preview-wrapper { flex: 0 0 auto; }
+  .full-invoice-view-container { min-width: 0; height: calc(100dvh - 16px); }
+  .full-invoice-top-bar { flex-direction: column; align-items: stretch; gap: 7px; padding: 10px; flex-shrink: 0; }
+  .full-invoice-top-bar .title-left { min-width: 0; gap: 8px; }
+  .full-invoice-top-bar .title-left > span:not(.pill) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .full-invoice-top-bar .title-left .icon-button { flex-shrink: 0; }
+  .full-invoice-top-bar .actions-right { flex-wrap: wrap; gap: 5px; }
+  .full-invoice-top-bar .actions-right button { min-height: 34px; padding: 5px 7px; font-size: 11px; line-height: 1.1; }
+  .full-invoice-top-bar .actions-right button svg { width: 14px; height: 14px; }
+  .full-invoice-top-bar .actions-right .icon-button { min-width: 34px; padding: 5px; }
+  .full-invoice-content-grid { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+  .bill-document-preview-wrapper { display: block; flex: 0 0 auto; width: 100%; min-width: 0; padding: 12px; overflow-x: auto; }
+  .bill-document-preview-wrapper .a4-bill-document { margin: 0; }
+  .payment-history-drawer { flex: 0 0 auto; width: 100%; min-width: 0; padding: 16px; border-left: 0; }
+  .payment-history-drawer .history-item { gap: 12px; flex-wrap: wrap; }
+}
+
 @media screen and (max-width: 768px) {
   .app-shell, .app-shell > main, .page { width: 100% !important; min-width: 0; }
-  .app-shell .topbar { height: auto !important; min-height: 60px; flex-wrap: wrap; padding: 8px 12px !important; }
-  .topbar > div:first-of-type { flex-direction: column; align-items: flex-start !important; gap: 2px !important; }
-  .topbar .top-actions { width: 100%; justify-content: flex-end; flex-wrap: wrap; }
+  .app-shell .topbar { height: auto !important; min-height: 0 !important; flex-wrap: wrap; padding: 7px 12px !important; gap: 6px !important; }
+  .topbar > div:first-of-type { flex-direction: row; align-items: center !important; gap: 9px !important; }
+  .topbar .top-actions { display: grid !important; grid-template-columns: 42px minmax(0, 1fr) 76px !important; width: 100%; justify-content: stretch; flex-wrap: nowrap; gap: 7px !important; }
   .top-actions .user-profile-badge { display: none; }
   .top-actions > .icon-button[title="Search ERP"] { display: none; }
-  .top-actions button { min-height: 40px; }
-  .menu-button, .close-menu { min-width: 44px; min-height: 44px; flex-shrink: 0; }
+  .top-actions button { min-height: 36px !important; height: 36px !important; min-width: 0 !important; padding: 5px 7px !important; font-size: 10px !important; gap: 3px !important; white-space: nowrap; }
+  .top-actions > .icon-button { width: 42px !important; padding: 5px !important; }
+  .top-actions > .icon-button svg { width: 17px; height: 17px; }
+  .menu-button, .close-menu { min-width: 38px; min-height: 38px; flex-shrink: 0; }
+
+  /* Compact Store Expenses heading and primary action on a phone. */
+  .expenses-page-header { display: grid !important; grid-template-columns: minmax(0, 1fr) 118px !important; gap: 10px !important; align-items: start !important; margin-bottom: 12px !important; }
+  .expenses-page-header h1 { font-size: 22px !important; line-height: 1.1 !important; }
+  .expenses-page-header small { display: block; margin-top: 5px; font-size: 11px !important; line-height: 1.35 !important; }
+  .expenses-add-button { min-height: 46px !important; padding: 7px 8px !important; font-size: 12px !important; line-height: 1.2 !important; }
   .sidebar { max-width: calc(100vw - 40px); overflow-y: auto; }
   .table-toolbar { min-width: 0 !important; width: 100%; }
   .table-toolbar > *, .items-search-container > *, .items-toolbar > *, .page-heading > * { min-width: 0; max-width: 100%; }
@@ -66,4 +430,36 @@
   .ref-actions-row button { flex: 1 1 100%; min-height: 44px; }
   .ref-sig-title { overflow-wrap: anywhere; }
   .app-shell .top-actions .user-profile-badge { display: none !important; }
+}
+
+/* Parties final compact pass — placed last so it wins over shared mobile rules. */
+@media screen and (max-width: 768px) {
+  .parties-page-heading { margin-bottom: 12px !important; gap: 8px !important; }
+  .parties-page-heading h1 { font-size: 25px !important; letter-spacing: -.03em !important; }
+  .parties-header-actions { grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr) 40px !important; gap: 7px !important; }
+  .parties-header-actions .secondary { min-height: 39px !important; height: 39px !important; padding: 6px 7px !important; font-size: 11px !important; border-radius: 10px !important; }
+  .parties-header-actions > .icon-button { width: 40px !important; min-width: 40px !important; min-height: 39px !important; height: 39px !important; padding: 5px !important; border-radius: 10px !important; }
+  .parties-header-actions > .icon-button svg { width: 17px !important; height: 17px !important; }
+  .parties-metrics-row { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 7px !important; margin-bottom: 12px !important; }
+  .party-metric-box, .party-metric-box:first-child { grid-column: auto !important; min-height: 74px !important; padding: 10px 9px !important; display: flex !important; flex-direction: column !important; align-items: flex-start !important; justify-content: center !important; border-radius: 12px !important; }
+  .party-metric-box span { font-size: 10px !important; line-height: 1.2 !important; }
+  .party-metric-box strong, .party-metric-box:first-child strong { margin-top: 5px !important; font-size: 19px !important; line-height: 1.05 !important; letter-spacing: -.035em !important; }
+  .parties-table-card { border-radius: 13px !important; }
+  .parties-toolbar { padding: 10px !important; gap: 8px !important; }
+  .parties-search-container { gap: 8px !important; }
+  .parties-search-container .search-input-wrap, .parties-search-container .category-select-wrap { min-height: 41px !important; height: 41px !important; border-radius: 10px !important; }
+  .parties-search-container .search-input-wrap { padding: 0 11px !important; }
+  .parties-search-container .search-input-wrap input { font-size: 13px !important; }
+  .parties-toolbar-right { gap: 8px !important; }
+  .parties-toolbar-right button { min-height: 40px !important; height: 40px !important; padding: 6px 8px !important; border-radius: 10px !important; font-size: 12px !important; }
+  .parties-toolbar-right button svg { width: 16px !important; height: 16px !important; }
+  .parties-table-card .table-scroll .party-history-row { gap: 5px 10px !important; padding: 12px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(1) .party-history-link { font-size: 13px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(3) { font-size: 13px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(5) { font-size: 12px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) { gap: 7px !important; padding-top: 4px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) .secondary { min-height: 34px !important; height: 34px !important; padding: 5px 10px !important; border-radius: 9px !important; font-size: 11px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) .icon-button, .parties-table-card .table-scroll .party-history-row td:nth-child(6) .whatsapp-icon-btn { width: 34px !important; height: 34px !important; min-height: 34px !important; border-radius: 9px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) svg { width: 17px !important; height: 17px !important; }
+  .parties-table-card .pagination-strip { padding: 9px 12px !important; font-size: 11px !important; }
 }

@@ -1,5 +1,4 @@
 import { matchesItemSearch } from "../../utils/itemSearch";
-import { SearchablePicker } from "../../components/SearchablePicker";
 import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -816,9 +815,8 @@ export function Parties({
   onClearAutoOpenShareLedger?: () => void;
 }) {
   const [balanceFilter, setBalanceFilter] = useState("all");
-  const selectBalance = (filter: string) => { setBalanceFilter(filter); setPageIndex(0); setQuery(""); setCategoryFilter("All Categories"); };
+  const selectBalance = (filter: string) => { setBalanceFilter(filter); setPageIndex(0); setQuery(""); };
   const [query, setQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("All Categories");
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Party|undefined>();
   const [historyParty, setHistoryParty] = useState<Party | null>(null);
@@ -847,19 +845,12 @@ export function Parties({
   const toCollect = useMemo(() => rows.filter(r => r.balance > 0).reduce((a, b) => a + b.balance, 0), [rows]);
   const toPay = useMemo(() => Math.abs(rows.filter(r => r.balance < 0).reduce((a, b) => a + b.balance, 0)), [rows]);
 
-  const categoriesList = useMemo(() => {
-    const catSet = new Set<string>();
-    rows.forEach(r => { if (r.category) catSet.add(r.category); });
-    return Array.from(catSet);
-  }, [rows]);
-
   const filtered = useMemo(() => {
     return rows.filter(r => {
       const matchQuery = matchesItemSearch(query, [r.name, r.phone]);
-      const matchCat = categoryFilter === "All Categories" || r.category === categoryFilter;
-      return matchQuery && matchCat && (balanceFilter === "all" || (balanceFilter === "collect" ? r.balance > 0 : r.balance < 0));
+      return matchQuery && (balanceFilter === "all" || (balanceFilter === "collect" ? r.balance > 0 : r.balance < 0));
     });
-  }, [rows, query, categoryFilter, balanceFilter]);
+  }, [rows, query, balanceFilter]);
 
   const totalPages = Math.ceil(filtered.length / pageSize) || 1;
   const visibleList = useMemo(() => query.trim() ? filtered.slice(0, 100) : filtered.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize), [filtered, query, pageIndex]);
@@ -918,7 +909,7 @@ export function Parties({
             className="secondary share-ledger-btn"
             onClick={() => notify("The customer ledger portal is not connected yet.")}
           >
-            <Share2 size={15} /> ShareLedger Portal
+            <Share2 size={15} /> Share Ledger
           </button>
 
           <div ref={reportsRef} className="parties-reports-dropdown">
@@ -969,7 +960,7 @@ export function Parties({
       </div>
 
       {/* Parties Table Card */}
-      <article className="card table-card">
+      <article className="card table-card parties-table-card">
         <div className="table-toolbar parties-toolbar">
           <div className="parties-search-container">
             <div className="search-input-wrap">
@@ -979,10 +970,6 @@ export function Parties({
                 onChange={e => { setQuery(e.target.value); setPageIndex(0); }}
                 placeholder="Search party name or mobile number..."
               />
-            </div>
-            <div className="category-select-wrap">
-              <SearchablePicker value={categoryFilter} onChange={value => { setCategoryFilter(value); setPageIndex(0); }} placeholder="Search Categories" emptyValue="All Categories" emptyLabel="All Categories" options={categoriesList.map(c => ({ value: c, label: c }))} />
-              <ChevronDown size={14} />
             </div>
           </div>
 

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
  <item><shape android:shape="rectangle"><solid android:color="#FFFDF7" /></shape></item>
- <item android:left="18dp" android:right="18dp" android:top="18dp" android:bottom="18dp"><bitmap android:src="@drawable/hb_logo" android:gravity="fill" /></item>
+ <!-- Android masks splash icons to a square/circle. Keep the wide brand mark in
+      a small centred safe area so no letters or logo edges are cropped. -->
+ <item android:width="72dp" android:height="27dp" android:gravity="center"><bitmap android:src="@drawable/hb_logo" android:gravity="fill" android:filter="true" /></item>
 </layer-list>

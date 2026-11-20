@@ -6,6 +6,7 @@ import { SearchablePicker } from "../../components/SearchablePicker";
 import { DateRangeFilter } from "../../components/DateRangeFilter";
 import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { flushSync } from "react-dom";
 import {
   ArrowLeft,
   Banknote,
@@ -53,8 +54,8 @@ import { NumberInput } from "../../components/NumberInput";
 import { PartyCreateForm, partyPayloadFromForm } from "../parties/Parties";
 import { money } from "../../data";
 import type { Invoice, InvoiceSetting, Party, Product, VoucherRecord } from "../../types";
-import { downloadInvoicePdf } from "../../utils/pdf";
 import { BillOfSupplyTemplate } from "../../components/BillOfSupplyTemplate";
+import { downloadInvoicePdf } from "../../utils/pdf";
 import {
   AddItemModal,
   CustomDateRange,
@@ -924,6 +925,68 @@ export function QuickVoucherSettingsModal({
   );
 }
 
+function PurchaseInvoicePreview({ invoice, setting }: { invoice: Invoice; setting: InvoiceSetting }) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const documentRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ available: 0, width: 800, height: 980 });
+  const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(1);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    const bill = documentRef.current;
+    if (!viewport || !bill) return;
+    const measure = () => {
+      const style = getComputedStyle(viewport);
+      setSize({ available: viewport.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight), width: bill.offsetWidth, height: bill.offsetHeight });
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewport); observer.observe(bill); measure();
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    let pinch: { distance: number; zoom: number; x: number; y: number } | null = null;
+    const distance = (touches: TouchList) => Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+    const start = (event: TouchEvent) => {
+      if (event.touches.length !== 2) return;
+      const bill = documentRef.current; const rect = bill?.getBoundingClientRect();
+      if (!rect?.width || !rect.height) return;
+      event.preventDefault();
+      pinch = { distance: Math.max(1, distance(event.touches)), zoom: zoomRef.current, x: ((event.touches[0].clientX + event.touches[1].clientX) / 2 - rect.left) / rect.width, y: ((event.touches[0].clientY + event.touches[1].clientY) / 2 - rect.top) / rect.height };
+    };
+    const move = (event: TouchEvent) => {
+      if (!pinch || event.touches.length !== 2) return;
+      event.preventDefault();
+      const nextZoom = Math.min(4, Math.max(1, pinch.zoom * distance(event.touches) / pinch.distance));
+      zoomRef.current = nextZoom;
+      flushSync(() => setZoom(nextZoom));
+      const rect = documentRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const x = (event.touches[0].clientX + event.touches[1].clientX) / 2;
+      const y = (event.touches[0].clientY + event.touches[1].clientY) / 2;
+      viewport.scrollLeft += rect.left + pinch.x * rect.width - x;
+      viewport.scrollTop += rect.top + pinch.y * rect.height - y;
+    };
+    const end = () => { pinch = null; };
+    viewport.addEventListener("touchstart", start, { passive: false });
+    viewport.addEventListener("touchmove", move, { passive: false });
+    viewport.addEventListener("touchend", end); viewport.addEventListener("touchcancel", end);
+    return () => { viewport.removeEventListener("touchstart", start); viewport.removeEventListener("touchmove", move); viewport.removeEventListener("touchend", end); viewport.removeEventListener("touchcancel", end); };
+  }, []);
+
+  const scale = Math.min(1, size.available / size.width || 1) * zoom;
+  return <div className="purchase-document-preview-wrapper" ref={viewportRef}>
+    <div className="purchase-document-preview-size" style={{ width: size.width * scale, height: size.height * scale }}>
+      <div className="purchase-document-preview-scale" style={{ width: size.width, transform: `scale(${scale})` }}>
+        <BillOfSupplyTemplate ref={documentRef} invoice={invoice} setting={setting} />
+      </div>
+    </div>
+  </div>;
+}
+
 export function GenericVoucherPage({
   title,
   subtitle,
@@ -1129,19 +1192,19 @@ export function GenericVoucherPage({
     const previewInvoice = getPurchaseInvoicePreview(selectedVoucher);
     const paid = previewInvoice.status === "Paid" ? previewInvoice.amount : 0;
     return (
-      <div className="printable-report" style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 20, minHeight: "85vh" }}>
+      <div className="purchase-invoice-detail printable-report" style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 20, minHeight: "85vh" }}>
         <div style={{ position: "fixed", left: -10000, top: 0 }}>
           <div ref={purchaseDocumentRef}>
             <BillOfSupplyTemplate invoice={previewInvoice} setting={invoiceSetting} />
           </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button type="button" className="icon-button" onClick={() => setSelectedVoucher(null)} aria-label="Back to list" title="Back to list"><ArrowLeft size={18} /></button><span>{type} {selectedVoucher.number}</span>
+        <div className="purchase-invoice-detail-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div className="purchase-invoice-detail-title" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button type="button" data-native-back className="icon-button" onClick={() => setSelectedVoucher(null)} aria-label="Back to list" title="Back to list"><ArrowLeft size={18} /></button><span>{type} {selectedVoucher.number}</span>
             <span className={`pill ${selectedVoucher.status === "Converted" || selectedVoucher.status === "Completed" ? "success" : "danger"}`}>{selectedVoucher.status}</span>
           </div>
-          <div style={{ display: "flex", gap: 10 }}>
+          <div className="purchase-invoice-detail-actions" style={{ display: "flex", gap: 10 }}>
             <button className="secondary" onClick={handlePurchaseDownloadPdf} disabled={purchasePdfDownloading}>
               <Download size={15} /> {purchasePdfDownloading ? "Generating PDF..." : "Download PDF"}
             </button>
@@ -1162,13 +1225,13 @@ export function GenericVoucherPage({
             <button className="icon-button" onClick={() => handleDeleteVoucher(selectedVoucher)} style={{ color: "#dc2626" }} title="Delete">
               <Trash2 size={16} />
             </button>
-            <button className="icon-button" onClick={() => setSelectedVoucher(null)}>
+            <button data-native-back className="icon-button" onClick={() => setSelectedVoucher(null)}>
               <X size={18} />
             </button>
           </div>
         </div>
 
-        <BillOfSupplyTemplate invoice={previewInvoice} setting={invoiceSetting} />
+        <PurchaseInvoicePreview invoice={previewInvoice} setting={invoiceSetting} />
       </div>
     );
   }
@@ -1237,11 +1300,11 @@ export function GenericVoucherPage({
   }
 
   return (
-    <div className="generic-voucher-wrap" style={{ minHeight: "85vh", padding: "0 4px" }}>
+    <div className={`generic-voucher-wrap ${type === "Purchase Invoice" ? "purchase-invoices-page" : ""}`} style={{ minHeight: "85vh", padding: "0 4px" }}>
       {/* Header Bar matching Reference Image */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      <div className={type === "Purchase Invoice" ? "purchase-page-top-header" : undefined} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", margin: 0 }}>{title}</h1>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div className={type === "Purchase Invoice" ? "purchase-header-tools" : undefined} style={{ display: "flex", gap: 10 }}>
           {type === "Purchase Invoice" && <>
             <button type="button" className="secondary" onClick={() => downloadPurchaseList()} disabled={purchaseListDownloading || !records.length} title="Download all purchase invoices with item details as Excel"><Download size={16} />{purchaseListDownloading ? "Generating Excel..." : "Download Excel"}</button>
             <button type="button" className="secondary" onClick={() => downloadPurchaseList(true)} disabled={purchaseListDownloading || !records.length} title="Download one row per purchase invoice: party name, total including tax, and tax amount"><FileSpreadsheet size={16} />Download Summary Excel</button>
@@ -1277,9 +1340,9 @@ export function GenericVoucherPage({
       </div>
 
       {/* Filter Bar matching Reference Image */}
-      <article className="card" style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 16px", marginBottom: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <article className={`card ${type === "Purchase Invoice" ? "purchase-toolbar-card" : ""}`} style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 16px", marginBottom: 16 }}>
+        <div className={type === "Purchase Invoice" ? "purchase-toolbar-controls" : undefined} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+          <div className={type === "Purchase Invoice" ? "purchase-toolbar-left" : undefined} style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ position: "relative", width: 220 }}>
               <Search size={15} color="#94a3b8" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
               <input
@@ -1304,7 +1367,7 @@ export function GenericVoucherPage({
 
           <button
             type="button"
-            className="primary-purple-btn"
+            className={`primary-purple-btn ${type === "Purchase Invoice" ? "purchase-create-purple-btn" : ""}`}
             style={{ background: "#4f46e5", color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", font: "600 13px Manrope", cursor: "pointer" }}
             onClick={() => { setEditingRecord(undefined); setCreatingFullVoucher(true); }}
           >
@@ -1315,9 +1378,9 @@ export function GenericVoucherPage({
 
       {type === "Purchase Invoice" && <button className="secondary" disabled={deleting || !filtered.some(row => selectedIds.has(row.id))} onClick={() => void deleteVouchers(filtered.filter(row => selectedIds.has(row.id)))} style={{ marginBottom: 12, color: "#dc2626" }}><Trash2 size={15} /> {deleting ? "Deleting..." : `Delete selected (${filtered.filter(row => selectedIds.has(row.id)).length})`}</button>}
       {/* Table Card matching Reference Image */}
-      <article className="card table-card" style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
+      <article className={`card table-card ${type === "Purchase Invoice" ? "purchase-invoices-table-card" : ""}`} style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
         <div className="table-scroll">
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table className={type === "Purchase Invoice" ? "purchase-invoices-main-table" : undefined} style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0", textTransform: "uppercase", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
                 {type === "Purchase Invoice" && <th><input aria-label="Select all purchase invoices" type="checkbox" disabled={deleting} checked={filtered.length > 0 && filtered.every(row => selectedIds.has(row.id))} onChange={() => setSelectedIds(filtered.every(row => selectedIds.has(row.id)) ? new Set() : new Set(filtered.map(row => row.id)))} /></th>}
@@ -1365,16 +1428,16 @@ export function GenericVoucherPage({
                     </span>
                   </td>
                   <td style={{ padding: "14px 16px", textAlign: "center" }}>
-                    <button type="button" className="secondary compact" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => setSelectedVoucher(row)}>
+                    <button type="button" className={`secondary compact ${type === "Purchase Invoice" ? "purchase-row-action purchase-view-action" : ""}`} style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => setSelectedVoucher(row)}>
                       View
                     </button>
-                    {type === "Purchase Invoice" && <button type="button" className="secondary compact" style={{ marginLeft: 6 }} onClick={() => { setEditingRecord(row); setCreatingFullVoucher(true); }}>Edit</button>}
-                    {type === "Purchase Invoice" && <button type="button" className="secondary compact" style={{ marginLeft: 6 }} onClick={() => { setSelectedVoucher(row); setPurchaseDownloadRequested(true); }} aria-label={`Download PDF for ${row.number}`}><Download size={14} /> Download PDF</button>}
-                    <button type="button" className="icon-pencil-btn" style={{ marginLeft: 6, padding: "4px 6px" }} onClick={() => type === "Purchase Invoice" ? setSelectedVoucher(row) : notify(`${type} ${row.number} sent to print`)} title="Print">
+                    {type === "Purchase Invoice" && <button type="button" className="secondary compact purchase-row-action purchase-edit-action" style={{ marginLeft: 6 }} onClick={() => { setEditingRecord(row); setCreatingFullVoucher(true); }}>Edit</button>}
+                    {type === "Purchase Invoice" && <button type="button" className="secondary compact purchase-row-action purchase-download-action" style={{ marginLeft: 6 }} onClick={() => { setSelectedVoucher(row); setPurchaseDownloadRequested(true); }} aria-label={`Download PDF for ${row.number}`} title="Download PDF"><Download size={14} /><span>Download PDF</span></button>}
+                    <button type="button" className={`icon-pencil-btn ${type === "Purchase Invoice" ? "purchase-row-icon-action" : ""}`} style={{ marginLeft: 6, padding: "4px 6px" }} onClick={() => type === "Purchase Invoice" ? setSelectedVoucher(row) : notify(`${type} ${row.number} sent to print`)} title="Print">
                       <Printer size={14} />
                     </button>
                     <div style={{ display: "inline-block" }}>
-                      <button type="button" className="icon-button" aria-label={`Actions for ${row.number}`} aria-expanded={openMenuId === row.id} disabled={deleting} onClick={() => setOpenMenuId(openMenuId === row.id ? null : row.id)}><MoreVertical size={16} /></button>
+                      <button type="button" className={`icon-button ${type === "Purchase Invoice" ? "purchase-row-icon-action" : ""}`} aria-label={`Actions for ${row.number}`} aria-expanded={openMenuId === row.id} disabled={deleting} onClick={() => setOpenMenuId(openMenuId === row.id ? null : row.id)}><MoreVertical size={16} /></button>
                       {openMenuId === row.id && <div role="menu"><button type="button" role="menuitem" className="secondary compact" style={{ color: "#dc2626" }} disabled={deleting} onClick={() => void handleDeleteVoucher(row)}><Trash2 size={14} /> Delete</button></div>}
                     </div>
                   </td>

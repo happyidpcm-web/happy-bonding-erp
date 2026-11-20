@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Keep a 108dp adaptive-icon canvas. Without it Android enlarges the
+         wide logo drawable to fill the square mask and cuts both sides. -->
+    <item android:width="108dp" android:height="108dp" android:gravity="center">
+        <shape android:shape="rectangle"><solid android:color="#00FFFFFF" /></shape>
+    </item>
+    <item android:width="66dp" android:height="25dp" android:gravity="center">
+        <bitmap android:src="@drawable/hb_logo" android:gravity="fill" />
+    </item>
+</layer-list>

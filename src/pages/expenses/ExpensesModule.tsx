@@ -76,13 +76,13 @@ export function ExpensesModule({ notify, currentBranchId }: { notify: (msg: stri
   ];
 
   return (
-    <div style={{ padding: "0 4px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+    <div className="expenses-page" style={{ padding: "0 4px" }}>
+      <div className="expenses-page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: "#0f172a" }}>Store Expenses</h1>
           <small style={{ color: "#64748b" }}>Track daily shop expenditures (Rent, Electricity, Tea, Staff Advance, Freight)</small>
         </div>
-        <button className="primary-purple-btn" style={{ background: "#4f46e5", color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", font: "600 13px Manrope", cursor: "pointer" }} onClick={() => setModalOpen(true)}>
+        <button className="primary-purple-btn expenses-add-button" style={{ background: "#4f46e5", color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", font: "600 13px Manrope", cursor: "pointer" }} onClick={() => setModalOpen(true)}>
           + Add Store Expense
         </button>
       </div>
@@ -97,7 +97,7 @@ export function ExpensesModule({ notify, currentBranchId }: { notify: (msg: stri
         ))}
       </div>
 
-      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 16px", marginBottom: 16, display: "flex", gap: 12, alignItems: "center" }}>
+      <div className="expenses-filter-card" style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 16px", marginBottom: 16, display: "flex", gap: 12, alignItems: "center" }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: "#64748b" }}>Category Filter:</span>
         <select aria-label="Expense category filter" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={{ padding: "6px 12px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 13 }}>
           <option value="All">All Categories</option>
@@ -105,8 +105,8 @@ export function ExpensesModule({ notify, currentBranchId }: { notify: (msg: stri
         </select>
       </div>
 
-      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div className="expenses-table-card" style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
+        <table className="expenses-main-table" style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0", textTransform: "uppercase", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
               <th style={{ padding: "12px 16px", textAlign: "left" }}>Date</th>

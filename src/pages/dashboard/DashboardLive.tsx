@@ -292,16 +292,19 @@ export function DashboardLive({
         <div style={{ display: "flex", gap: 10 }}>
           <DateRangeFilter showTime={false} value={dateFilter} range={customRange} onChange={value => { setDateFilter(value); setShowLatest(false); }} onRangeChange={setCustomRange} />
         </div>
-        <article className="card transactions" style={{ gridColumn: "1 / -1" }}>
-          <div className="card-title">
+        <article className="card transactions dashboard-transactions-card" style={{ gridColumn: "1 / -1" }}>
+          <div className="card-title dashboard-transactions-title">
             <div>
               <h2>{dateFilter === "Custom Range" ? "Custom Range Transactions" : `${dateFilter} Transactions`}</h2>
-              <p role="status" style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0" }}>
+              <p className="dashboard-verbose-status" role="status" style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0" }}>
                 {loading ? "Loading…" : `Showing ${displayList.length} of ${filteredTransactions.length} sales invoice transactions in the selected period`}
+              </p>
+              <p className="dashboard-transaction-status" role="status">
+                {loading ? "Loading…" : `${filteredTransactions.length} sales invoice${filteredTransactions.length === 1 ? "" : "s"} in this period`}
               </p>
             </div>
             <button className="text-button" style={{ font: "700 13px Manrope", color: "#2563eb" }} onClick={onSeeAllTransactions}>
-              {showLatest ? "Show All Matching Transactions →" : "Show Latest 3 Transactions"}
+              {showLatest ? "View all" : "Latest 3"}
             </button>
           </div>
 
@@ -317,8 +320,8 @@ export function DashboardLive({
               </div>
             </div>
           )}
-          <div className="table-scroll">
-            <table>
+          <div className="table-scroll dashboard-transactions-table-scroll">
+            <table className="dashboard-transactions-table">
               <thead>
                 <tr>
                   <th>DATE</th>
@@ -353,7 +356,7 @@ export function DashboardLive({
 
           <div style={{ textAlign: "center", padding: "14px 0" }}>
             <button className="text-button" style={{ font: "700 13px Manrope", color: "#2563eb" }} onClick={onSeeAllTransactions}>
-              {showLatest ? "Show All Matching Transactions →" : "Show Latest 3 Transactions"}
+              {showLatest ? "View all" : "Latest 3"}
             </button>
           </div>
         </article>

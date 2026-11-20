@@ -7,7 +7,7 @@ const getBaseUrl = () => {
     if (!server) throw new Error('Enter your store website address on the sign-in screen.');
     return server.replace(/\/+$/, '');
   }
-  if (typeof window !== "undefined" && import.meta.env.VITE_API_URL) {
+  if (typeof window !== "undefined" && import.meta.env?.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
   return "/api";

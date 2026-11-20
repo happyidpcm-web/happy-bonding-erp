@@ -1,5 +1,5 @@
 import { useAndroidBack } from "./hooks/useAndroidBack";
-import { getMobileServer, isAndroidApp, saveMobileServer } from "./utils/mobileServer";
+import { flushSync } from "react-dom";
 import ownerSignatureUrl from "./assets/owner-signature.png";
 import { findInvoiceParty } from "./utils/invoiceParty";
 import { matchesItemSearch } from "./utils/itemSearch";
@@ -7,7 +7,7 @@ import { indexParties, searchParties } from "./utils/partySearch";
 import { useDismissibleDropdown } from "./hooks/useDismissibleDropdown";
 import { timeFilterRange, isInvoiceInDateRange, isValidCustomDateRange, type CustomDateRange, type DateRangeSelection } from "./utils/invoiceDateRange";
 export { isInvoiceInDateRange, type CustomDateRange } from "./utils/invoiceDateRange";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft, BarChart3, Banknote, Boxes, Building2, Calendar, CheckSquare, ChevronDown, ExternalLink, Eye, EyeOff, Gift, IndianRupee as CircleIndianRupee,
   ClipboardList, CreditCard, Download, FileSpreadsheet, FileText, Keyboard, LayoutDashboard, Mail, Menu, MessageCircle, MessageSquare, MoreVertical, PackagePlus,
@@ -102,7 +102,14 @@ export default function App() {
   const [authenticated, setAuthenticated] = useState(api.hasSession());
   const [page, setPage] = useState<Page>("dashboard");
   const [sidebar, setSidebar] = useState(false);
-  useAndroidBack(sidebar, () => setSidebar(false));
+  const returnToDashboard = useCallback(() => {
+    setSidebar(false);
+    setActiveInvoiceModal(null);
+    setActiveReportSubScreen(null);
+    setReportDateSelection(undefined);
+    setPage("dashboard");
+  }, []);
+  useAndroidBack(sidebar, () => setSidebar(false), page === "dashboard", returnToDashboard);
   const [productRows, setProductRows] = useState<Product[]>([]);
   const [partyRows, setPartyRows] = useState<Party[]>([]);
   const [invoiceRows, setInvoiceRows] = useState<Invoice[]>([]);
@@ -193,18 +200,31 @@ export default function App() {
   };
 
   const go = (id: Page) => {
-    if (id === "reports") setReportDateSelection(undefined);
-    if (id === "sales") setSalesView(view => ({ key: view.key + 1, create: false }));
-    setPage(id);
-    setSidebar(false);
-    setCreateDropdownOpen(false);
-    if (id === "parties") {
-      setExpandedNav("parties");
-    } else if (["sales", "quotation", "payment_in", "sales_return", "credit_note", "delivery_challan", "proforma_invoice"].includes(id)) {
-      setExpandedNav("sales");
-    } else if (["purchases", "payment_out", "purchase_return", "debit_note", "purchase_orders", "expenses"].includes(id)) {
-      setExpandedNav("purchases");
+    const navigate = () => {
+      if (id === "reports") setReportDateSelection(undefined);
+      if (id === "sales") setSalesView(view => ({ key: view.key + 1, create: false }));
+      setPage(id);
+      if (id === "parties") {
+        setExpandedNav("parties");
+      } else if (["sales", "quotation", "payment_in", "sales_return", "credit_note", "delivery_challan", "proforma_invoice"].includes(id)) {
+        setExpandedNav("sales");
+      } else if (["purchases", "payment_out", "purchase_return", "debit_note", "purchase_orders", "expenses"].includes(id)) {
+        setExpandedNav("purchases");
+      }
+    };
+
+    // On a phone, hide the navigation drawer before mounting a heavy page.
+    // This prevents the drawer from remaining visible while the invoice screen loads.
+    if (sidebar) {
+      flushSync(() => {
+        setSidebar(false);
+        setCreateDropdownOpen(false);
+      });
+      window.requestAnimationFrame(navigate);
+      return;
     }
+    setCreateDropdownOpen(false);
+    navigate();
   };
   const openSalesInvoice = () => {
     setPage("sales");
@@ -327,7 +347,10 @@ export default function App() {
 
   if (!authenticated) return <LoginScreen onLogin={() => { setDataLoading(true); setDataError(""); setCurrentBranchId(api.currentBranchId()); setAuthenticated(true); }}/>;
   if (dataLoading) return <div className="erp-startup" role="status" aria-live="polite" aria-busy="true">
-    <div className="erp-startup-card"><span className="erp-startup-spinner" aria-hidden="true" /><h1>Happy Bonding ERP</h1><p>Loading your workspace…</p></div>
+    <div className="erp-startup-card">
+      <div className="erp-startup-logo-wrap"><img src={happyBondingLogo} alt="Happy Bonding" className="erp-startup-logo" /></div>
+      <span className="erp-startup-spinner" aria-hidden="true" />
+    </div>
   </div>;
   if (dataError) return <div className="erp-startup"><div className="erp-startup-card"><h1>Unable to load your workspace</h1><p role="alert">{dataError}</p><div className="erp-startup-actions"><button className="primary" onClick={() => void refreshAppData()}>Retry</button><button className="secondary" onClick={handleLogout}>Sign out</button></div></div></div>;
 
@@ -418,20 +441,11 @@ export default function App() {
               className={page === item.id || (item.id === "parties" && page === "parties") || (item.id === "sales" && ["sales", "quotation", "payment_in", "sales_return", "credit_note", "delivery_challan", "proforma_invoice"].includes(page)) || (item.id === "purchases" && ["purchases", "payment_out", "purchase_return", "debit_note", "purchase_orders", "expenses"].includes(page)) ? "active" : ""}
               onClick={() => {
                 if (item.id === "parties") {
-                  setExpandedNav(expandedNav === "parties" ? null : "parties");
-                  if (page !== "parties") {
-                    go("parties");
-                  }
+                  setExpandedNav(current => current === "parties" ? null : "parties");
                 } else if (item.id === "sales") {
-                  setExpandedNav(expandedNav === "sales" ? null : "sales");
-                  if (!["sales", "quotation", "payment_in", "sales_return", "credit_note", "delivery_challan", "proforma_invoice"].includes(page)) {
-                    go("sales");
-                  }
+                  setExpandedNav(current => current === "sales" ? null : "sales");
                 } else if (item.id === "purchases") {
-                  setExpandedNav(expandedNav === "purchases" ? null : "purchases");
-                  if (!["purchases", "payment_out", "purchase_return", "debit_note", "purchase_orders", "expenses"].includes(page)) {
-                    go("purchases");
-                  }
+                  setExpandedNav(current => current === "purchases" ? null : "purchases");
                 } else {
                   go(item.id);
                 }
@@ -814,7 +828,6 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
     const passVal = String(form.get("password")).trim();
 
     try {
-      if (isAndroidApp()) saveMobileServer(String(form.get("serverUrl") || ""));
       const loginRes = await api.login(emailVal, passVal);
       if (loginRes?.branchIds?.[0]) {
         api.setCurrentBranch(loginRes.branchIds[0]);
@@ -838,7 +851,6 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
           <p>Sign in to Happy Bonding ERP</p>
         </div>
         <form onSubmit={submit}>
-          {isAndroidApp() && <details className="mobile-server-settings"><summary>Connection settings</summary><label>Store website address<input name="serverUrl" type="url" defaultValue={getMobileServer()} placeholder="https://billing.yourdomain.com" autoCapitalize="none" autoCorrect="off" required /><small>Use the secure website address provided by your store admin.</small></label></details>}
           <label>
             Email address
             <input name="email" type="email" placeholder="e.g. admin@happybonding.in" required />
@@ -875,7 +887,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
               </button>
             </div>
           </label>
-          {error && <div className="login-error">{error}</div>}
+          {error && <div className="login-error" role="alert">{error}</div>}
           <button className="primary" disabled={busy}>
             {busy ? "Signing in..." : "Sign in"}
           </button>
@@ -1057,6 +1069,70 @@ function InvoiceDetailModal({
   onClose: () => void;
 }) {
   const documentRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [previewSize, setPreviewSize] = useState({ available: 0, width: 800, height: 980 });
+  const [previewZoom, setPreviewZoom] = useState(1);
+  const zoomValue = useRef(1);
+  useEffect(() => {
+    const wrapper = previewRef.current;
+    if (!wrapper) return;
+    let pinch: { distance: number; zoom: number; x: number; y: number } | null = null;
+    const distance = (touches: TouchList) => Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+    const start = (event: TouchEvent) => {
+      if (event.touches.length !== 2) return;
+      event.preventDefault();
+      const rect = documentRef.current?.getBoundingClientRect();
+      if (!rect?.width || !rect.height) return;
+      pinch = {
+        distance: Math.max(1, distance(event.touches)), zoom: zoomValue.current,
+        x: ((event.touches[0].clientX + event.touches[1].clientX) / 2 - rect.left) / rect.width,
+        y: ((event.touches[0].clientY + event.touches[1].clientY) / 2 - rect.top) / rect.height,
+      };
+    };
+    const move = (event: TouchEvent) => {
+      if (!pinch || event.touches.length !== 2) return;
+      event.preventDefault();
+      const zoom = Math.min(4, Math.max(1, pinch.zoom * distance(event.touches) / pinch.distance));
+      zoomValue.current = zoom;
+      // Commit the new dimensions before correcting scroll: keep the bill point
+      // beneath the fingers fixed, including when the midpoint moves during pinch.
+      flushSync(() => setPreviewZoom(zoom));
+      const rect = documentRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const midpointX = (event.touches[0].clientX + event.touches[1].clientX) / 2;
+      const midpointY = (event.touches[0].clientY + event.touches[1].clientY) / 2;
+      wrapper.scrollLeft += rect.left + pinch.x * rect.width - midpointX;
+      const verticalScroller = wrapper.scrollHeight > wrapper.clientHeight + 1
+        ? wrapper : wrapper.closest<HTMLElement>('.full-invoice-content-grid');
+      if (verticalScroller) verticalScroller.scrollTop += rect.top + pinch.y * rect.height - midpointY;
+    };
+    const end = () => { pinch = null; };
+    wrapper.addEventListener('touchstart', start, { passive: false });
+    wrapper.addEventListener('touchmove', move, { passive: false });
+    wrapper.addEventListener('touchend', end);
+    wrapper.addEventListener('touchcancel', end);
+    return () => {
+      wrapper.removeEventListener('touchstart', start);
+      wrapper.removeEventListener('touchmove', move);
+      wrapper.removeEventListener('touchend', end);
+      wrapper.removeEventListener('touchcancel', end);
+    };
+  }, []);
+  useEffect(() => {
+    const wrapper = previewRef.current;
+    const bill = documentRef.current;
+    if (!wrapper || !bill) return;
+    const measure = () => {
+      const style = getComputedStyle(wrapper);
+      setPreviewSize({ available: wrapper.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight), width: bill.offsetWidth, height: bill.offsetHeight });
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(wrapper);
+    observer.observe(bill);
+    measure();
+    return () => observer.disconnect();
+  }, []);
+  const previewScale = Math.min(1, previewSize.available / previewSize.width || 1) * previewZoom;
   const [downloading, setDownloading] = useState(false);
   const [pdfShareOpen, setPdfShareOpen] = useState(false);
   const [savingPayment, setSavingPayment] = useState(false);
@@ -1126,7 +1202,7 @@ function InvoiceDetailModal({
       <div className="full-invoice-view-container card">
         <div className="full-invoice-top-bar">
           <div className="title-left">
-            <button type="button" className="icon-button" onClick={onClose} aria-label="Back to Sales Invoices" title="Back to Sales Invoices"><ArrowLeft size={18} /></button><span>Sales Invoice {invoice.number}</span>
+            <button type="button" data-native-back className="icon-button" onClick={onClose} aria-label="Back to Sales Invoices" title="Back to Sales Invoices"><ArrowLeft size={18} /></button><span>Sales Invoice {invoice.number}</span>
             <span className={`pill ${invoice.status === "Paid" ? "success" : "danger"}`}>{invoice.status}</span>
           </div>
           <div className="actions-right">
@@ -1147,7 +1223,7 @@ function InvoiceDetailModal({
                 <CreditCard size={15} /> {savingPayment ? "Saving..." : `Receive ${money(balance)}`}
               </button>
             )}
-            <button className="icon-button" onClick={onClose}>
+            <button data-native-back className="icon-button" onClick={onClose} aria-label="Close invoice details">
               <X size={20} />
             </button>
           </div>
@@ -1155,8 +1231,14 @@ function InvoiceDetailModal({
 
         {pdfShareOpen && documentRef.current && <InvoicePdfShare invoice={invoice} businessName={setting.business?.name || "Happy Bonding"} element={documentRef.current} onClose={() => setPdfShareOpen(false)} />}
         <div className="full-invoice-content-grid">
-          <div className="bill-document-preview-wrapper">
-            <BillOfSupplyTemplate ref={documentRef} invoice={invoice} setting={setting} seasonalTheme />
+          <div className="bill-preview-panel">
+          <div className="bill-document-preview-wrapper" ref={previewRef} aria-label="Invoice preview. Pinch with two fingers to zoom.">
+            <div className="bill-preview-size" style={{ width: previewSize.width * previewScale, height: previewSize.height * previewScale }}>
+              <div className="bill-preview-scale" style={{ transform: `scale(${previewScale})`, width: previewSize.width }}>
+                <BillOfSupplyTemplate ref={documentRef} invoice={invoice} setting={setting} seasonalTheme />
+              </div>
+            </div>
+          </div>
           </div>
 
           <aside className="payment-history-drawer card">
@@ -1319,6 +1401,25 @@ export function customRangeLabel(range: CustomDateRange) {
   const timed = Boolean(range.fromTime || range.toTime);
   return `${fmt(range.from)}${timed ? ` ${range.fromTime || "00:00"}` : ""} - ${fmt(range.to)}${timed ? ` ${range.toTime || "23:59"} IST` : ""}`;
 }
+
+const InvoiceRowCheckbox = memo(function InvoiceRowCheckbox({ invoiceId, onToggle }: {
+  invoiceId: string | number;
+  onToggle: (id: string | number, checked: boolean) => void;
+}) {
+  const [checked, setChecked] = useState(false);
+  return <input
+    type="checkbox"
+    checked={checked}
+    onClick={event => event.stopPropagation()}
+    onChange={event => {
+      event.stopPropagation();
+      const next = event.target.checked;
+      // Update this small control first; the invoice list can refresh afterwards.
+      setChecked(next);
+      onToggle(invoiceId, next);
+    }}
+  />;
+});
 
 function SalesInvoicesListView({
   rows,
@@ -1502,17 +1603,23 @@ function SalesInvoicesListView({
   };
 
   const toggleSelectAll = () => {
-    if (filtered.every(row => selectedIds.has(row.id))) setSelectedIds(new Set());
-    else setSelectedIds(new Set(filtered.map(x => x.id)));
+    setSelectedIds(current => {
+      if (filtered.every(row => current.has(row.id))) return new Set();
+      return new Set(filtered.map(x => x.id));
+    });
   };
 
-  const toggleSelect = (id: string | number, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const next = new Set(selectedIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setSelectedIds(next);
-  };
+  const toggleSelect = useCallback((id: string | number, checked: boolean) => {
+    // Keep selection bookkeeping out of the urgent touch update on Android.
+    startTransition(() => {
+      setSelectedIds(current => {
+        const next = new Set(current);
+        if (checked) next.add(id);
+        else next.delete(id);
+        return next;
+      });
+    });
+  }, []);
 
   return (
     <div className="sales-invoices-screen-wrap">
@@ -1733,7 +1840,7 @@ function SalesInvoicesListView({
       </div>
 
       {/* Sales Invoices Main Table matching reference image */}
-      <article className="card table-card">
+      <article className="card table-card sales-invoices-table-card">
         <div className="table-scroll">
           <table className="sales-invoices-main-table">
             <thead>
@@ -1764,11 +1871,7 @@ function SalesInvoicesListView({
                   onClick={() => onSelectInvoice(inv)}
                 >
                   <td style={{ textAlign: "center" }} onClick={e => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(inv.id)}
-                      onChange={e => toggleSelect(inv.id, e as unknown as React.MouseEvent)}
-                    />
+                    <InvoiceRowCheckbox invoiceId={inv.id} onToggle={toggleSelect} />
                   </td>
                   <td>{inv.date}</td>
                   <td className="mono" style={{ fontWeight: 600, color: "#1e293b", whiteSpace: "nowrap" }}>

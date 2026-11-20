@@ -3,9 +3,9 @@
 
     <application
         android:allowBackup="false"
-        android:icon="@drawable/hb_launcher"
+        android:icon="@mipmap/hb_icon"
         android:label="@string/app_name"
-        android:roundIcon="@drawable/hb_launcher"
+        android:roundIcon="@mipmap/hb_icon"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 

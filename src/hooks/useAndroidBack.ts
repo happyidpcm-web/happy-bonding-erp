@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { App } from '@capacitor/app';
 import { isAndroidApp } from '../utils/mobileServer';
 
-export function useAndroidBack(drawerOpen: boolean, closeDrawer: () => void) {
+export function useAndroidBack(drawerOpen: boolean, closeDrawer: () => void, isDashboard: boolean, goToDashboard: () => void) {
   useEffect(() => {
     if (!isAndroidApp()) return;
     const listener = App.addListener('backButton', () => {
@@ -11,9 +11,9 @@ export function useAndroidBack(drawerOpen: boolean, closeDrawer: () => void) {
       const closeButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-native-back]')].filter(button => button.getClientRects().length);
       if (closeButtons.length) { closeButtons.at(-1)?.click(); return; }
       if (drawerOpen) { closeDrawer(); return; }
-      // Preserve unsaved billing forms when leaving the app.
-      void App.minimizeApp();
+      if (!isDashboard) { goToDashboard(); return; }
+      if (window.confirm("Exit Happy Bonding ERP?")) void App.exitApp();
     });
     return () => { void listener.then(handle => handle.remove()); };
-  }, [drawerOpen, closeDrawer]);
+  }, [drawerOpen, closeDrawer, isDashboard, goToDashboard]);
 }
