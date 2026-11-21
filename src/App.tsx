@@ -3988,6 +3988,31 @@ export function AddItemModal({ products: initialProducts, priceMode = "sales", d
               )}
             </tbody>
           </table>
+          <div className="mobile-add-items-list">
+            {filteredProducts.map(prod => {
+              const qty = qtyMap[String(prod.id)] || 0;
+              const isOutOfStock = priceMode !== "purchase" && prod.stock <= 0;
+              return (
+                <article className={`mobile-add-item-card ${qty > 0 ? "is-selected" : ""}`} key={`mobile-${prod.id}`}>
+                  <div className="mobile-add-item-info">
+                    <strong title={prod.name}>{prod.name}</strong>
+                    <span>{prod.sku || "No item code"}</span>
+                    <small className={isOutOfStock ? "is-empty" : ""}>{prod.stock} {prod.unit || "PCS"} available</small>
+                  </div>
+                  {qty === 0 ? (
+                    <button type="button" className="mobile-add-item-button" disabled={isOutOfStock} onClick={() => setQty(prod.id, 1)}><Plus size={16} /> Add</button>
+                  ) : (
+                    <div className="mobile-add-item-stepper">
+                      <button type="button" aria-label={`Reduce ${prod.name} quantity`} onClick={() => setQty(prod.id, qty - 1)}>−</button>
+                      <strong>{qty}</strong>
+                      <button type="button" aria-label={`Increase ${prod.name} quantity`} onClick={() => setQty(prod.id, qty + 1)}>+</button>
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+            {!filteredProducts.length && <div className="mobile-add-items-empty">No items found matching “{searchQuery}”.</div>}
+          </div>
         </div>
 
         {/* Selected Items Summary Strip */}

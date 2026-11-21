@@ -8,6 +8,7 @@
 .mobile-voucher-items { display: none; }
 .mobile-inline-item-qty { display: none; }
 .mobile-item-selection-row { display: none; }
+.mobile-add-items-list { display: none; }
 @media print {
   .bill-preview-size { width: auto !important; height: auto !important; }
   .bill-preview-scale { transform: none !important; }
@@ -1453,4 +1454,23 @@
   }
   .mobile-inline-stepper { background: #eef3ff !important; border-color: #b6c5f0 !important; }
   .mobile-inline-stepper button { width: 30px !important; height: 30px !important; }
+}
+
+/* Dedicated phone cards avoid the hidden actions caused by desktop table columns. */
+@media screen and (max-width: 768px) {
+  .add-items-bill-modal .add-items-table { display: none !important; }
+  .add-items-bill-modal .mobile-add-items-list { display: flex !important; flex-direction: column !important; gap: 8px !important; padding: 10px 12px !important; background: #f8fafc !important; }
+  .add-items-bill-modal .mobile-add-item-card { display: flex !important; min-width: 0 !important; align-items: center !important; justify-content: space-between !important; gap: 12px !important; padding: 12px !important; border: 1px solid #e0e7ef !important; border-radius: 12px !important; background: #fff !important; box-shadow: 0 1px 2px rgba(15,23,42,.03) !important; }
+  .add-items-bill-modal .mobile-add-item-card.is-selected { border-color: #aab9f4 !important; background: #f7f8ff !important; box-shadow: inset 3px 0 0 #4f46e5 !important; }
+  .add-items-bill-modal .mobile-add-item-info { display: flex !important; min-width: 0 !important; flex: 1 1 auto !important; flex-direction: column !important; gap: 3px !important; }
+  .add-items-bill-modal .mobile-add-item-info strong { overflow: hidden !important; color: #172033 !important; font-size: 13px !important; font-weight: 800 !important; line-height: 1.25 !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+  .add-items-bill-modal .mobile-add-item-info span { overflow: hidden !important; color: #718096 !important; font-size: 10px !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+  .add-items-bill-modal .mobile-add-item-info small { color: #8793a5 !important; font-size: 10px !important; font-weight: 650 !important; }
+  .add-items-bill-modal .mobile-add-item-info small.is-empty { color: #c2414b !important; }
+  .add-items-bill-modal .mobile-add-item-button, .add-items-bill-modal .mobile-add-item-stepper { display: inline-flex !important; flex: 0 0 auto !important; min-width: 72px !important; min-height: 36px !important; align-items: center !important; justify-content: center !important; gap: 5px !important; padding: 6px 10px !important; border: 1px solid #aebef0 !important; border-radius: 9px !important; background: #eef3ff !important; color: #3f3acb !important; font-size: 11px !important; font-weight: 800 !important; }
+  .add-items-bill-modal .mobile-add-item-button:disabled { opacity: .45 !important; }
+  .add-items-bill-modal .mobile-add-item-stepper { min-width: auto !important; padding: 3px !important; gap: 4px !important; }
+  .add-items-bill-modal .mobile-add-item-stepper button { display: grid !important; width: 30px !important; height: 30px !important; place-items: center !important; border: 0 !important; border-radius: 7px !important; background: #4f46e5 !important; color: #fff !important; font-size: 16px !important; font-weight: 800 !important; }
+  .add-items-bill-modal .mobile-add-item-stepper strong { min-width: 24px !important; color: #1f2a44 !important; text-align: center !important; font-size: 13px !important; }
+  .add-items-bill-modal .mobile-add-items-empty { padding: 28px 12px !important; color: #718096 !important; font-size: 12px !important; text-align: center !important; }
 }
