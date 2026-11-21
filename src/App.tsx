@@ -515,7 +515,7 @@ export default function App() {
     <main>
       <header className="topbar">
         <button aria-label="Open navigation" className="icon-button menu-button" onClick={() => setSidebar(true)}><Menu/></button>
-        <div><strong>Happy Bonding ERP</strong><span>{new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"long",year:"numeric",weekday:"long"})} · {currentBranch?.name || "Branch"} Store</span></div>
+        <div><strong>Happy Bonding My Billbook</strong><span>{new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"long",year:"numeric",weekday:"long"})} · {currentBranch?.name || "Branch"} Store</span></div>
         <div className="top-actions">
           <button className="icon-button" title="Sync Offline Changes" onClick={handleSyncNow}><CheckSquare size={19}/></button>
           <button className="icon-button" title="Search ERP"><Search size={19}/></button>
