@@ -144,6 +144,22 @@
   .item-sales-report .table-scroll tbody td:nth-child(3) {
     padding-bottom: 2px !important;
   }
+  .item-sales-report .table-scroll tbody td:nth-child(4),
+  .item-sales-report .table-scroll tbody td:nth-child(5),
+  .item-sales-report .table-scroll tbody td:nth-child(6),
+  .item-sales-report .table-scroll tbody td:nth-child(7) {
+    min-height: 58px !important;
+    padding: 9px 10px !important;
+    border: 1px solid #e8edf3 !important;
+    border-radius: 10px !important;
+    background: #fafbfd !important;
+    justify-content: center !important;
+  }
+  .item-sales-report .table-scroll tbody td:nth-child(4),
+  .item-sales-report .table-scroll tbody td:nth-child(6) {
+    align-items: flex-start !important;
+    text-align: left !important;
+  }
   .item-sales-report .table-scroll tbody td:nth-child(n+4)::before {
     width: 100% !important;
     color: #718096 !important;
@@ -163,8 +179,10 @@
     align-items: center !important;
     justify-content: space-between !important;
     margin-top: 2px !important;
-    padding-top: 10px !important;
-    border-top: 1px solid #edf0f4 !important;
+    padding: 10px !important;
+    border: 1px solid #e8edf3 !important;
+    border-radius: 10px !important;
+    background: #fffcf1 !important;
     color: #172033 !important;
     font-size: 15px !important;
   }
