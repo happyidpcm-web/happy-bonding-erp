@@ -21,8 +21,15 @@
     margin-bottom: 14px !important;
   }
   .item-sales-report .back-heading h1 {
-    font-size: 25px !important;
-    line-height: 1.12 !important;
+    font-size: 22px !important;
+    line-height: 1.18 !important;
+    letter-spacing: -.025em !important;
+  }
+  .item-sales-report .back-heading {
+    align-items: flex-start !important;
+  }
+  .item-sales-report .back-heading > .icon-button {
+    margin-top: 2px !important;
   }
   .item-sales-report .page-heading .header-actions {
     display: grid !important;
@@ -53,7 +60,15 @@
     grid-column: 1 / -1 !important;
   }
   .item-sales-report .backend-report-filters > .secondary {
+    grid-column: 2 / 3 !important;
+    grid-row: 1 !important;
+    width: 100% !important;
     padding: 7px 16px !important;
+  }
+  .item-sales-report .backend-report-filters > .sales-date-picker-wrap {
+    grid-column: 1 / 2 !important;
+    grid-row: 1 !important;
+    width: 100% !important;
   }
   .item-sales-report .item-report-period {
     margin: 14px 0 10px !important;
