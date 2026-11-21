@@ -6,6 +6,7 @@
 .bill-preview-size { position: relative; flex-shrink: 0; margin: 0 auto; }
 .bill-preview-scale { transform-origin: top left; }
 .mobile-voucher-items { display: none; }
+.mobile-inline-item-qty { display: none; }
 @media print {
   .bill-preview-size { width: auto !important; height: auto !important; }
   .bill-preview-scale { transform: none !important; }
@@ -1238,6 +1239,45 @@
     white-space: nowrap !important;
     font-size: 13px !important;
   }
+  .add-items-table tbody tr:not(:has(td[colspan])) td:nth-child(1) > strong { padding-top: 4px !important; }
+  .mobile-inline-item-qty {
+    display: block !important;
+    margin-top: 9px !important;
+  }
+  .mobile-inline-item-qty > button,
+  .mobile-inline-stepper {
+    display: inline-flex !important;
+    min-height: 32px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 5px !important;
+    border: 1px solid #b9c9f3 !important;
+    border-radius: 8px !important;
+    background: #eef3ff !important;
+    color: #3f3acb !important;
+    padding: 5px 11px !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+  }
+  .mobile-inline-stepper { padding: 2px !important; gap: 4px !important; }
+  .mobile-inline-stepper button {
+    display: grid !important;
+    width: 28px !important;
+    height: 28px !important;
+    place-items: center !important;
+    border: 0 !important;
+    border-radius: 6px !important;
+    background: #4f46e5 !important;
+    color: #fff !important;
+    font-size: 16px !important;
+    font-weight: 800 !important;
+  }
+  .mobile-inline-stepper strong {
+    min-width: 24px !important;
+    text-align: center !important;
+    color: #172033 !important;
+    font-size: 13px !important;
+  }
   .add-items-table tbody tr:not(:has(td[colspan])) td:nth-child(2) {
     display: block !important;
     grid-column: 1 !important;
@@ -1296,4 +1336,5 @@
   .add-items-summary-strip > div span { margin-right: 0 !important; font-size: 11px !important; }
   .add-items-footer-bar { padding: 10px 16px 14px !important; flex-shrink: 0 !important; }
   .add-items-footer-actions button { min-height: 42px !important; font-size: 12px !important; }
+  .add-items-btn-primary:disabled { opacity: .48 !important; box-shadow: none !important; cursor: not-allowed !important; }
 }
