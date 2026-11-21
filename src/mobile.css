@@ -1219,7 +1219,7 @@
     padding: 12px 16px !important;
     border-bottom: 1px solid #e8edf3 !important;
     background: #fff !important;
-    cursor: pointer !important;
+    cursor: default !important;
   }
   .add-items-table tbody tr.is-selected { background: #f3f7ff !important; box-shadow: inset 3px 0 0 #4f46e5 !important; }
   .add-items-table tbody tr.is-selected td:first-child strong { color: #3730a3 !important; }
@@ -1267,6 +1267,7 @@
     grid-row: 1 / span 3 !important;
     align-items: center !important;
     justify-content: flex-end !important;
+    min-width: 78px !important;
   }
   .add-items-table tbody td[colspan] {
     display: block !important;
