@@ -66,7 +66,6 @@ export function ItemSummary({ onBack, notify }: { onBack: () => void; notify: (m
       <button className="secondary" disabled={loading} onClick={() => setRetry(n => n + 1)}>Refresh</button>
     </div>
     {data && <div className="item-report-period"><div><span className="item-report-caption">Report period</span><strong>{filter === 'All' ? 'All' : <>{new Date(data.from + 'T00:00:00Z').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}{data.from !== data.to && <> ? {new Date(data.to + 'T00:00:00Z').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}</>}</>}</strong></div><span className="item-report-count">{rows.length} items</span></div>}
-    <p style={{ fontSize: 12, color: 'var(--muted)' }}>Purchases and sales follow the selected period. Current stock is the live balance including opening stock and adjustments. Returns are excluded from purchase/sales totals. Older stock receipts use their recorded receipt date.</p>
     {loading ? <p role="status">Loading sales and purchases…</p> : error ? <div role="alert">{error} <button onClick={() => setRetry(n => n + 1)}>Retry</button></div> : <>
       <div className="item-report-totals">
         <div><span>Sales quantity</span><strong>{qty(totals.salesQty)}</strong></div><div><span>Purchase quantity</span><strong>{qty(totals.purchaseQty)}</strong></div>

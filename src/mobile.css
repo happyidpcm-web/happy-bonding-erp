@@ -140,6 +140,10 @@
     align-items: flex-end !important;
     text-align: right !important;
   }
+  .item-sales-report .table-scroll tbody td:nth-child(2),
+  .item-sales-report .table-scroll tbody td:nth-child(3) {
+    padding-bottom: 2px !important;
+  }
   .item-sales-report .table-scroll tbody td:nth-child(n+4)::before {
     width: 100% !important;
     color: #718096 !important;
@@ -153,6 +157,21 @@
   .item-sales-report .table-scroll tbody td:nth-child(6)::before { content: "Current stock"; }
   .item-sales-report .table-scroll tbody td:nth-child(7)::before { content: "Sales amount"; }
   .item-sales-report .table-scroll tbody td:nth-child(8)::before { content: "Purchase amount"; }
+  .item-sales-report .table-scroll tbody td:nth-child(8) {
+    grid-column: 1 / -1 !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    margin-top: 2px !important;
+    padding-top: 10px !important;
+    border-top: 1px solid #edf0f4 !important;
+    color: #172033 !important;
+    font-size: 15px !important;
+  }
+  .item-sales-report .table-scroll tbody td:nth-child(8)::before {
+    width: auto !important;
+    font-size: 10px !important;
+  }
 }
 
 /* Final compact pass — Parties should feel like a fast, professional CRM list. */
