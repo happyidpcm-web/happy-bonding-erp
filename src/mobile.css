@@ -1555,3 +1555,72 @@
   }
   .generic-voucher-editor .voucher-bottom-save-bar button:disabled { opacity: .58 !important; }
 }
+
+/* Sales invoice cards: retain the customer context while keeping actions compact. */
+@media screen and (max-width: 768px) {
+  .sales-invoices-table-card .sales-invoices-main-table tbody tr {
+    grid-template-columns: 22px minmax(0, 1fr) auto 26px !important;
+    grid-template-rows: auto auto auto !important;
+    gap: 4px 9px !important;
+    min-height: 92px !important;
+    padding: 12px 13px !important;
+  }
+  .sales-invoices-table-card .sales-invoices-main-table tbody td:nth-child(1) {
+    grid-column: 1 !important;
+    grid-row: 1 / span 3 !important;
+    padding-top: 3px !important;
+  }
+  .sales-invoices-table-card .sales-invoices-main-table tbody td:nth-child(2) {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+  }
+  .sales-invoices-table-card .sales-invoices-main-table tbody td:nth-child(3) {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    font-size: 13px !important;
+    line-height: 1.25 !important;
+  }
+  .sales-invoices-table-card .sales-invoices-main-table tbody td:nth-child(4) {
+    display: block !important;
+    grid-column: 2 / span 2 !important;
+    grid-row: 3 !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    color: #64748b !important;
+    font-size: 11px !important;
+    line-height: 1.25 !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+  .sales-invoices-table-card .sales-invoice-party strong {
+    color: #334155 !important;
+    font-weight: 700 !important;
+  }
+  .sales-invoices-table-card .sales-invoices-main-table tbody td:nth-child(6) {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+  }
+  .sales-invoices-table-card .sales-invoices-main-table tbody td:nth-child(9) {
+    grid-column: 3 !important;
+    grid-row: 2 !important;
+    align-self: start !important;
+  }
+  .sales-invoices-table-card .sales-invoices-main-table tbody td:nth-child(10) {
+    grid-column: 4 !important;
+    grid-row: 1 / span 3 !important;
+  }
+  .sales-invoices-table-card input[type="checkbox"] {
+    width: 18px !important;
+    height: 18px !important;
+    border-radius: 4px !important;
+  }
+  .sales-invoices-table-card .sales-dots-menu-btn {
+    width: 26px !important;
+    height: 32px !important;
+    padding: 2px !important;
+  }
+}

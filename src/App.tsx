@@ -1876,8 +1876,8 @@ function SalesInvoicesListView({
                   <td className="mono" style={{ fontWeight: 600, color: "#1e293b", whiteSpace: "nowrap" }}>
                     {inv.number}
                   </td>
-                  <td>
-                    <strong>{inv.party}</strong>
+                  <td className="sales-invoice-party">
+                    <strong>{inv.party || "Walk-in Customer"}</strong>
                   </td>
                   <td style={{ color: "#64748b" }}>-</td>
                   <td className="right">
