@@ -289,9 +289,9 @@ export function CreateQuotationScreen({
   const matchedParties = partyMatches.rows;
 
   return (
-    <div className="printable-report" style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 20, minHeight: "85vh" }}>
+    <div className="printable-report generic-voucher-editor" style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 20, minHeight: "85vh" }}>
       {/* Top Header Bar matching Reference Image */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, borderBottom: "1px solid #f1f5f9", paddingBottom: 12 }}>
+      <div className="voucher-editor-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, borderBottom: "1px solid #f1f5f9", paddingBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <button type="button" className="icon-button" onClick={onBack} title="Back to list">
             <ArrowLeft size={18} />
@@ -323,7 +323,7 @@ export function CreateQuotationScreen({
       {supplierModalOpen && <Modal title="Create Supplier" onClose={() => { if (!supplierSaving) setSupplierModalOpen(false); }} wide>
         <PartyCreateForm onSubmit={createSupplier} onCancel={() => setSupplierModalOpen(false)} saving={supplierSaving} defaults={{ type: "Supplier", openingBalanceType: "TO_PAY", name: /^\d+$/.test(partyQuery.trim()) ? "" : partyQuery.trim(), phone: /^\d+$/.test(partyQuery.trim()) ? partyQuery.trim() : "" }} />
       </Modal>}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 20, marginBottom: 20 }}>
+      <div className="voucher-party-meta-grid" style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 20, marginBottom: 20 }}>
         {/* Bill To Container with Fast Live Searchable Dropdown for 10,170 Database Customers */}
         <div style={{ border: "1px dashed #cbd5e1", borderRadius: 12, padding: 14, background: "#fafafa", minHeight: 120, position: "relative" }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", marginBottom: 6, display: "block" }}>Bill To</span>
@@ -461,8 +461,8 @@ export function CreateQuotationScreen({
       </div>
 
       {/* Items Table matching Reference Image */}
-      <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden", marginBottom: 20 }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div className="voucher-lines-card" style={{ border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden", marginBottom: 20 }}>
+        <table className="voucher-lines-table" style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0", textTransform: "uppercase", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
               <th style={{ padding: "10px 12px", width: 40 }}>NO</th>
@@ -535,7 +535,7 @@ export function CreateQuotationScreen({
       </div>
 
       {/* Bottom Split Layout: Terms/Notes (Left) & Calculations (Right) */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 420px", gap: 30 }}>
+      <div className="voucher-bottom-grid" style={{ display: "grid", gridTemplateColumns: "1fr 420px", gap: 30 }}>
         {/* Left Side Links & Terms */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <button type="button" style={{ background: "none", border: "none", color: "#2563eb", font: "600 13px Manrope", cursor: "pointer", textAlign: "left", width: "max-content" }} onClick={() => setShowNotes(!showNotes)}>
