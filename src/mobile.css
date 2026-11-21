@@ -1386,6 +1386,43 @@
     color: #64748b !important;
   }
   .mobile-item-meta span:last-child { color: #8995a7 !important; }
+  .add-items-table .mobile-item-add-btn,
+  .add-items-table .mobile-item-stepper {
+    display: inline-flex !important;
+    flex: 0 0 auto !important;
+    min-width: 72px !important;
+    min-height: 34px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 5px !important;
+    padding: 5px 10px !important;
+    border: 1px solid #b6c5f0 !important;
+    border-radius: 8px !important;
+    background: #eef3ff !important;
+    color: #3f3acb !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    line-height: 1 !important;
+  }
+  .add-items-table .mobile-item-stepper { min-width: auto !important; padding: 2px !important; gap: 4px !important; }
+  .add-items-table .mobile-item-stepper button {
+    display: grid !important;
+    width: 30px !important;
+    height: 30px !important;
+    place-items: center !important;
+    border: 0 !important;
+    border-radius: 6px !important;
+    background: #4f46e5 !important;
+    color: #fff !important;
+    font-size: 16px !important;
+    font-weight: 800 !important;
+  }
+  .add-items-table .mobile-item-stepper strong { min-width: 25px !important; text-align: center !important; color: #1f2a44 !important; font-size: 13px !important; }
+  .add-items-table tbody tr:not(:has(td[colspan])) td:nth-child(2),
+  .add-items-table tbody tr:not(:has(td[colspan])) td:nth-child(3),
+  .add-items-table tbody tr:not(:has(td[colspan])) td:nth-child(4),
+  .add-items-table tbody tr:not(:has(td[colspan])) td:nth-child(5),
+  .add-items-table tbody tr:not(:has(td[colspan])) td:nth-child(6) { display: none !important; }
   .mobile-inline-item-qty {
     display: flex !important;
     flex: 0 0 auto !important;

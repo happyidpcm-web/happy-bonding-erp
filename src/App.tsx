@@ -3942,17 +3942,15 @@ export function AddItemModal({ products: initialProducts, priceMode = "sales", d
                           <span>{prod.sku || "No item code"}</span>
                           <span>{prod.stock} {prod.unit || "PCS"} available</span>
                         </div>
-                        <div className="mobile-inline-item-qty">
-                          {qty === 0 ? (
-                            <button type="button" onClick={() => setQty(prod.id, 1)}><Plus size={15} /> Add</button>
-                          ) : (
-                            <div className="mobile-inline-stepper">
-                              <button type="button" aria-label={`Reduce ${prod.name} quantity`} onClick={() => setQty(prod.id, qty - 1)}>−</button>
-                              <strong>{qty}</strong>
-                              <button type="button" aria-label={`Increase ${prod.name} quantity`} onClick={() => setQty(prod.id, qty + 1)}>+</button>
-                            </div>
-                          )}
-                        </div>
+                        {qty === 0 ? (
+                          <button type="button" className="mobile-item-add-btn" onClick={() => setQty(prod.id, 1)}><Plus size={15} /> Add</button>
+                        ) : (
+                          <div className="mobile-item-stepper">
+                            <button type="button" aria-label={`Reduce ${prod.name} quantity`} onClick={() => setQty(prod.id, qty - 1)}>−</button>
+                            <strong>{qty}</strong>
+                            <button type="button" aria-label={`Increase ${prod.name} quantity`} onClick={() => setQty(prod.id, qty + 1)}>+</button>
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td style={{ color: "#64748b" }}>{prod.sku}</td>
