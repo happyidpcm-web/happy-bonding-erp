@@ -545,7 +545,6 @@ export function CreateQuotationScreen({
                   <label><span>MRP</span><NumberInput aria-label={`MRP for ${line.name}`} min={0} step="0.01" value={line.mrp} onValueChange={mrp => updateLine({ mrp })} /></label>
                   <label><span>Quantity</span><NumberInput aria-label={`Quantity for ${line.name}`} min={1} value={line.qty} onValueChange={qty => updateLine({ qty, amount: qty * line.price - line.discount })} /></label>
                   <label><span>{type === "Purchase Invoice" ? "Purchase Price" : "Price"}</span><NumberInput aria-label={`Price for ${line.name}`} min={0} step="0.01" value={line.price} onValueChange={price => updateLine({ price, amount: line.qty * price - line.discount })} /></label>
-                  <label><span>Discount</span><NumberInput aria-label={`Discount for ${line.name}`} min={0} step="0.01" value={line.discount} onValueChange={discount => updateLine({ discount, amount: line.qty * line.price - discount })} /></label>
                   <label><span>Tax</span><select aria-label={`Tax for ${line.name}`} value={line.tax} onChange={e => updateLine({ tax: Number(e.target.value) })}><option value={0}>0%</option><option value={5}>5%</option><option value={12}>12%</option><option value={18}>18%</option><option value={28}>28%</option></select></label>
                 </div>
                 <footer><span>Line total</span><strong>₹ {amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></footer>
