@@ -7,6 +7,7 @@
 .bill-preview-scale { transform-origin: top left; }
 .mobile-voucher-items { display: none; }
 .mobile-inline-item-qty { display: none; }
+.mobile-item-selection-row { display: none; }
 @media print {
   .bill-preview-size { width: auto !important; height: auto !important; }
   .bill-preview-scale { transform: none !important; }
@@ -1337,4 +1338,71 @@
   .add-items-footer-bar { padding: 10px 16px 14px !important; flex-shrink: 0 !important; }
   .add-items-footer-actions button { min-height: 42px !important; font-size: 12px !important; }
   .add-items-btn-primary:disabled { opacity: .48 !important; box-shadow: none !important; cursor: not-allowed !important; }
+
+  /* Compact product cards: one clearly-scannable action per item. */
+  .add-items-table tbody tr:not(:has(td[colspan])) {
+    display: block !important;
+    min-height: 0 !important;
+    padding: 13px 16px !important;
+  }
+  .add-items-table tbody tr:not(:has(td[colspan])) td { display: none !important; }
+  .add-items-table tbody tr:not(:has(td[colspan])) td:nth-child(1) {
+    display: block !important;
+    overflow: visible !important;
+    font-size: 13px !important;
+  }
+  .add-items-table tbody tr:not(:has(td[colspan])) td:nth-child(1) > strong {
+    padding: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-size: 14px !important;
+    letter-spacing: -.01em !important;
+  }
+  .add-items-table tbody tr.is-selected { background: #f7f9ff !important; box-shadow: inset 3px 0 0 #4f46e5 !important; }
+  .mobile-item-selection-row {
+    display: flex !important;
+    min-width: 0 !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+    margin-top: 8px !important;
+  }
+  .mobile-item-meta {
+    display: flex !important;
+    min-width: 0 !important;
+    flex-direction: column !important;
+    gap: 3px !important;
+    color: #7b8799 !important;
+    font-size: 10px !important;
+    font-weight: 650 !important;
+    line-height: 1.15 !important;
+  }
+  .mobile-item-meta span:first-child {
+    max-width: 190px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    color: #64748b !important;
+  }
+  .mobile-item-meta span:last-child { color: #8995a7 !important; }
+  .mobile-inline-item-qty {
+    display: flex !important;
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+  }
+  .mobile-inline-item-qty > button,
+  .mobile-inline-stepper {
+    min-height: 34px !important;
+    border-radius: 8px !important;
+  }
+  .mobile-inline-item-qty > button {
+    min-width: 70px !important;
+    padding: 5px 10px !important;
+    background: #eef3ff !important;
+    border-color: #b6c5f0 !important;
+    color: #3f3acb !important;
+  }
+  .mobile-inline-stepper { background: #eef3ff !important; border-color: #b6c5f0 !important; }
+  .mobile-inline-stepper button { width: 30px !important; height: 30px !important; }
 }
