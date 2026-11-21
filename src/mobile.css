@@ -704,3 +704,30 @@
   .item-actions-menu .icon-button { width: 32px !important; min-width: 32px !important; height: 32px !important; min-height: 32px !important; border-color: #dfe5ec !important; border-radius: 8px !important; }
   .item-actions-menu .icon-button svg { width: 16px !important; height: 16px !important; }
 }
+
+/* Android inventory card value rows: explicit flex layout prevents label/value overlap. */
+@media screen and (max-width: 768px) {
+  .inventory-table-scroll tbody td:nth-child(5),
+  .inventory-table-scroll tbody td:nth-child(6),
+  .inventory-table-scroll tbody td:nth-child(8) {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    text-align: right !important;
+    color: #26354d !important;
+    font-size: 14px !important;
+    font-weight: 650 !important;
+  }
+  .inventory-table-scroll tbody td:nth-child(5)::before,
+  .inventory-table-scroll tbody td:nth-child(6)::before,
+  .inventory-table-scroll tbody td:nth-child(8)::before {
+    flex: 0 0 auto !important;
+    color: #718096 !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+  }
+  .inventory-table-scroll tbody td:nth-child(5) .inventory-stock-quantity { margin-left: auto !important; }
+  .inventory-table-scroll tbody td:nth-child(5) .inventory-stock-quantity strong { font-size: 16px !important; }
+  .inventory-table-scroll tbody td:nth-child(6),
+  .inventory-table-scroll tbody td:nth-child(8) { font-variant-numeric: tabular-nums !important; }
+}
