@@ -1795,8 +1795,10 @@
     -webkit-overflow-scrolling: touch !important;
   }
   .item-totals-report .table-scroll tbody tr {
-    gap: 8px 14px !important;
-    padding: 12px 14px !important;
+    /* Keep the compact report rows visually anchored on both edges. */
+    grid-template-columns: minmax(0, .78fr) minmax(0, 1.22fr) !important;
+    gap: 8px 12px !important;
+    padding: 13px 14px !important;
   }
   .item-totals-report .table-scroll tbody td:nth-child(1) {
     font-size: 12px !important;
@@ -1804,5 +1806,21 @@
   .item-totals-report .table-scroll tbody td:nth-child(2),
   .item-totals-report .table-scroll tbody td:nth-child(3) {
     font-size: 14px !important;
+    line-height: 1.25 !important;
+  }
+  .item-totals-report .table-scroll tbody td:nth-child(2) {
+    align-items: flex-start !important;
+    text-align: left !important;
+  }
+  .item-totals-report .table-scroll tbody td:nth-child(3) {
+    align-items: flex-end !important;
+    text-align: right !important;
+  }
+  .item-totals-report .table-scroll tbody td:nth-child(2)::before,
+  .item-totals-report .table-scroll tbody td:nth-child(3)::before {
+    width: 100% !important;
+  }
+  .item-totals-report .table-scroll tbody td:nth-child(1) {
+    padding-bottom: 2px !important;
   }
 }
