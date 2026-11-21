@@ -1663,3 +1663,70 @@
     letter-spacing: .01em !important;
   }
 }
+
+/* Item sales report: show every value in the same row instead of horizontal scrolling. */
+@media screen and (max-width: 768px) {
+  .item-totals-report .table-scroll {
+    overflow: visible !important;
+  }
+  .item-totals-report .table-scroll table {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  .item-totals-report .table-scroll thead,
+  .item-totals-report .table-scroll tfoot {
+    display: none !important;
+  }
+  .item-totals-report .table-scroll tbody {
+    display: block !important;
+  }
+  .item-totals-report .table-scroll tbody tr {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap: 10px 14px !important;
+    padding: 14px !important;
+    border-bottom: 1px solid #e7ebf0 !important;
+    background: #fff !important;
+  }
+  .item-totals-report .table-scroll tbody tr:last-child {
+    border-bottom: 0 !important;
+  }
+  .item-totals-report .table-scroll tbody td {
+    display: flex !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+  }
+  .item-totals-report .table-scroll tbody td:nth-child(1) {
+    grid-column: 1 / -1 !important;
+    color: #172033 !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    line-height: 1.35 !important;
+    overflow-wrap: anywhere !important;
+  }
+  .item-totals-report .table-scroll tbody td:nth-child(2),
+  .item-totals-report .table-scroll tbody td:nth-child(3) {
+    flex-direction: column !important;
+    gap: 3px !important;
+    color: #1f2a44 !important;
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+  .item-totals-report .table-scroll tbody td:nth-child(3) {
+    align-items: flex-end !important;
+    text-align: right !important;
+  }
+  .item-totals-report .table-scroll tbody td:nth-child(2)::before,
+  .item-totals-report .table-scroll tbody td:nth-child(3)::before {
+    color: #718096 !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    letter-spacing: .035em !important;
+    text-transform: uppercase !important;
+  }
+  .item-totals-report .table-scroll tbody td:nth-child(2)::before { content: "Quantity sold"; }
+  .item-totals-report .table-scroll tbody td:nth-child(3)::before { content: "Sales amount"; }
+}
