@@ -1614,13 +1614,52 @@
     grid-row: 1 / span 3 !important;
   }
   .sales-invoices-table-card input[type="checkbox"] {
+    appearance: none !important;
+    -webkit-appearance: none !important;
     width: 18px !important;
     height: 18px !important;
     border-radius: 4px !important;
+    border: 1.5px solid #94a3b8 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    outline: 0 !important;
+    cursor: pointer !important;
+  }
+  .sales-invoices-table-card input[type="checkbox"]:checked {
+    border-color: #2563eb !important;
+    background-color: #2563eb !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5 6.3 12 13 4.5' fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2'/%3E%3C/svg%3E") !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    background-size: 13px 13px !important;
+  }
+  .sales-invoices-table-card input[type="checkbox"]:focus-visible {
+    outline: 2px solid rgba(37, 99, 235, .28) !important;
+    outline-offset: 2px !important;
   }
   .sales-invoices-table-card .sales-dots-menu-btn {
     width: 26px !important;
     height: 32px !important;
     padding: 2px !important;
+  }
+  .sales-invoices-table-card .sales-invoice-party {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+  }
+  .sales-invoices-table-card .sales-invoice-party::before {
+    content: "Customer";
+    flex: 0 0 auto;
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .025em;
+  }
+  .sales-invoices-table-card .sales-invoice-party strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px !important;
+    letter-spacing: .01em !important;
   }
 }
