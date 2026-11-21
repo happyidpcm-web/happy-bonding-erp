@@ -1348,7 +1348,11 @@
   .add-items-table tbody tr:not(:has(td[colspan])) td { display: none !important; }
   .add-items-table tbody tr:not(:has(td[colspan])) td:nth-child(1) {
     display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
     overflow: visible !important;
+    white-space: normal !important;
     font-size: 13px !important;
   }
   .add-items-table tbody tr:not(:has(td[colspan])) td:nth-child(1) > strong {
@@ -1361,7 +1365,10 @@
   }
   .add-items-table tbody tr.is-selected { background: #f7f9ff !important; box-shadow: inset 3px 0 0 #4f46e5 !important; }
   .mobile-item-selection-row {
-    display: flex !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 76px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
     min-width: 0 !important;
     align-items: center !important;
     justify-content: space-between !important;
@@ -1403,6 +1410,10 @@
     font-size: 11px !important;
     font-weight: 800 !important;
     line-height: 1 !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    z-index: 2 !important;
   }
   .add-items-table .mobile-item-stepper { min-width: auto !important; padding: 2px !important; gap: 4px !important; }
   .add-items-table .mobile-item-stepper button {
