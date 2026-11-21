@@ -529,6 +529,34 @@ export function CreateQuotationScreen({
             )}
           </tbody>
         </table>
+        <div className="mobile-voucher-items" aria-label={`${type} items`}>
+          {lines.map((line, idx) => {
+            const updateLine = (patch: Partial<typeof line>) => setLines(rows => rows.map(row => row.id === line.id ? { ...row, ...patch } : row));
+            const amount = type === "Purchase Invoice" ? purchaseLineAmount(line) : line.amount;
+            return (
+              <article className="mobile-voucher-item-card" key={`mobile-${line.id}`}>
+                <header>
+                  <span className="mobile-item-number">{idx + 1}</span>
+                  <strong title={line.name}>{line.name}</strong>
+                  <button type="button" className="mobile-item-remove" aria-label={`Remove ${line.name}`} onClick={() => setLines(rows => rows.filter(row => row.id !== line.id))}><X size={16} /></button>
+                </header>
+                <div className="mobile-voucher-fields">
+                  <label><span>HSN / SAC</span><b>{line.hsn || "-"}</b></label>
+                  <label><span>MRP</span><NumberInput aria-label={`MRP for ${line.name}`} min={0} step="0.01" value={line.mrp} onValueChange={mrp => updateLine({ mrp })} /></label>
+                  <label><span>Quantity</span><NumberInput aria-label={`Quantity for ${line.name}`} min={1} value={line.qty} onValueChange={qty => updateLine({ qty, amount: qty * line.price - line.discount })} /></label>
+                  <label><span>{type === "Purchase Invoice" ? "Purchase Price" : "Price"}</span><NumberInput aria-label={`Price for ${line.name}`} min={0} step="0.01" value={line.price} onValueChange={price => updateLine({ price, amount: line.qty * price - line.discount })} /></label>
+                  <label><span>Discount</span><NumberInput aria-label={`Discount for ${line.name}`} min={0} step="0.01" value={line.discount} onValueChange={discount => updateLine({ discount, amount: line.qty * line.price - discount })} /></label>
+                  <label><span>Tax</span><select aria-label={`Tax for ${line.name}`} value={line.tax} onChange={e => updateLine({ tax: Number(e.target.value) })}><option value={0}>0%</option><option value={5}>5%</option><option value={12}>12%</option><option value={18}>18%</option><option value={28}>28%</option></select></label>
+                </div>
+                <footer><span>Line total</span><strong>₹ {amount.toLocaleString("en-IN")}</strong></footer>
+              </article>
+            );
+          })}
+          <div className="mobile-voucher-item-actions">
+            <button type="button" onClick={() => setItemSearchOpen(true)}><Plus size={17} /> Add Item</button>
+            <button type="button" onClick={() => notify("Barcode scanner ready")}><QrCode size={17} /> Scan Barcode</button>
+          </div>
+        </div>
         <div style={{ background: "#f8fafc", padding: "10px 20px", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "flex-end", gap: 30, fontSize: 13, fontWeight: 700, color: "#334155" }}>
           <span>SUBTOTAL: ₹ {subtotal.toLocaleString("en-IN")}</span>
         </div>
