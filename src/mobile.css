@@ -937,3 +937,101 @@
   .generic-voucher-editor .voucher-lines-table tbody tr:last-child td > div { grid-template-columns: 1fr !important; gap: 8px !important; }
   .generic-voucher-editor .voucher-lines-table + div { padding: 10px 12px !important; justify-content: flex-end !important; }
 }
+
+/* Purchase edit rows must retain every editable field on a phone. */
+@media screen and (max-width: 768px) {
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) {
+    grid-template-columns: 25px minmax(0, 1fr) minmax(0, 1fr) 30px !important;
+    gap: 9px 10px !important;
+    min-height: 0 !important;
+  }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(1) {
+    display: block !important;
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    color: #718096 !important;
+  }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(2) {
+    display: block !important;
+    grid-column: 2 / 4 !important;
+    grid-row: 1 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(3),
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(4),
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(5),
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(6),
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(7),
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(8) {
+    display: block !important;
+    min-width: 0 !important;
+    color: #273449 !important;
+    font-size: 12px !important;
+  }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(3),
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(5),
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(7) { grid-column: 2 !important; }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(4),
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(6),
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(8) { grid-column: 3 !important; }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(3) { grid-row: 2 !important; }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(4) { grid-row: 2 !important; }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(5) { grid-row: 3 !important; }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(6) { grid-row: 3 !important; }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(7) { grid-row: 4 !important; }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(8) { grid-row: 4 !important; }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(9) {
+    display: block !important;
+    grid-column: 2 / 4 !important;
+    grid-row: 5 !important;
+    padding-top: 7px !important;
+    border-top: 1px solid #edf0f3 !important;
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    text-align: right !important;
+  }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(10) {
+    display: block !important;
+    grid-column: 4 !important;
+    grid-row: 1 !important;
+  }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(3)::before,
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(4)::before,
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(5)::before,
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(6)::before,
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(7)::before,
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(8)::before {
+    display: block !important;
+    margin-bottom: 3px !important;
+    color: #718096 !important;
+    font-size: 9px !important;
+    font-weight: 800 !important;
+    letter-spacing: .04em !important;
+  }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(3)::before { content: "HSN" !important; }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(4)::before { content: "MRP" !important; }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(5)::before { content: "QTY" !important; }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(6)::before { content: "PRICE" !important; }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(7)::before { content: "DISCOUNT" !important; }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) td:nth-child(8)::before { content: "TAX" !important; }
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) input,
+  .generic-voucher-editor .voucher-lines-table tbody tr:not(:has(td[colspan])) select {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+  .generic-voucher-editor .voucher-lines-table td[colspan] {
+    display: block !important;
+    padding: 10px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .generic-voucher-editor .voucher-lines-table td[colspan] > div {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 9px !important;
+    width: 100% !important;
+  }
+}
