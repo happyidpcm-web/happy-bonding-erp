@@ -9,6 +9,7 @@ import { DateRangeFilter } from '../../components/DateRangeFilter';
 import type { CustomDateRange, DateRangeSelection } from '../../utils/invoiceDateRange';
 import { EmailExcelReportModal } from './Reports';
 import { prepareItemReport, type ItemReportSort } from '../../utils/itemReport';
+import { canShareNativeFiles, shareNativeFile } from '../../utils/nativeFiles';
 
 export const backendReports: Record<string, { kind: string; title: string }> = {
   'Coupon report': { kind: 'coupon-report', title: 'Coupon Report' },
@@ -51,6 +52,7 @@ export function BackendReport({ report, onBack, notify, initialDateSelection, on
   };
   const [search, setSearch] = useState('');
   const [emailOpen, setEmailOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const isCouponReport = report.kind === 'coupon-report';
   const isProfitReport = report.kind === 'bill-profit';
   const isExpenseReport = report.kind === 'expense-category' || report.kind === 'expense-transactions';
@@ -91,16 +93,31 @@ export function BackendReport({ report, onBack, notify, initialDateSelection, on
     return [columnLabel(c), date ? `${date[3]}/${date[2]}/${date[1]}` : value];
   })));
   if (isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport || isAgeingReport || isExpenseReport || isProfitReport || isCouponReport) exportRows.push(Object.fromEntries(columns.map((c, index) => [columnLabel(c), index === 0 ? 'Total' : c === 'Quantity' ? totalQuantity : data?.moneyColumns.includes(c) ? Number(rows.reduce((sum, row) => sum + (typeof row[c] === 'number' ? Number(row[c]) : 0), 0).toFixed(2)) : ''])));
-  const exportExcel = () => {
+  const exportExcel = async () => {
+    if (exporting || !exportRows.length) return;
+    setExporting(true);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportRows), 'Report');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ Report: report.title, From: filter === 'All' ? 'All' : data?.from, To: filter === 'All' ? 'All' : data?.to, Search: search, ...(isItemReport ? { View: itemView, Sort: sort } : {}), Notes: data?.note }]), 'Filters');
-    XLSX.writeFile(wb, `${report.kind}_${data?.from}_${data?.to}.xlsx`);
+    const filename = `${report.kind}_${data?.from}_${data?.to}.xlsx`;
+    try {
+      if (canShareNativeFiles()) {
+        const bytes = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        await shareNativeFile(new File([bytes], filename, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'Save Excel report');
+        notify('Choose Files or Drive in the next screen to save the Excel report.');
+      } else {
+        XLSX.writeFile(wb, filename);
+      }
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Unable to export the Excel report. Please retry.');
+    } finally {
+      setExporting(false);
+    }
   };
   const formatDate = (value: string) => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(value + 'T00:00:00Z'));
   return <div className={`${isAgeingReport ? 'printable-report item-sales-report ageing-report' : isStockReport ? 'printable-report item-sales-report stock-detail-report' : isLedgerReport ? 'printable-report item-sales-report ledger-report' : isItemReport || isPartyItemReport || isCategoryReport || isPurchaseReport || isAuditReport || isStaffReport || isExpenseReport || isProfitReport || isCouponReport ? 'printable-report item-sales-report' : 'printable-report'}${isItemReport && itemView === 'items' ? ' item-totals-report' : ''}`}>
     <div className="page-heading"><div className="back-heading"><button type="button" className="icon-button" onClick={onBack} aria-label="Back" title="Back to Reports"><ArrowLeft size={18} /></button><h1>{isItemReport && itemView === 'items' ? 'Item Sales Totals' : report.title}</h1></div>
-      <div className="header-actions"><button className="secondary" disabled={loading || !!error || !rows.length} onClick={exportExcel}>Download Excel</button><button className="secondary" disabled={loading || !!error || !rows.length} onClick={() => setEmailOpen(true)}>Email Excel</button><button className="secondary" disabled={loading || !!error} onClick={() => window.print()}>Print PDF</button></div>
+      <div className="header-actions"><button className="secondary" disabled={loading || !!error || !rows.length || exporting} onClick={() => void exportExcel()}>{exporting ? 'Preparing...' : canShareNativeFiles() ? 'Save Excel' : 'Download Excel'}</button><button className="secondary" disabled={loading || !!error || !rows.length} onClick={() => setEmailOpen(true)}>Email Excel</button>{!canShareNativeFiles() && <button className="secondary" disabled={loading || !!error} onClick={() => window.print()}>Print PDF</button>}</div>
     </div>
     <div className="backend-report-filters"><DateRangeFilter value={filter} range={range} onChange={setFilter} onRangeChange={setRange} /><input aria-label="Search report" placeholder="Search this report" value={search} onChange={e => setSearch(e.target.value)} /><button className="secondary" disabled={loading} onClick={() => setRefresh(n => n + 1)}>Refresh</button></div>
     {isItemReport && <div className="backend-report-filters">

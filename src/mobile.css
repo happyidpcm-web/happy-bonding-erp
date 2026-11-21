@@ -1729,4 +1729,80 @@
   }
   .item-totals-report .table-scroll tbody td:nth-child(2)::before { content: "Quantity sold"; }
   .item-totals-report .table-scroll tbody td:nth-child(3)::before { content: "Sales amount"; }
+
+  /* Keep report actions compact on phone; Android uses the native save/share sheet for Excel. */
+  .item-totals-report .page-heading {
+    gap: 10px !important;
+    margin-bottom: 14px !important;
+  }
+  .item-totals-report .page-heading .header-actions {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+  .item-totals-report .page-heading .header-actions .secondary {
+    min-width: 0 !important;
+    min-height: 40px !important;
+    padding: 7px 8px !important;
+    border-radius: 10px !important;
+    font-size: 12px !important;
+    white-space: nowrap !important;
+  }
+  .item-totals-report .backend-report-filters {
+    gap: 8px !important;
+    margin-bottom: 12px !important;
+  }
+  .item-totals-report .backend-report-filters > input,
+  .item-totals-report .backend-report-filters select {
+    min-height: 40px !important;
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+  }
+  .item-totals-report .backend-report-filters > .secondary {
+    min-height: 38px !important;
+    padding: 7px 13px !important;
+    border-radius: 9px !important;
+    font-size: 12px !important;
+  }
+  .item-totals-report .item-report-period {
+    margin: 16px 0 12px !important;
+  }
+  .item-totals-report .item-report-totals {
+    gap: 10px !important;
+    margin-bottom: 14px !important;
+  }
+  .item-totals-report .item-report-totals > div {
+    min-width: 0 !important;
+    padding: 13px 12px !important;
+    border-radius: 13px !important;
+  }
+  .item-totals-report .item-report-totals span {
+    font-size: 11px !important;
+    line-height: 1.25 !important;
+  }
+  .item-totals-report .item-report-totals strong {
+    margin-top: 6px !important;
+    font-size: clamp(15px, 4.35vw, 18px) !important;
+    line-height: 1.15 !important;
+    letter-spacing: -.055em !important;
+    white-space: nowrap !important;
+  }
+  .item-totals-report .table-card,
+  .item-totals-report .table-scroll {
+    overflow: visible !important;
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  .item-totals-report .table-scroll tbody tr {
+    gap: 8px 14px !important;
+    padding: 12px 14px !important;
+  }
+  .item-totals-report .table-scroll tbody td:nth-child(1) {
+    font-size: 12px !important;
+  }
+  .item-totals-report .table-scroll tbody td:nth-child(2),
+  .item-totals-report .table-scroll tbody td:nth-child(3) {
+    font-size: 14px !important;
+  }
 }
