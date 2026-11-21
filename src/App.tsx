@@ -213,14 +213,13 @@ export default function App() {
       }
     };
 
-    // On a phone, hide the navigation drawer before mounting a heavy page.
-    // This prevents the drawer from remaining visible while the invoice screen loads.
+    // Commit drawer dismissal and navigation together so a submenu tap feels instant.
     if (sidebar) {
       flushSync(() => {
         setSidebar(false);
         setCreateDropdownOpen(false);
+        navigate();
       });
-      window.requestAnimationFrame(navigate);
       return;
     }
     setCreateDropdownOpen(false);
@@ -1716,7 +1715,7 @@ function SalesInvoicesListView({
             <span>Total Sales</span>
           </div>
           <h2 className="sales-summary-card-val">
-            ₹ {totalSalesVal.toLocaleString("en-IN")}
+            ₹ {totalSalesVal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </h2>
         </button>
 
@@ -1727,7 +1726,7 @@ function SalesInvoicesListView({
             <span>Paid</span>
           </div>
           <h2 className="sales-summary-card-val">
-            ₹ {paidSalesVal.toLocaleString("en-IN")}
+            ₹ {paidSalesVal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </h2>
         </button>
 
@@ -1738,7 +1737,7 @@ function SalesInvoicesListView({
             <span>Unpaid</span>
           </div>
           <h2 className="sales-summary-card-val">
-            ₹ {unpaidSalesVal.toLocaleString("en-IN")}
+            ₹ {unpaidSalesVal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </h2>
         </button>
 
@@ -1749,7 +1748,7 @@ function SalesInvoicesListView({
             <span>Cancelled</span>
           </div>
           <h2 className="sales-summary-card-val" style={{ color: "#64748b" }}>
-            {cancelledSalesVal > 0 ? `₹ ${cancelledSalesVal.toLocaleString("en-IN")}` : "-"}
+            {cancelledSalesVal > 0 ? `₹ ${cancelledSalesVal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
           </h2>
         </button>
       </div>

@@ -731,3 +731,12 @@
   .inventory-table-scroll tbody td:nth-child(6),
   .inventory-table-scroll tbody td:nth-child(8) { font-variant-numeric: tabular-nums !important; }
 }
+
+/* Sales invoices: compact financial summary with stable two-decimal amounts. */
+@media screen and (max-width: 768px) {
+  .sales-invoices-screen-wrap .sales-summary-cards-grid { gap: 8px !important; margin-bottom: 12px !important; }
+  .sales-invoices-screen-wrap .sales-summary-card { min-height: 82px !important; padding: 10px 11px !important; border-radius: 13px !important; }
+  .sales-invoices-screen-wrap .sales-summary-card-head { font-size: 11px !important; }
+  .sales-invoices-screen-wrap .sales-summary-card-val { margin-top: 2px !important; font-size: 16px !important; line-height: 1.1 !important; letter-spacing: -.055em !important; white-space: nowrap !important; overflow: visible !important; }
+  .sales-invoices-table-card .sales-invoices-main-table tbody tr { min-height: 72px !important; padding: 11px 13px !important; }
+}
