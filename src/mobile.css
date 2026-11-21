@@ -1474,3 +1474,49 @@
   .add-items-bill-modal .mobile-add-item-stepper strong { min-width: 24px !important; color: #1f2a44 !important; text-align: center !important; font-size: 13px !important; }
   .add-items-bill-modal .mobile-add-items-empty { padding: 28px 12px !important; color: #718096 !important; font-size: 12px !important; text-align: center !important; }
 }
+
+/* Final purchase-editor polish: compact financial form hierarchy. */
+@media screen and (max-width: 768px) {
+  .generic-voucher-editor .voucher-lines-card {
+    margin: 14px 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    overflow: visible !important;
+  }
+  .generic-voucher-editor .mobile-voucher-items {
+    gap: 11px !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+  .generic-voucher-editor .mobile-voucher-item-card {
+    border-color: #dbe3ee !important;
+    border-radius: 14px !important;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, .055) !important;
+  }
+  .generic-voucher-editor .mobile-voucher-item-card header {
+    grid-template-columns: 26px minmax(0, 1fr) 36px !important;
+    padding: 12px 13px 10px !important;
+    background: #fbfcfe !important;
+  }
+  .generic-voucher-editor .mobile-item-number { width: 25px !important; height: 25px !important; font-size: 11px !important; }
+  .generic-voucher-editor .mobile-voucher-item-card header strong { font-size: 14px !important; }
+  .generic-voucher-editor .mobile-voucher-fields { gap: 11px 12px !important; padding: 13px !important; }
+  .generic-voucher-editor .mobile-voucher-fields label { gap: 5px !important; font-size: 10px !important; }
+  .generic-voucher-editor .mobile-voucher-fields input,
+  .generic-voucher-editor .mobile-voucher-fields select { height: 38px !important; border-color: #d3dce7 !important; border-radius: 9px !important; font-weight: 700 !important; }
+  .generic-voucher-editor .mobile-voucher-item-card footer { padding: 11px 13px !important; background: #fffbed !important; }
+  .generic-voucher-editor .mobile-voucher-item-card footer strong { font-size: 16px !important; letter-spacing: -.02em !important; }
+  .generic-voucher-editor .mobile-voucher-item-actions { gap: 10px !important; margin-top: 1px !important; }
+  .generic-voucher-editor .mobile-voucher-item-actions button { min-height: 44px !important; border-radius: 11px !important; }
+  .generic-voucher-editor .mobile-voucher-items + div {
+    margin-top: 12px !important;
+    padding: 12px 14px !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 11px !important;
+    background: #f8fafc !important;
+    justify-content: flex-end !important;
+    color: #263449 !important;
+    font-size: 13px !important;
+  }
+}
