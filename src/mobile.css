@@ -14,6 +14,147 @@
   .bill-preview-scale { transform: none !important; }
 }
 
+/* Item sales & purchase summary: mobile-first report cards, with no sideways table. */
+@media screen and (max-width: 768px) {
+  .item-sales-report .page-heading {
+    gap: 10px !important;
+    margin-bottom: 14px !important;
+  }
+  .item-sales-report .back-heading h1 {
+    font-size: 25px !important;
+    line-height: 1.12 !important;
+  }
+  .item-sales-report .page-heading .header-actions {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+  .item-sales-report .page-heading .header-actions .secondary {
+    min-width: 0 !important;
+    min-height: 40px !important;
+    padding: 7px 8px !important;
+    border-radius: 10px !important;
+    font-size: 12px !important;
+  }
+  .item-sales-report .backend-report-filters {
+    display: grid !important;
+    grid-template-columns: 1fr auto !important;
+    gap: 9px !important;
+    margin-bottom: 14px !important;
+  }
+  .item-sales-report .backend-report-filters > * {
+    min-width: 0 !important;
+    min-height: 42px !important;
+    font-size: 13px !important;
+  }
+  .item-sales-report .backend-report-filters > select,
+  .item-sales-report .backend-report-filters > input {
+    grid-column: 1 / -1 !important;
+  }
+  .item-sales-report .backend-report-filters > .secondary {
+    padding: 7px 16px !important;
+  }
+  .item-sales-report .item-report-period {
+    margin: 14px 0 10px !important;
+  }
+  .item-sales-report > p {
+    margin: 0 0 14px !important;
+    font-size: 12px !important;
+    line-height: 1.45 !important;
+  }
+  .item-sales-report .item-report-totals {
+    gap: 10px !important;
+    margin-bottom: 14px !important;
+  }
+  .item-sales-report .item-report-totals > div {
+    min-width: 0 !important;
+    padding: 13px 12px !important;
+    border-radius: 13px !important;
+  }
+  .item-sales-report .item-report-totals span {
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+  }
+  .item-sales-report .item-report-totals strong {
+    margin-top: 7px !important;
+    font-size: clamp(15px, 4.15vw, 18px) !important;
+    line-height: 1.15 !important;
+    letter-spacing: -.045em !important;
+    white-space: nowrap !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+  .item-sales-report .table-card,
+  .item-sales-report .table-scroll {
+    overflow: visible !important;
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  .item-sales-report .table-scroll table,
+  .item-sales-report .table-scroll tbody {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  .item-sales-report .table-scroll thead,
+  .item-sales-report .table-scroll tfoot {
+    display: none !important;
+  }
+  .item-sales-report .table-scroll tbody tr {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px 16px !important;
+    padding: 14px !important;
+    border-bottom: 1px solid #e7ebf0 !important;
+    background: #fff !important;
+  }
+  .item-sales-report .table-scroll tbody tr:last-child { border-bottom: 0 !important; }
+  .item-sales-report .table-scroll tbody td {
+    display: flex !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    flex-direction: column !important;
+    gap: 3px !important;
+    color: #1f2a44 !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+  .item-sales-report .table-scroll tbody td:nth-child(1) {
+    grid-column: 1 / -1 !important;
+    font-size: 13px !important;
+    line-height: 1.35 !important;
+    overflow-wrap: anywhere !important;
+  }
+  .item-sales-report .table-scroll tbody td:nth-child(2),
+  .item-sales-report .table-scroll tbody td:nth-child(3) {
+    color: #64748b !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+  }
+  .item-sales-report .table-scroll tbody td:nth-child(3),
+  .item-sales-report .table-scroll tbody td:nth-child(5),
+  .item-sales-report .table-scroll tbody td:nth-child(7),
+  .item-sales-report .table-scroll tbody td:nth-child(8) {
+    align-items: flex-end !important;
+    text-align: right !important;
+  }
+  .item-sales-report .table-scroll tbody td:nth-child(n+4)::before {
+    width: 100% !important;
+    color: #718096 !important;
+    font-size: 9px !important;
+    font-weight: 700 !important;
+    letter-spacing: .04em !important;
+    text-transform: uppercase !important;
+  }
+  .item-sales-report .table-scroll tbody td:nth-child(4)::before { content: "Sales qty"; }
+  .item-sales-report .table-scroll tbody td:nth-child(5)::before { content: "Purchase qty"; }
+  .item-sales-report .table-scroll tbody td:nth-child(6)::before { content: "Current stock"; }
+  .item-sales-report .table-scroll tbody td:nth-child(7)::before { content: "Sales amount"; }
+  .item-sales-report .table-scroll tbody td:nth-child(8)::before { content: "Purchase amount"; }
+}
+
 /* Final compact pass — Parties should feel like a fast, professional CRM list. */
 @media screen and (max-width: 768px) {
   .parties-page-heading { margin-bottom: 12px !important; gap: 8px !important; }

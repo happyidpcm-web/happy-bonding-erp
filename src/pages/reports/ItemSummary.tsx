@@ -8,6 +8,7 @@ import { money } from '../../data';
 import { DateRangeFilter } from '../../components/DateRangeFilter';
 import type { CustomDateRange } from '../../utils/invoiceDateRange';
 import { EmailExcelReportModal } from './Reports';
+import { canShareNativeFiles, shareNativeFile } from '../../utils/nativeFiles';
 
 export function ItemSummary({ onBack, notify }: { onBack: () => void; notify: (message: string) => void }) {
   const [sort, setSort] = useState('salesQty');
@@ -34,20 +35,27 @@ export function ItemSummary({ onBack, notify }: { onBack: () => void; notify: (m
     matchesItemSearch(search, [r.name, r.sku, r.size])).sort((a, b) => Number(b[sort as 'salesQty' | 'purchaseQty' | 'salesAmount' | 'purchaseAmount']) - Number(a[sort as 'salesQty' | 'purchaseQty' | 'salesAmount' | 'purchaseAmount']) || a.name.localeCompare(b.name));
   const totals = rows.reduce((s, r) => ({ salesQty: s.salesQty + r.salesQty, purchaseQty: s.purchaseQty + r.purchaseQty, salesAmount: s.salesAmount + r.salesAmount, purchaseAmount: s.purchaseAmount + r.purchaseAmount }), { salesQty: 0, purchaseQty: 0, salesAmount: 0, purchaseAmount: 0 });
   const excelRows = rows.map(r => ({ 'Item Name': r.name, 'Item Code': r.sku, Category: r.category, 'Sales Quantity': r.salesQty, 'Purchase Quantity': r.purchaseQty, 'Current Stock': r.currentStock, 'Sales Amount': r.salesAmount, 'Purchase Amount': r.purchaseAmount }));
-  const exportExcel = () => {
+  const exportExcel = async () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(excelRows), 'Item Sales Purchase');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ From: filter === 'All' ? 'All' : data?.from, To: filter === 'All' ? 'All' : data?.to, Category: category, Search: search, ...totals }]), 'Filters and Totals');
-    XLSX.writeFile(wb, `item_sales_purchase_${data?.from}_${data?.to}.xlsx`);
+    const filename = `item_sales_purchase_${data?.from}_${data?.to}.xlsx`;
+    if (canShareNativeFiles()) {
+      const bytes = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      await shareNativeFile(new File([bytes], filename, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'Save item sales report');
+      notify('Choose Files or Drive in the next screen to save the Excel report.');
+      return;
+    }
+    XLSX.writeFile(wb, filename);
   };
   const qty = (n: number) => Number(n.toFixed(3));
   return <div className="report-screen-wrap printable-report item-sales-report">
     <div className="page-heading">
       <div className="back-heading"><button type="button" className="icon-button" onClick={onBack} aria-label="Back" title="Back to Reports"><ArrowLeft size={18} /></button><h1>Item Sales and Purchase Summary</h1></div>
       <div className="header-actions">
-        <button className="secondary" disabled={loading || !!error || !rows.length} onClick={exportExcel}>Download Excel</button>
+        <button className="secondary" disabled={loading || !!error || !rows.length} onClick={() => void exportExcel()}>{canShareNativeFiles() ? 'Save Excel' : 'Download Excel'}</button>
         <button className="secondary" disabled={loading || !!error || !rows.length} onClick={() => setEmailOpen(true)}>Email Excel</button>
-        <button className="secondary" disabled={loading || !!error} onClick={() => window.print()}>Print PDF</button>
+        {!canShareNativeFiles() && <button className="secondary" disabled={loading || !!error} onClick={() => window.print()}>Print PDF</button>}
       </div>
     </div>
     <div className="backend-report-filters">
