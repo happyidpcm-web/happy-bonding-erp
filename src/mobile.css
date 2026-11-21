@@ -1519,4 +1519,39 @@
     color: #263449 !important;
     font-size: 13px !important;
   }
+
+  /* Keep the final save action clear after the payment and signature section. */
+  .generic-voucher-editor .voucher-bottom-save-bar {
+    display: grid !important;
+    grid-template-columns: minmax(0, .88fr) minmax(0, 1.32fr) !important;
+    gap: 10px !important;
+    margin: 18px 0 12px !important;
+    padding: 12px !important;
+    border: 1px solid #e1e7ef !important;
+    border-radius: 14px !important;
+    background: #fff !important;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, .08) !important;
+  }
+  .generic-voucher-editor .voucher-bottom-save-bar button {
+    min-width: 0 !important;
+    min-height: 46px !important;
+    margin: 0 !important;
+    padding: 9px 8px !important;
+    border-radius: 10px !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    line-height: 1.15 !important;
+  }
+  .generic-voucher-editor .voucher-bottom-save-bar .secondary {
+    border: 1px solid #d8c98d !important;
+    background: #fffdf7 !important;
+    color: #4b3b1d !important;
+  }
+  .generic-voucher-editor .voucher-bottom-save-bar .voucher-bottom-save-btn {
+    border: 0 !important;
+    background: #4f46e5 !important;
+    color: #fff !important;
+    box-shadow: 0 5px 12px rgba(79, 70, 229, .22) !important;
+  }
+  .generic-voucher-editor .voucher-bottom-save-bar button:disabled { opacity: .58 !important; }
 }

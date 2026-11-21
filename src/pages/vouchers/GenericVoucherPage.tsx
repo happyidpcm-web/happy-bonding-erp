@@ -712,6 +712,25 @@ export function CreateQuotationScreen({
         </div>
       </div>
 
+      <div className="voucher-bottom-save-bar" aria-label="Save invoice actions">
+        <button
+          type="button"
+          className="secondary"
+          disabled={saving || Boolean(editingRecord)}
+          onClick={() => handleSaveQuotation(true)}
+        >
+          {saving ? "Saving..." : "Save & New"}
+        </button>
+        <button
+          type="button"
+          className="primary-purple-btn voucher-bottom-save-btn"
+          disabled={saving}
+          onClick={() => handleSaveQuotation(false)}
+        >
+          {saving ? "Saving..." : editingRecord ? `Update ${type}` : `Save ${type}`}
+        </button>
+      </div>
+
       {/* Item Picker Modal */}
       {itemSearchOpen && (
         <AddItemModal
