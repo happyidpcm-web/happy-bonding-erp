@@ -1462,7 +1462,7 @@ export function GenericVoucherPage({
                     </button>
                     {type === "Purchase Invoice" && <button type="button" className="secondary compact purchase-row-action purchase-edit-action" style={{ marginLeft: 6 }} onClick={() => { setEditingRecord(row); setCreatingFullVoucher(true); }}>Edit</button>}
                     {type === "Purchase Invoice" && <button type="button" className="secondary compact purchase-row-action purchase-download-action" style={{ marginLeft: 6 }} onClick={() => { setSelectedVoucher(row); setPurchaseDownloadRequested(true); }} aria-label={`Download PDF for ${row.number}`} title="Download PDF"><Download size={14} /><span>Download PDF</span></button>}
-                    <button type="button" className={`icon-pencil-btn ${type === "Purchase Invoice" ? "purchase-row-icon-action" : ""}`} style={{ marginLeft: 6, padding: "4px 6px" }} onClick={() => type === "Purchase Invoice" ? setSelectedVoucher(row) : notify(`${type} ${row.number} sent to print`)} title="Print">
+                    <button type="button" className={`icon-pencil-btn ${type === "Purchase Invoice" ? "purchase-row-icon-action purchase-print-action" : ""}`} style={{ marginLeft: 6, padding: "4px 6px" }} onClick={() => type === "Purchase Invoice" ? setSelectedVoucher(row) : notify(`${type} ${row.number} sent to print`)} title="Print">
                       <Printer size={14} />
                     </button>
                     <div style={{ display: "inline-block" }}>

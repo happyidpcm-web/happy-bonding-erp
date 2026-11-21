@@ -745,6 +745,7 @@
 /* Purchase invoices: compact corporate hierarchy sized for phone-width controls. */
 @media screen and (max-width: 768px) {
   .purchase-page-top-header { gap: 9px !important; margin-bottom: 12px !important; }
+  .purchase-invoices-table-card .purchase-print-action { display: none !important; }
   .purchase-page-top-header h1 { font-size: 25px !important; letter-spacing: -.03em !important; }
   .purchase-header-tools { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px 40px !important; gap: 7px !important; }
   .purchase-header-tools .purchase-export-btn { display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; min-width: 0 !important; min-height: 40px !important; height: 40px !important; padding: 6px 7px !important; border-radius: 10px !important; font-size: 11px !important; white-space: nowrap !important; }
