@@ -105,6 +105,60 @@
   .dashboard-transaction-status { font-size: 11px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
   .dashboard-transactions-card [role="status"]:not(.dashboard-transaction-status) { padding: 10px 14px !important; }
   .dashboard-transactions-card [role="status"] strong { font-size: 18px !important; }
+
+  /* Sales report: no horizontal cut-off and a compact aligned heading/filter. */
+  .sales-report-card,
+  .sales-report-card.half-width { width: 100% !important; min-width: 0 !important; max-width: none !important; padding: 14px !important; border-radius: 14px !important; }
+  .sales-report-head { align-items: center !important; gap: 10px !important; padding-bottom: 10px !important; }
+  .sales-report-title { min-width: 0 !important; flex: 1 !important; }
+  .sales-report-head h2 { font-size: 16px !important; line-height: 1.2 !important; }
+  .sales-report-title p { margin: 3px 0 0 !important; color: #758194 !important; font-size: 10px !important; font-weight: 600 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+  .report-select-wrap { flex: 0 0 auto !important; }
+  .report-select-btn { width: 80px !important; height: 34px !important; gap: 5px !important; padding: 0 9px !important; border-radius: 9px !important; font-size: 11px !important; }
+  .report-select-btn svg { width: 14px !important; height: 14px !important; }
+  .report-dropdown-menu { width: 110px !important; }
+}
+
+/* Executive dashboard alignment — compact balance summary and clear daily totals. */
+@media screen and (max-width: 768px) {
+  main:has(.dashboard-transactions-card) .metrics-grid.three { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+  main:has(.dashboard-transactions-card) .metrics-grid.three .metric { min-height: 92px !important; padding: 12px !important; gap: 9px !important; align-items: center !important; border-radius: 15px !important; text-align: left !important; }
+  main:has(.dashboard-transactions-card) .metrics-grid.three .metric:nth-child(3) { grid-column: 1 / -1 !important; min-height: 80px !important; }
+  main:has(.dashboard-transactions-card) .metrics-grid.three .metric-icon { width: 34px !important; height: 34px !important; flex: 0 0 34px !important; border-radius: 10px !important; }
+  main:has(.dashboard-transactions-card) .metrics-grid.three .metric-icon svg { width: 18px !important; height: 18px !important; }
+  main:has(.dashboard-transactions-card) .metrics-grid.three .metric > div:last-child { min-width: 0 !important; }
+  main:has(.dashboard-transactions-card) .metrics-grid.three .metric span { font-size: 10px !important; line-height: 1.25 !important; }
+  main:has(.dashboard-transactions-card) .metrics-grid.three .metric strong { font-size: 18px !important; line-height: 1.15 !important; letter-spacing: -.025em !important; white-space: nowrap !important; }
+  main:has(.dashboard-transactions-card) .metrics-grid.three .metric:nth-child(3) strong { font-size: 21px !important; }
+
+  .dashboard-transactions-card > div[role="status"]:not(.dashboard-transaction-status) { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 9px !important; padding: 10px 12px !important; background: #fffaf0 !important; }
+  .dashboard-transactions-card > div[role="status"]:not(.dashboard-transaction-status) > div { min-width: 0 !important; padding: 10px !important; border: 1px solid #f0dfaa !important; border-radius: 11px !important; background: #fff !important; }
+  .dashboard-transactions-card > div[role="status"]:not(.dashboard-transaction-status) span { margin: 0 0 5px !important; color: #687789 !important; font-size: 10px !important; font-weight: 700 !important; }
+  .dashboard-transactions-card > div[role="status"]:not(.dashboard-transaction-status) strong { font-size: 20px !important; line-height: 1.15 !important; font-variant-numeric: tabular-nums; white-space: nowrap !important; letter-spacing: -.03em !important; }
+  .dashboard-transactions-card > div[role="status"]:not(.dashboard-transaction-status) > div:last-child strong { color: #b4142d !important; }
+}
+
+/* Parties action row — one restrained, consistent control system. */
+@media screen and (max-width: 768px) {
+  .parties-table-card .table-scroll .party-history-row { padding: 13px 14px !important; gap: 6px 12px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) { align-items: center !important; gap: 8px !important; padding-top: 5px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) .secondary { min-width: 126px !important; min-height: 36px !important; height: 36px !important; padding: 6px 12px !important; border-color: #e5d59a !important; background: #fffdf7 !important; color: #563e16 !important; font-size: 11px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) .icon-button,
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) .whatsapp-icon-btn { display: inline-grid !important; place-items: center !important; width: 36px !important; height: 36px !important; min-height: 36px !important; padding: 0 !important; border-radius: 10px !important; box-shadow: none !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) .whatsapp-icon-btn { border: 1px solid #bfe7cf !important; background: #f3fcf7 !important; color: #25d366 !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) .icon-button { border: 1px solid #dfe5ed !important; background: #fff !important; color: #334155 !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) .icon-button:last-child { border-color: transparent !important; background: transparent !important; width: 30px !important; }
+  .parties-table-card .table-scroll .party-history-row td:nth-child(6) button:active { transform: scale(.96); }
+  .parties-table-card .pagination-strip { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 10px !important; padding: 11px 14px !important; border-top: 1px solid #f0e6c6 !important; }
+  .parties-table-card .pagination-strip > span { color: #5e6875 !important; font-size: 10px !important; }
+  .parties-table-card .pagination-strip .tabs { gap: 6px !important; }
+  .parties-table-card .pagination-strip .tabs button { min-height: 30px !important; padding: 5px 10px !important; border-radius: 8px !important; background: #f3f5f8 !important; color: #253249 !important; font-size: 10px !important; font-weight: 700 !important; }
+  .parties-table-card .pagination-strip .tabs button:disabled { opacity: .45 !important; }
+
+  /* Restore natural touch scrolling for the paginated party list. */
+  .parties-table-card .table-scroll { max-height: min(58dvh, 620px) !important; overflow-x: hidden !important; overflow-y: auto !important; overscroll-behavior-y: contain !important; touch-action: pan-y !important; -webkit-overflow-scrolling: touch; }
+  .parties-table-card .table-scroll table { margin: 0 !important; }
+  .bulk-dropdown-menu .bulk-add-item-btn + .bulk-add-item-btn { border-top: 1px solid #edf0f3 !important; }
 }
 @media screen and (max-width: 768px) {
   /* Parties: every summary, filter and action stays within the phone width. */
@@ -462,4 +516,191 @@
   .parties-table-card .table-scroll .party-history-row td:nth-child(6) .icon-button, .parties-table-card .table-scroll .party-history-row td:nth-child(6) .whatsapp-icon-btn { width: 34px !important; height: 34px !important; min-height: 34px !important; border-radius: 9px !important; }
   .parties-table-card .table-scroll .party-history-row td:nth-child(6) svg { width: 17px !important; height: 17px !important; }
   .parties-table-card .pagination-strip { padding: 9px 12px !important; font-size: 11px !important; }
+}
+
+@media screen and (max-width: 768px) {
+  .parties-table-card { overflow: visible !important; }
+  .parties-table-card .table-scroll { max-height: min(58dvh, 620px) !important; overflow-x: hidden !important; overflow-y: auto !important; touch-action: pan-y !important; overscroll-behavior-y: contain !important; -webkit-overflow-scrolling: touch; }
+  .party-row-menu-wrap { position: relative !important; margin-left: 0 !important; }
+  .party-row-action-menu { position: absolute !important; z-index: 300 !important; right: 0 !important; top: calc(100% + 7px) !important; bottom: auto !important; width: 148px !important; padding: 5px !important; border: 1px solid #e5ddc2 !important; border-radius: 12px !important; background: #fff !important; box-shadow: 0 14px 30px rgba(31, 41, 55, .18) !important; }
+  .party-row-action-menu button { display: flex !important; align-items: center !important; gap: 9px !important; width: 100% !important; min-height: 36px !important; padding: 8px 9px !important; border: 0 !important; border-radius: 8px !important; background: transparent !important; color: #263247 !important; font-size: 11px !important; font-weight: 700 !important; text-align: left !important; }
+  .party-row-action-menu button:hover { background: #fff8e9 !important; }
+  .party-row-action-menu button.danger { color: #c5263d !important; }
+  .party-row-action-menu button.danger:hover { background: #fff0f2 !important; }
+}
+
+/* Items: one compact, consistent mobile control system. */
+@media screen and (max-width: 768px) {
+  .items-page-heading { gap: 9px !important; margin-bottom: 12px !important; }
+  .items-page-heading h1 { font-size: 25px !important; letter-spacing: -.03em !important; }
+  .items-header-actions {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+  .items-header-actions > .secondary {
+    width: 100% !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    padding: 6px 8px !important;
+    justify-content: center !important;
+    border-radius: 10px !important;
+    font-size: 11px !important;
+    white-space: nowrap !important;
+  }
+  .items-header-actions .parties-reports-dropdown { min-width: 0 !important; }
+  .items-header-actions .reports-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 5px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+  .items-header-actions .reports-btn span { overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+  .items-header-actions .reports-btn svg { flex: 0 0 auto !important; width: 15px !important; height: 15px !important; }
+  .items-header-actions > .icon-button { display: none !important; }
+  .items-offer-short-label, .items-barcode-short-label { display: inline !important; }
+  .items-offer-full-label, .items-barcode-full-label { display: none !important; }
+
+  .items-promo-banner { margin-bottom: 12px !important; padding: 9px 12px !important; border-radius: 12px !important; }
+  .items-promo-banner strong { font-size: 12px !important; }
+  .items-promo-banner svg { width: 18px !important; height: 18px !important; }
+
+  .items-metrics-grid { gap: 9px !important; margin-bottom: 12px !important; }
+  .items-metrics-grid .party-metric-box { min-height: 90px !important; padding: 12px 14px !important; border-radius: 13px !important; }
+  .items-metrics-grid .party-metric-box span { font-size: 11px !important; }
+  .items-metrics-grid .party-metric-box strong { margin-top: 5px !important; font-size: 22px !important; line-height: 1.1 !important; letter-spacing: -.035em !important; white-space: nowrap !important; }
+  .items-metrics-grid .inventory-metric-note { margin-top: 5px !important; font-size: 10px !important; line-height: 1.3 !important; }
+
+  .items-toolbar { padding: 10px !important; gap: 9px !important; }
+  .items-search-container { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+  .items-search-container .search-input-wrap,
+  .items-search-container .category-select-wrap { grid-column: 1 / -1 !important; min-height: 42px !important; height: 42px !important; border-radius: 10px !important; }
+  .items-search-container .search-input-wrap { padding: 0 12px !important; }
+  .items-search-container .search-input-wrap input { font-size: 13px !important; }
+  .items-search-container > button,
+  .items-search-container > select { min-width: 0 !important; width: 100% !important; height: 40px !important; min-height: 40px !important; padding: 6px 12px !important; border-radius: 10px !important; font-size: 12px !important; }
+  .items-search-container > button { grid-column: 1 / -1 !important; justify-content: center !important; }
+  .items-search-container > select { grid-column: 1 / -1 !important; }
+  .items-toolbar > div:last-child { gap: 8px !important; }
+  .items-toolbar > div:last-child > button,
+  .items-toolbar .bulk-action-wrap > button { min-height: 42px !important; height: 42px !important; padding: 6px 9px !important; border-radius: 10px !important; font-size: 12px !important; }
+
+  .inventory-table-scroll tbody tr { gap: 7px 11px !important; padding: 13px 14px !important; }
+  .inventory-table-scroll tbody td:nth-child(2) .text-button { font-size: 13px !important; }
+  .inventory-table-scroll tbody td:nth-child(5),
+  .inventory-table-scroll tbody td:nth-child(6),
+  .inventory-table-scroll tbody td:nth-child(8) { min-height: 22px !important; font-size: 12px !important; }
+  .inventory-table-scroll tbody td:nth-child(9) { justify-content: flex-end !important; padding-top: 1px !important; }
+  .item-actions-menu .icon-button { width: 34px !important; min-width: 34px !important; height: 34px !important; min-height: 34px !important; padding: 0 !important; border: 1px solid #e2e8f0 !important; border-radius: 9px !important; background: #fff !important; color: #475569 !important; }
+  .item-actions-menu .icon-button svg { width: 17px !important; height: 17px !important; }
+}
+
+/* Item reports and history: no clipped menus or desktop-width tables on phones. */
+@media screen and (max-width: 768px) {
+  .items-header-actions .reports-btn span { flex: 0 0 auto !important; overflow: visible !important; text-overflow: clip !important; }
+  .items-header-actions .parties-reports-menu {
+    width: min(208px, calc(100vw - 32px)) !important;
+    right: 0 !important;
+    left: auto !important;
+    z-index: 700 !important;
+  }
+  .items-header-actions .parties-reports-menu button {
+    min-height: 42px !important;
+    padding: 10px 12px !important;
+    font-size: 12px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .modal:has(.item-sales-history) {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(100dvh - 30px) !important;
+    padding: 14px !important;
+    border-radius: 18px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+  .modal:has(.item-sales-history) .modal-head { padding-bottom: 10px !important; }
+  .modal:has(.item-sales-history) .modal-head h2 { max-width: calc(100% - 44px) !important; font-size: 17px !important; line-height: 1.25 !important; }
+  .item-sales-history { padding: 4px 0 0 !important; font-size: 12px !important; }
+  .item-history-meta { font-size: 10px !important; gap: 4px !important; }
+  .item-history-summary { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; margin: 12px 0 18px !important; }
+  .item-history-stat { min-height: 78px !important; padding: 11px !important; border-radius: 12px !important; }
+  .item-history-stat > div { font-size: 10px !important; line-height: 1.25 !important; }
+  .item-history-stat strong { margin-top: 6px !important; font-size: 17px !important; line-height: 1.15 !important; white-space: nowrap !important; }
+  .item-sales-history h3 { margin: 16px 0 9px !important; font-size: 15px !important; }
+  .item-history-table { max-height: none !important; overflow: visible !important; border: 0 !important; border-radius: 0 !important; }
+  .item-history-table table { width: 100% !important; min-width: 0 !important; }
+  .item-history-table thead { display: none !important; }
+  .item-history-table tbody { display: grid !important; gap: 8px !important; }
+  .item-history-table tbody tr { display: grid !important; min-width: 0 !important; padding: 11px !important; border: 1px solid #eadfbd !important; border-radius: 11px !important; background: #fffdf8 !important; }
+  .item-history-table tbody td { min-width: 0 !important; padding: 0 !important; border: 0 !important; font-size: 11px !important; white-space: normal !important; }
+  .item-adjustments-table tbody tr { grid-template-columns: minmax(0, 1fr) auto !important; gap: 4px 10px !important; }
+  .item-adjustments-table tbody td:nth-child(1) { color: #66758a !important; }
+  .item-adjustments-table tbody td:nth-child(2) { grid-column: 1 !important; color: #182235 !important; font-weight: 700 !important; }
+  .item-adjustments-table tbody td:nth-child(3) { grid-column: 2 !important; grid-row: 1 / span 2 !important; align-self: center !important; font-size: 15px !important; font-weight: 800 !important; }
+  .item-invoices-table tbody tr { grid-template-columns: minmax(0, 1fr) auto !important; gap: 5px 10px !important; }
+  .item-invoices-table tbody td:nth-child(1) { color: #66758a !important; font-size: 10px !important; }
+  .item-invoices-table tbody td:nth-child(2) { grid-column: 1 !important; }
+  .item-invoices-table tbody td:nth-child(2) .text-button { max-width: 100% !important; overflow: hidden !important; text-overflow: ellipsis !important; color: #bd1b35 !important; font-size: 12px !important; }
+  .item-invoices-table tbody td:nth-child(3) { grid-column: 1 !important; color: #475569 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+  .item-invoices-table tbody td:nth-child(4),
+  .item-invoices-table tbody td:nth-child(5),
+  .item-invoices-table tbody td:nth-child(6) { grid-column: 2 !important; text-align: right !important; align-self: center !important; }
+  .item-invoices-table tbody td:nth-child(4) { grid-row: 1 !important; color: #66758a !important; }
+  .item-invoices-table tbody td:nth-child(5) { grid-row: 2 !important; color: #182235 !important; font-size: 14px !important; font-weight: 800 !important; }
+  .item-invoices-table tbody td:nth-child(6) { grid-row: 3 !important; }
+  .item-history-status { padding: 3px 7px !important; font-size: 9px !important; }
+  .item-sales-history .modal-actions { margin-top: 14px !important; padding-top: 12px !important; }
+  .item-sales-history .modal-actions .secondary { min-height: 38px !important; padding: 6px 15px !important; border-radius: 10px !important; font-size: 12px !important; }
+}
+
+/* Final compact inventory cards: clear hierarchy without wasted vertical space. */
+@media screen and (max-width: 768px) {
+  .inventory-table-scroll tbody tr {
+    grid-template-columns: 32px minmax(0, 1fr) 36px !important;
+    grid-template-rows: auto auto auto auto !important;
+    gap: 7px 10px !important;
+    padding: 13px 14px 12px !important;
+    background: #fff !important;
+  }
+  .inventory-table-scroll tbody td:nth-child(1) { grid-column: 1 !important; grid-row: 1 !important; align-self: center !important; padding-top: 0 !important; }
+  .inventory-table-scroll tbody td:nth-child(2) { grid-column: 2 !important; grid-row: 1 !important; align-self: center !important; }
+  .inventory-table-scroll tbody td:nth-child(2) .text-button { color: #243b73 !important; font-size: 13px !important; font-weight: 800 !important; line-height: 1.25 !important; }
+  .inventory-table-scroll tbody td:nth-child(2) .text-button strong { color: inherit !important; }
+  .inventory-table-scroll tbody td:nth-child(9) { grid-column: 3 !important; grid-row: 1 !important; align-self: center !important; justify-content: flex-end !important; padding: 0 !important; }
+  .inventory-table-scroll tbody td:nth-child(5),
+  .inventory-table-scroll tbody td:nth-child(6),
+  .inventory-table-scroll tbody td:nth-child(8) {
+    grid-column: 1 / -1 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    min-height: 24px !important;
+    align-items: center !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #334155 !important;
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+  }
+  .inventory-table-scroll tbody td:nth-child(5) { grid-row: 2 !important; padding-top: 7px !important; border-top: 1px solid #edf0f3 !important; }
+  .inventory-table-scroll tbody td:nth-child(6) { grid-row: 3 !important; }
+  .inventory-table-scroll tbody td:nth-child(8) { grid-row: 4 !important; }
+  .inventory-table-scroll tbody td:nth-child(5)::before,
+  .inventory-table-scroll tbody td:nth-child(6)::before,
+  .inventory-table-scroll tbody td:nth-child(8)::before { color: #728197 !important; font-size: 11px !important; font-weight: 600 !important; }
+  .inventory-table-scroll tbody td:nth-child(5) > *,
+  .inventory-table-scroll tbody td:nth-child(6) > *,
+  .inventory-table-scroll tbody td:nth-child(8) > * { justify-self: end !important; font-variant-numeric: tabular-nums !important; }
+  .inventory-table-scroll tbody td:nth-child(5) .inventory-stock-quantity { display: inline-flex !important; align-items: baseline !important; gap: 4px !important; color: #20304d !important; }
+  .inventory-table-scroll tbody td:nth-child(5) .inventory-stock-quantity strong { font-size: 15px !important; }
+  .inventory-table-scroll tbody td:nth-child(5) .inventory-stock-quantity span { color: #69778a !important; font-size: 10px !important; font-weight: 700 !important; }
+  .item-actions-menu .icon-button { width: 32px !important; min-width: 32px !important; height: 32px !important; min-height: 32px !important; border-color: #dfe5ec !important; border-radius: 8px !important; }
+  .item-actions-menu .icon-button svg { width: 16px !important; height: 16px !important; }
 }

@@ -2,7 +2,7 @@ import { matchesItemSearch } from "../../utils/itemSearch";
 import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft, Boxes, ChevronDown, ClipboardList, FileSpreadsheet, MessageCircle, MessageSquare, MoreVertical, Plus, Search, Settings, Share2, Trash2
+  ArrowLeft, Boxes, ChevronDown, ClipboardList, Download, FileSpreadsheet, MessageCircle, MessageSquare, MoreVertical, Pencil, Plus, Search, Settings, Share2, Trash2
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { money } from "../../data";
@@ -819,6 +819,8 @@ export function Parties({
   const [query, setQuery] = useState("");
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Party|undefined>();
+  const [partyActionMenu, setPartyActionMenu] = useState<Party | null>(null);
+  const partyActionMenuRef = useDismissibleDropdown(partyActionMenu !== null, () => setPartyActionMenu(null));
   const [historyParty, setHistoryParty] = useState<Party | null>(null);
   const [ledgerParty, setLedgerParty] = useState<Party | null>(null);
   const [saving, setSaving] = useState(false);
@@ -887,6 +889,25 @@ export function Parties({
       notify("Party updated successfully");
     } catch (error) {
       notify(error instanceof Error ? error.message : "Party update failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteParty = async (party: Party) => {
+    if (!window.confirm(`Delete ${party.name}? Parties linked to invoices will be kept safely.`)) return;
+    try {
+      setSaving(true);
+      const partyId = String(party.id);
+      const result = await api.removeSelectedParties([partyId]);
+      if (result.deletedIds.includes(partyId)) {
+        setRows(rows.filter(row => String(row.id) !== partyId));
+        notify(`${party.name} deleted successfully.`);
+      } else {
+        notify("This party is linked to business records and cannot be deleted.");
+      }
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Party delete failed");
     } finally {
       setSaving(false);
     }
@@ -993,6 +1014,20 @@ export function Parties({
                     </div>
                     <ArrowLeft size={14} style={{ transform: "rotate(180deg)" }} />
                   </button>
+                  <button
+                    onClick={() => {
+                      exportCustomersToExcel(filtered);
+                      setBulkActionDropdownOpen(false);
+                      notify(`Downloaded ${filtered.length.toLocaleString("en-IN")} parties as Excel.`);
+                    }}
+                    className="bulk-add-item-btn"
+                  >
+                    <div>
+                      <strong>Download Parties</strong>
+                      <small>Export the current party list to Excel</small>
+                    </div>
+                    <Download size={14} />
+                  </button>
                 </div>
               )}
             </div>
@@ -1044,9 +1079,28 @@ export function Parties({
                     <button className="icon-button" onClick={() => setLedgerParty(p)} title="View Ledger">
                       <ClipboardList size={16} />
                     </button>
-                    <button className="icon-button" onClick={() => setEditing(p)} title="Edit Party">
-                      <MoreVertical size={16} />
-                    </button>
+                    <div className="party-row-menu-wrap" ref={partyActionMenu?.id === p.id ? partyActionMenuRef : undefined}>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        onClick={() => setPartyActionMenu(current => current?.id === p.id ? null : p)}
+                        title="Party actions"
+                        aria-label={`Actions for ${p.name}`}
+                        aria-expanded={partyActionMenu?.id === p.id}
+                      >
+                        <MoreVertical size={16} />
+                      </button>
+                      {partyActionMenu?.id === p.id && (
+                        <div className="party-row-action-menu">
+                          <button type="button" onClick={() => { setPartyActionMenu(null); setEditing(p); }}>
+                            <Pencil size={15} /> Edit Party
+                          </button>
+                          <button type="button" className="danger" onClick={() => { setPartyActionMenu(null); void deleteParty(p); }}>
+                            <Trash2 size={15} /> Delete Party
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

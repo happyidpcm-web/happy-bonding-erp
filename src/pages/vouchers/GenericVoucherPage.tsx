@@ -1055,7 +1055,8 @@ export function GenericVoucherPage({
       if (!isInvoiceInDateRange(r, dateFilter, customDateRange)) return false;
       if (query.trim()) {
         const q = query.toLowerCase();
-        if (!matchesItemSearch(q, [r.number, r.party, r.notes])) return false;
+        const invoiceItems = (r.items || []).flatMap(item => [item.name, item.hsn, item.variantId]);
+        if (!matchesItemSearch(q, [r.number, r.party, r.notes, ...invoiceItems])) return false;
       }
       return true;
     });
@@ -1320,18 +1321,18 @@ export function GenericVoucherPage({
 
       {/* Subtab Bar matching Image 1 */}
       {type === "Purchase Invoice" && <div className="sales-summary-cards-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
-        <div className="sales-summary-card active-purple-card" style={{ cursor: "default" }}>
+        <button type="button" className={`sales-summary-card ${statusFilter === "All" ? "active-purple-card" : ""}`} onClick={() => setStatusFilter("All")} aria-pressed={statusFilter === "All"} title="Show all purchase invoices">
           <div className="sales-summary-card-head purple-text"><Receipt size={16} /><span>Total Purchases</span></div>
           <h2 className="sales-summary-card-val">{money(purchaseTotals.total)}</h2>
-        </div>
-        <div className="sales-summary-card" style={{ cursor: "default" }}>
+        </button>
+        <button type="button" className={`sales-summary-card ${statusFilter === "Paid" ? "active-purple-card" : ""}`} onClick={() => setStatusFilter("Paid")} aria-pressed={statusFilter === "Paid"} title="Show paid purchase invoices">
           <div className="sales-summary-card-head green-text"><CheckSquare size={16} /><span>Paid</span></div>
           <h2 className="sales-summary-card-val">{money(purchaseTotals.paid)}</h2>
-        </div>
-        <div className="sales-summary-card" style={{ cursor: "default" }}>
+        </button>
+        <button type="button" className={`sales-summary-card ${statusFilter === "Unpaid" ? "active-purple-card" : ""}`} onClick={() => setStatusFilter("Unpaid")} aria-pressed={statusFilter === "Unpaid"} title="Show unpaid purchase invoices">
           <div className="sales-summary-card-head red-text"><Calendar size={16} /><span>Unpaid</span></div>
           <h2 className="sales-summary-card-val">{money(purchaseTotals.unpaid)}</h2>
-        </div>
+        </button>
       </div>}
       <div style={{ borderBottom: "1px solid #e2e8f0", marginBottom: 16, display: "flex", gap: 24 }}>
         <div style={{ borderBottom: "2px solid #4f46e5", paddingBottom: 8, color: "#4f46e5", fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
@@ -1348,7 +1349,7 @@ export function GenericVoucherPage({
               <input
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder="Search..."
+                placeholder={type === "Purchase Invoice" ? "Search supplier, invoice or item..." : "Search invoice, party or item..."}
                 style={{ width: "100%", paddingLeft: 34, paddingRight: 10, height: 38, border: "1px solid #cbd5e1", borderRadius: 8, fontSize: 13, background: "#fff" }}
               />
             </div>

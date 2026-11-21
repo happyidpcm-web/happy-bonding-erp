@@ -101,7 +101,10 @@ export function SalesReportChartCard({ invoices }: { invoices: Invoice[] }) {
   return (
     <article className="card sales-report-card half-width">
       <div className="card-title sales-report-head">
-        <h2>Sales Report - {startDateStr} to {endDateStr}</h2>
+        <div className="sales-report-title">
+          <h2>Sales Report</h2>
+          <p>{startDateStr} – {endDateStr}</p>
+        </div>
         <div ref={reportRef} className="report-select-wrap">
           <button
             type="button"

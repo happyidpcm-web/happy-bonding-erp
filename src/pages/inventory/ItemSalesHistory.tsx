@@ -45,7 +45,7 @@ export function ItemSalesHistory({ item, onClose, onOpenInvoice }: {
         <article className="item-history-stat"><div>Total increased</div><strong className="stock-increase">+{(data.adjustments || []).reduce((sum, row) => sum + Math.max(0, row.quantity), 0).toLocaleString("en-IN")} PCS</strong></article>
         <article className="item-history-stat"><div>Total decreased</div><strong className="stock-decrease">-{(data.adjustments || []).reduce((sum, row) => sum + Math.max(0, -row.quantity), 0).toLocaleString("en-IN")} PCS</strong></article>
       </div>
-      <div className="table-scroll item-history-table"><table>
+      <div className="table-scroll item-history-table item-adjustments-table"><table>
         <thead><tr><th>Date / Time</th><th>Adjustment</th><th className="right">Quantity (PCS)</th></tr></thead>
         <tbody>{(data.adjustments || []).map(row => <tr key={row.id}>
           <td>{new Date(row.date).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</td>
@@ -55,7 +55,7 @@ export function ItemSalesHistory({ item, onClose, onOpenInvoice }: {
       </table></div>
       <h3>Sales invoice transactions</h3>
       {invoiceError && <p role="alert">{invoiceError}</p>}
-      <div className="table-scroll item-history-table">
+      <div className="table-scroll item-history-table item-invoices-table">
         <table>
           <thead><tr><th>Date</th><th>Invoice number</th><th>Customer</th><th className="right">Item quantity</th><th className="right">Item amount</th><th>Payment status</th></tr></thead>
           <tbody>{data.transactions.map(row => <tr key={row.id}>

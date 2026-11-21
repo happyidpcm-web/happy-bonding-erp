@@ -1578,7 +1578,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode, onOpenInv
             onClick={() => notify("This bulk/offer feature is not connected to the backend yet.")}
             style={{ borderColor: "#6366f1", color: "#4f46e5", background: "#f5f3ff", fontWeight: 700 }}
           >
-            <Tag size={15} /> Manage Offer
+            <Tag size={15} /> <span className="items-offer-label"><span className="items-offer-full-label">Manage Offer</span><span className="items-offer-short-label">Offers</span></span>
           </button>
 
           <div ref={reportsRef} className="parties-reports-dropdown" style={{ position: "relative" }}>
@@ -1588,7 +1588,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode, onOpenInv
               onClick={() => setReportsDropdownOpen(!reportsDropdownOpen)}
               title="See all your items specific reports"
             >
-              <FileSpreadsheet size={15} /> Reports <ChevronDown size={14} />
+              <FileSpreadsheet size={15} /> <span className="items-reports-label">Reports</span> <ChevronDown size={14} />
             </button>
             {reportsDropdownOpen && (
               <div className="parties-reports-menu">
@@ -1615,7 +1615,7 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode, onOpenInv
             title="Print Barcode Stickers & Price Tags"
             style={{ background: "#eef2ff", color: "#4f46e5", borderColor: "#c7d2fe", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}
           >
-            <QrCode size={15} /> Barcode Generator
+            <QrCode size={15} /> <span className="items-barcode-label"><span className="items-barcode-full-label">Barcode Generator</span><span className="items-barcode-short-label">Barcode</span></span>
           </button>
 
           <button className="icon-button" title="Item Settings" onClick={() => notify("This feature is not connected to the backend yet.")}>
@@ -1671,10 +1671,6 @@ export function Items({ rows, invoices = [], setRows, notify, apiMode, onOpenInv
                 onChange={e => setQuery(e.target.value)}
                 placeholder="Search by Item Name, SKU, HSN or Size..."
               />
-            </div>
-            <div className="category-select-wrap">
-              <SearchablePicker value={categoryFilter} onChange={setCategoryFilter} placeholder="Search Categories" emptyValue="All Categories" emptyLabel="All Categories" options={categoriesList.map(c => ({ value: c, label: c }))} />
-              <ChevronDown size={14} />
             </div>
             <button
               type="button"
