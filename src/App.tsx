@@ -3933,7 +3933,23 @@ export function AddItemModal({ products: initialProducts, priceMode = "sales", d
                 const qty = qtyMap[String(prod.id)] || 0;
                 const isOutOfStock = priceMode !== "purchase" && prod.stock <= 0;
                 return (
-                  <tr key={prod.id}>
+                  <tr
+                    key={prod.id}
+                    className={`add-items-product-row ${qty > 0 ? "is-selected" : ""}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Add ${prod.name} to bill`}
+                    onClick={event => {
+                      if ((event.target as HTMLElement).closest("button, input, select")) return;
+                      setQty(prod.id, qty + 1);
+                    }}
+                    onKeyDown={event => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setQty(prod.id, qty + 1);
+                      }
+                    }}
+                  >
                     <td>
                       <strong style={{ display: "block", color: "#0f172a" }}>{prod.name}</strong>
                       {isOutOfStock && <span className="insufficient-stock-badge">Insufficient stock</span>}
@@ -3944,19 +3960,19 @@ export function AddItemModal({ products: initialProducts, priceMode = "sales", d
                     <td style={{ textAlign: "right", fontWeight: 700, color: "#0f172a" }}>₹ {itemPrice(prod)}</td>
                     <td style={{ textAlign: "center" }}>
                       {qty === 0 ? (
-                        <button type="button" className="add-items-qty-add-btn" onClick={() => setQty(prod.id, 1)}>
+                        <button type="button" className="add-items-qty-add-btn" onClick={event => { event.stopPropagation(); setQty(prod.id, 1); }}>
                           + Add
                         </button>
                       ) : (
                         <div className="add-items-stepper">
-                          <button type="button" className="add-items-stepper-btn" onClick={() => setQty(prod.id, qty - 1)}>-</button>
+                          <button type="button" className="add-items-stepper-btn" onClick={event => { event.stopPropagation(); setQty(prod.id, qty - 1); }}>-</button>
                           <NumberInput
                             aria-label={`Selected quantity for ${prod.name}`}
                             className="add-items-stepper-input"
                             value={qty}
                             onValueChange={quantity => setQty(prod.id, quantity)}
                           />
-                          <button type="button" className="add-items-stepper-btn" onClick={() => setQty(prod.id, qty + 1)}>+</button>
+                          <button type="button" className="add-items-stepper-btn" onClick={event => { event.stopPropagation(); setQty(prod.id, qty + 1); }}>+</button>
                           <span className="add-items-unit-tag">{prod.unit || "PCS"}</span>
                         </div>
                       )}
@@ -3995,7 +4011,7 @@ export function AddItemModal({ products: initialProducts, priceMode = "sales", d
           </div>
           <div className="add-items-footer-actions">
             <button type="button" className="secondary" onClick={onClose}>Cancel [ESC]</button>
-            <button type="button" className="add-items-btn-primary" onClick={handleAddItemsToBill}>Add to Bill [F7]</button>
+            <button type="button" className="add-items-btn-primary" disabled={selectedCount === 0} onClick={handleAddItemsToBill}>{selectedCount ? `Add ${selectedCount} Item${selectedCount > 1 ? "s" : ""}` : "Add to Bill"}</button>
           </div>
         </div>
       </div>
