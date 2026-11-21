@@ -1307,8 +1307,8 @@ export function GenericVoucherPage({
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", margin: 0 }}>{title}</h1>
         <div className={type === "Purchase Invoice" ? "purchase-header-tools" : undefined} style={{ display: "flex", gap: 10 }}>
           {type === "Purchase Invoice" && <>
-            <button type="button" className="secondary" onClick={() => downloadPurchaseList()} disabled={purchaseListDownloading || !records.length} title="Download all purchase invoices with item details as Excel"><Download size={16} />{purchaseListDownloading ? "Generating Excel..." : "Download Excel"}</button>
-            <button type="button" className="secondary" onClick={() => downloadPurchaseList(true)} disabled={purchaseListDownloading || !records.length} title="Download one row per purchase invoice: party name, total including tax, and tax amount"><FileSpreadsheet size={16} />Download Summary Excel</button>
+            <button type="button" className="secondary purchase-export-btn" onClick={() => downloadPurchaseList()} disabled={purchaseListDownloading || !records.length} title="Download all purchase invoices with item details as Excel"><Download size={16} /><span className="purchase-export-full">{purchaseListDownloading ? "Generating Excel..." : "Download Excel"}</span><span className="purchase-export-short">Excel</span></button>
+            <button type="button" className="secondary purchase-export-btn" onClick={() => downloadPurchaseList(true)} disabled={purchaseListDownloading || !records.length} title="Download one row per purchase invoice: party name, total including tax, and tax amount"><FileSpreadsheet size={16} /><span className="purchase-export-full">Download Summary Excel</span><span className="purchase-export-short">Summary</span></button>
           </>}
           <button type="button" className="icon-button" style={{ border: "1px solid #cbd5e1", borderRadius: 8, padding: 8, background: "#fff" }} title="Settings" onClick={() => setQuickSettingsOpen(true)}>
             <Settings size={16} color="#475569" />
