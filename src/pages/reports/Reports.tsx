@@ -1,3 +1,4 @@
+import { GroupShirtReport } from "../group-shirts/GroupShirtReport";
 import { matchesItemSearch } from "../../utils/itemSearch";
 import { SearchablePicker } from "../../components/SearchablePicker";
 import { ItemSummary } from './ItemSummary';
@@ -795,6 +796,7 @@ export function Reports({
     }
   }, [initialReport]);
 
+  if (activeReport === 'Group shirts') return <GroupShirtReport onBack={() => setActiveReport(null)} />;
   if (activeReport === 'Balance sheet') return <BalanceSummary onBack={() => setActiveReport(null)} />;
   if (activeReport && backendReports[activeReport]) return <BackendReport key={activeReport} report={backendReports[activeReport]} onOpenInvoice={onOpenInvoice} initialDateSelection={initialDateSelection} onBack={() => setActiveReport(null)} notify={notify} />;
   if (activeReport === 'Rate list') return <RateListReportScreen products={products} onBack={() => setActiveReport(null)} notify={notify} />;
@@ -942,6 +944,7 @@ export function Reports({
         { name: "Expense Category Report", targetKey: "Expense categories", tags: ["Category", "Transaction"] },
         { name: "Expense Transaction Report", targetKey: "Expense transactions", tags: ["Category", "Transaction"] },
         { name: "Coupon Report", targetKey: "Coupon report", tags: ["Party", "Invoice Details", "Summary"] },
+        { name: "Group Shirts Report", targetKey: "Group shirts", tags: ["Party", "Summary", "Payment Collection"] },
         { name: "Purchase Summary", targetKey: "Purchase summary", tags: ["Invoice Details", "Summary"] },
       ],
     },

@@ -110,6 +110,10 @@ async function request<T>(path: string, options?: RequestInit, timeoutMs = 30000
 }
 
 export const api = {
+  updateGroupShirtOrder: (id: string, input: import("./pages/group-shirts/types").GroupShirtInput) => request<import("./pages/group-shirts/types").GroupShirtOrder>(`/group-shirts/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) }),
+  updateGroupShirtStatus: (id: string, status: import("./pages/group-shirts/types").GroupShirtStatus) => request<import("./pages/group-shirts/types").GroupShirtOrder>(`/group-shirts/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+  groupShirtOrders: () => request<import("./pages/group-shirts/types").GroupShirtOrder[]>("/group-shirts"),
+  createGroupShirtOrder: (input: import("./pages/group-shirts/types").GroupShirtInput) => request<import("./pages/group-shirts/types").GroupShirtOrder>("/group-shirts", { method: "POST", body: JSON.stringify(input) }),
   async adjustStock(id: string | number, direction: "increase" | "decrease", quantity: number) {
     return request<{ stock: number }>(`/products/${encodeURIComponent(id)}/adjust-stock`, { method: "POST", body: JSON.stringify({ direction, quantity }) });
   },

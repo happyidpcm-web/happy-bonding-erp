@@ -18,6 +18,7 @@ import { nextAvailableSalesNumber } from "./sales-numbering.js";
 import { runSalesTransaction } from "./sales-transaction.js";
 import { planInvoiceEdit } from "./invoice-edit.js";
 import { transactionsRouter } from "./transactions.js";
+import { groupShirtsRouter } from "./group-shirts.js";
 import { bulkProductInput, expenseInput, invoiceInput, invoiceSettingInput, loginInput, parseInput, partyInput, productInput, purchaseStockInput } from "./validation.js";
 
 const app = express();
@@ -89,6 +90,7 @@ app.use("/api/vouchers", voucherRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/email", emailRouter);
 app.use("/api/transactions", transactionsRouter);
+app.use("/api/group-shirts", groupShirtsRouter);
 
 app.get("/api/branches", async (req, res) => {
   const isOwner = req.session!.permissions.includes("*");

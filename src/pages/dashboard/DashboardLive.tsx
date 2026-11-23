@@ -1,3 +1,4 @@
+import { GroupShirtReport } from "../group-shirts/GroupShirtReport";
 import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import React, { useState, useMemo, useEffect } from "react";
 import { ChevronDown, IndianRupee as CircleIndianRupee, CreditCard, WalletCards } from "lucide-react";
@@ -222,6 +223,7 @@ export function DashboardLive({
   invoices,
   ownerSummary = [],
   onNewSale,
+  onOpenGroupShirts,
   onSelectInvoice,
   onSeeAllTransactions: _onSeeAllTransactions,
 }: {
@@ -229,6 +231,7 @@ export function DashboardLive({
   parties: Party[];
   invoices: Invoice[];
   ownerSummary?: OwnerBranchSummary[];
+  onOpenGroupShirts: () => void;
   onNewSale: () => void;
   onSelectInvoice: (inv: Invoice) => void;
   onSeeAllTransactions: () => void;
@@ -275,6 +278,7 @@ export function DashboardLive({
         <Metric label="🏛️ Total Cash + Bank Balance" value={`₹ ${cashBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`} onClick={() => setMetricDetail("cash")} icon={WalletCards} tone="blue" />
       </div>
 
+      <GroupShirtReport compact onOpenOrders={onOpenGroupShirts} />
       {metricDetail && <Modal title={metricDetail === "collect" ? "To Collect" : metricDetail === "pay" ? "To Pay" : "Paid Sales Breakdown"} onClose={() => setMetricDetail(null)}>
         {metricDetail === "cash" && <p>This dashboard total is calculated from paid sales invoices.</p>}
         <div className="table-scroll"><table>
