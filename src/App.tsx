@@ -29,6 +29,7 @@ import { GARMENT_HSN_CODES } from "./data/hsnCodes";
 import { ThermalReceiptTemplate } from "./components/ThermalReceiptTemplate";
 import { BarcodeGeneratorModal } from "./components/BarcodeGeneratorModal";
 import { RemindersModule } from "./pages/reminders/RemindersModule";
+import { GroupShirts } from "./pages/group-shirts/GroupShirts";
 import { ExpensesModule } from "./pages/expenses/ExpensesModule";
 import { CashBank } from "./pages/cash-bank/CashBank";
 import { Staff, StaffManagementModal } from "./pages/staff/Staff";
@@ -73,6 +74,7 @@ const nav: { section: string; items: { id: Page; label: string; icon: typeof Lay
     { id: "parties", label: "Parties", icon: UsersRound },
     { id: "items", label: "Items & Inventory", icon: Boxes },
     { id: "sales", label: "Sales", icon: ReceiptIndianRupee },
+    { id: "group_shirts", label: "Group Shirts", icon: UsersRound },
     { id: "purchases", label: "Purchases", icon: ShoppingBag },
     { id: "reports", label: "Reports", icon: BarChart3 },
   ]},
@@ -522,7 +524,7 @@ export default function App() {
         </div>
       </header>
       <section className={page === "pos" ? "page pos-page" : "page"}>
-        {page === "dashboard" && <DashboardLive products={productRows} parties={partyRows} invoices={invoiceRows} ownerSummary={ownerSummary} onNewSale={openSalesInvoice} onSelectInvoice={openInvoiceDetail} onSeeAllTransactions={() => go("sales")}/>}
+        {page === "dashboard" && <DashboardLive onOpenGroupShirts={() => go("group_shirts")} products={productRows} parties={partyRows} invoices={invoiceRows} ownerSummary={ownerSummary} onNewSale={openSalesInvoice} onSelectInvoice={openInvoiceDetail} onSeeAllTransactions={() => go("sales")}/>}
         {page === "parties" && <Parties onSelectInvoice={openInvoiceDetail} invoiceDetailOpen={!!activeInvoiceModal} rows={partyRows} setRows={setPartyRows} notify={notify} apiMode={apiMode} onNavigateReport={() => setPage("reports")} autoOpenShareLedger={autoOpenShareLedger} onClearAutoOpenShareLedger={() => setAutoOpenShareLedger(false)} />} 
         {page === "items" && <Items key={currentBranchId} rows={productRows} invoices={invoiceRows} setRows={setProductRows} notify={notify} apiMode={apiMode} invoiceDetailOpen={!!activeInvoiceModal} onOpenInvoice={async id => { const invoice = await api.sale(id); setActiveInvoiceModal(invoice); }}/>}
         {page === "sales" && <Sales rows={invoiceRows} products={productRows} parties={partyRows} setting={invoiceSetting} setSetting={setInvoiceSetting} setRows={setInvoiceRows} setParties={setPartyRows} setProducts={setProductRows} notify={notify} key={salesView.key} initialCreate={salesView.create} onSelectInvoice={openInvoiceDetail} onNavigateReports={handleNavigateReportsFromSales}/>}
@@ -541,6 +543,7 @@ export default function App() {
         {page === "expenses" && <ExpensesModule notify={notify} currentBranchId={currentBranchId} />}
 
         {page === "reminders" && <RemindersModule parties={partyRows} invoices={invoiceRows} notify={notify} />}
+        {page === "group_shirts" && <GroupShirts key={currentBranchId} onBack={() => go("dashboard")} />}
 
         {page === "reports" && <Reports onOpenInvoice={async id => { const invoice = await api.sale(id); setActiveInvoiceModal(invoice); }} key={currentBranchId} products={productRows} invoices={invoiceRows} notify={notify} initialReport={activeReportSubScreen} initialDateSelection={reportDateSelection}/>}
         {page === "cash" && <CashBank notify={notify}/>} 

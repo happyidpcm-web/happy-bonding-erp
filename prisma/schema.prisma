@@ -61,6 +61,7 @@ model Organization {
   sequences   DocumentSequence[]
   invoiceSetting InvoiceSetting[]
   auditEvents AuditEvent[]
+  groupShirtOrders GroupShirtOrder[]
   syncQueue   OfflineSyncQueue[]
   creditNotes CreditNote[]
   expenses    Expense[]
@@ -78,6 +79,7 @@ model Branch {
   products           Product[]
   settings           InvoiceSetting[]
   allowNegativeStock Boolean         @default(false)
+  groupShirtOrders GroupShirtOrder[]
   organization       Organization    @relation(fields: [organizationId], references: [id])
   memberships        UserBranch[]
   balances           StockBalance[]
@@ -474,4 +476,37 @@ model Voucher {
 
   @@unique([organizationId, branchId, type, number])
   @@index([organizationId, branchId, type, date])
+}
+
+model GroupShirtOrder {
+  fabricSupplier String @default("")
+  fabricMetres Float @default(0)
+  fabricPrice Float @default(0)
+  transportCost Float @default(0)
+  stitchingQuantity Int @default(0)
+  stitchingPrice Float @default(0)
+  shirtRate Float?
+  discount Float @default(0)
+  vestiQuantity Int @default(0)
+  vestiRate Float @default(0)
+  id String @id @default(cuid())
+  organizationId String
+  branchId String
+  organization Organization @relation(fields: [organizationId], references: [id])
+  branch Branch @relation(fields: [branchId], references: [id])
+  groupName String
+  customerName String
+  phone String
+  deliveryDate String
+  fabric String
+  colour String
+  sleeve String
+  printing String
+  notes String
+  photo String
+  advance Float @default(0)
+  lines Json
+  status String @default("CONFIRMED")
+  createdAt DateTime @default(now())
+  @@index([organizationId, branchId, createdAt])
 }
