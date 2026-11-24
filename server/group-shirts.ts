@@ -12,6 +12,8 @@ export const groupShirtInput = z.object({
   transportCost: z.number().min(0).max(100000000).default(0),
   stitchingQuantity: z.number().int().min(0).max(1000000).default(0),
   stitchingPrice: z.number().min(0).max(1000000).default(0),
+  vestiPurchaseQuantity: z.number().int().min(0).max(10000).default(0),
+  vestiPurchaseRate: z.number().min(0).max(100000).default(0),
   groupName: z.string().trim().min(1).max(150), customerName: z.string().trim().min(1).max(150),
   phone: z.string().trim().regex(/^[+\d ()-]{7,20}$/),
   deliveryDate: z.iso.date(), fabric: z.string().trim().max(150), colour: z.string().trim().max(100),

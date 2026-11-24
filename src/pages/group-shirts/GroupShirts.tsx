@@ -7,7 +7,7 @@ import { money } from "../../data";
 import { orderStatuses, normalizedStatus, statusLabel, type GroupShirtStatus, adultSizes, shirtSizes, sizeLabel, orderAmounts, productionAmounts, type GroupShirtInput, type GroupShirtOrder } from "./types";
 import "./group-shirts.css";
 
-const emptyOrder = (): GroupShirtInput => ({ groupName: "", customerName: "", phone: "", deliveryDate: "", fabric: "", colour: "", sleeve: "Half sleeve", printing: "", notes: "", photo: "", shirtRate: 0, discount: 0, vestiQuantity: 0, vestiRate: 0, advance: 0, lines: shirtSizes.map(size => ({ size, quantity: 0, rate: 0, photo: "" })) });
+const emptyOrder = (): GroupShirtInput => ({ groupName: "", customerName: "", phone: "", deliveryDate: "", fabric: "", colour: "", sleeve: "Half sleeve", printing: "", notes: "", photo: "", shirtRate: 0, discount: 0, vestiQuantity: 0, vestiRate: 0, vestiPurchaseQuantity: 0, vestiPurchaseRate: 0, advance: 0, lines: shirtSizes.map(size => ({ size, quantity: 0, rate: 0, photo: "" })) });
 
 async function readPhoto(file: File): Promise<string> {
   if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 10 * 1024 * 1024) throw new Error("Choose a JPG, PNG or WebP photo under 10 MB.");
@@ -139,7 +139,7 @@ export function GroupShirts({ onBack }: { onBack: () => void }) {
       </div></fieldset>)}
       <fieldset disabled={readonly || saving} className="gs-card"><legend>Vesti (optional)</legend>
         <label className="gs-checkbox"><input type="checkbox" checked={includeVesti} onChange={e => { setIncludeVesti(e.target.checked); if (!e.target.checked) setDraft(d => ({ ...d, vestiQuantity: 0, vestiRate: 0 })); }} /> Add vesti to this order</label>
-        {includeVesti && <div className="gs-fields"><label>Vesti quantity<input type="number" min={1} max={10000} step={1} required value={draft.vestiQuantity} onChange={e => field("vestiQuantity", Number(e.target.value))} /></label><label>Rate per vesti (INR)<input type="number" min={0} max={100000} step="0.01" required value={draft.vestiRate} onChange={e => field("vestiRate", Number(e.target.value))} /></label></div>}
+        {includeVesti && <div className="gs-fields"><label>Vesti quantity<input type="number" min={1} max={10000} step={1} required value={draft.vestiQuantity} onChange={e => field("vestiQuantity", Number(e.target.value))} /></label><label>Selling price per vesti (INR)<input type="number" min={0} max={100000} step="0.01" required value={draft.vestiRate} onChange={e => field("vestiRate", Number(e.target.value))} /></label><p>Vesti sales total<strong>{money(vesti)}</strong></p></div>}
       </fieldset>
       <fieldset disabled={readonly || saving} className="gs-card"><legend>Amount & payment</legend><div className="gs-fields">
         <label>Total shirt quantity<input readOnly value={quantity} /></label>
@@ -168,11 +168,17 @@ export function GroupShirts({ onBack }: { onBack: () => void }) {
           <div className="gs-inline-total"><span>Stitching total</span><strong>{money(costs.stitching)}</strong></div>
         </div>
       </fieldset>
+      <fieldset disabled={readonly || saving} className="gs-card gs-stitching"><legend>Vesti details</legend>
+        <div className="gs-stitching-row"><label>Vesti purchase quantity<input type="number" min={0} max={10000} step={1} value={draft.vestiPurchaseQuantity} onChange={e => field("vestiPurchaseQuantity", Number(e.target.value))} /></label>
+          <label>Purchase price per vesti (INR)<input type="number" min={0} max={100000} step="0.01" value={draft.vestiPurchaseRate} onChange={e => field("vestiPurchaseRate", Number(e.target.value))} /></label>
+          <div className="gs-inline-total"><span>Vesti purchase total</span><strong>{money(costs.vestiPurchase)}</strong></div>
+        </div>
+      </fieldset>
       <div className="gs-card gs-profit-card"><h2>Production cost & profit</h2><div className="gs-profit-row">
-        <p>Fabric purchase total<strong>{money(costs.fabricPurchase)}</strong></p><p>Stitching total<strong>{money(costs.stitching)}</strong></p>
+        <p>Fabric purchase total<strong>{money(costs.fabricPurchase)}</strong></p><p>Stitching total<strong>{money(costs.stitching)}</strong></p><p>Vesti purchase total<strong>{money(costs.vestiPurchase)}</strong></p>
         <p className="gs-cost-total">Production cost<strong>{money(costs.production)}</strong></p>
         <p>Order subtotal<strong>{money(subtotal)}</strong></p><p className={`gs-profit ${costs.profit < 0 ? "gs-loss" : ""}`}>Shirt profit amount<strong>{money(costs.profit)}</strong></p>
-      </div><small>Shirt profit = order subtotal (before discount, including vesti if added) − production cost. Advance does not change profit.</small></div>
+      </div><small>Profit = order subtotal (including vesti sales) − fabric, stitching and vesti purchase costs. Advance does not change profit.</small></div>
       {!readonly && <button className="primary" type="submit" disabled={saving}>{saving ? "Saving order…" : mode === "edit" ? "Save Changes" : "Create Group Shirt Order"}</button>}
     </form>}
   </section>;

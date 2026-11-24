@@ -3,7 +3,7 @@ export const shirtSizes = ["6M", "20", "22", "24", "26", "28", "30", "32", "34",
 export type ShirtLine = { size: string; quantity: number; rate: number; photo: string };
 export type GroupShirtInput = {
   fabricSupplier?: string; fabricMetres?: number; fabricPrice?: number; transportCost?: number;
-  stitchingQuantity?: number; stitchingPrice?: number;
+  stitchingQuantity?: number; stitchingPrice?: number; vestiPurchaseQuantity: number; vestiPurchaseRate: number;
   groupName: string; customerName: string; phone: string; deliveryDate: string;
   fabric: string; colour: string; sleeve: string; printing: string; notes: string;
   shirtRate: number | null; discount: number; vestiQuantity: number; vestiRate: number;
@@ -26,8 +26,9 @@ export function productionAmounts(order: GroupShirtInput) {
   const gst = round(fabricTotal * 0.05);
   const fabricPurchase = round(fabricTotal + gst + (order.transportCost || 0));
   const stitching = round((order.stitchingQuantity || 0) * (order.stitchingPrice || 0));
-  const production = round(fabricPurchase + stitching);
-  return { fabricTotal, gst, fabricPurchase, stitching, production, profit: round(orderAmounts(order).subtotal - production) };
+  const vestiPurchase = round((order.vestiPurchaseQuantity || 0) * (order.vestiPurchaseRate || 0));
+  const production = round(fabricPurchase + stitching + vestiPurchase);
+  return { fabricTotal, gst, fabricPurchase, stitching, vestiPurchase, production, profit: round(orderAmounts(order).subtotal - production) };
 }
 
 export const orderStatuses = ["PROCESSING", "COMPLETED", "DELIVERED"] as const;
