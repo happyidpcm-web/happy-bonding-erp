@@ -1,3 +1,4 @@
+import { isAndroidApp } from "../../utils/mobileServer";
 import { useEffect, useState } from "react";
 import { Plus, Shirt, ArrowLeft, MoreVertical, Eye, Pencil, Search } from "lucide-react";
 import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
@@ -76,7 +77,7 @@ export function GroupShirts({ onBack }: { onBack: () => void }) {
     setEditingId(order.id); setIncludeVesti(order.vestiQuantity > 0); setMode(nextMode); setError(""); setMessage("");
   }
   function field(key: keyof GroupShirtInput, value: string | number) { setDraft(d => ({ ...d, [key]: value })); }
-  return <section className={`group-shirts ${mode === "list" ? "gs-list-page" : ""}`}>
+  return <section className={`group-shirts ${mode === "list" ? "gs-list-page" : ""} ${isAndroidApp() ? "gs-android" : ""}`}>
     {mode === "list" && <button type="button" className="gs-dashboard-back" onClick={onBack}><ArrowLeft size={16} /> Back to Dashboard</button>}
     <header className="gs-header"><div className="gs-heading-content"><span className="gs-heading-icon"><Shirt size={23} aria-hidden="true" /></span><div><h1>Group Shirt Orders</h1><p>Manage orders, sizes and delivery status.</p></div></div>
       {mode === "list" && <button className="primary" onClick={() => { setDraft(emptyOrder()); setIncludeVesti(false); setMode("create"); setError(""); setMessage(""); }}><Plus size={16} /> Create Order</button>}
@@ -93,10 +94,10 @@ export function GroupShirts({ onBack }: { onBack: () => void }) {
       </div>
       <div className="gs-list-toolbar"><div><h2>{statusFilter === "ALL" ? "All orders" : statusFilter === "PROCESSING" ? "Pending orders" : statusLabel(statusFilter) + " orders"}</h2><span>{loading ? "Loading orders..." : `${visibleOrders.length} ${visibleOrders.length === 1 ? "order" : "orders"}`}</span></div><div className="gs-search-control"><Search size={17} aria-hidden="true" /><input className="gs-search" aria-label="Search group orders" placeholder="Search event, customer or phone" value={search} onChange={e => setSearch(e.target.value)} /></div></div>
       {loading ? <p>Loading orders...</p> : <div className="gs-table-wrap"><table className="gs-table">
-        <thead><tr><th>Event</th><th>Customer name</th><th>Mobile number</th><th className="gs-number">Total amount</th><th className="gs-number">Advance amount</th><th className="gs-number">Remaining amount</th><th>Status</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Event</th><th>{isAndroidApp() ? "Customer" : "Customer name"}</th><th>Mobile number</th><th className="gs-number">{isAndroidApp() ? "Total" : "Total amount"}</th><th className="gs-number">Advance amount</th><th className="gs-number">Remaining amount</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>{visibleOrders.map(order => {
           const amounts = orderAmounts(order);
-          return <tr key={order.id}><td><button type="button" className="gs-order-link" onClick={() => openOrder(order, "view")}>{order.groupName}</button></td><td>{order.customerName}</td><td>{order.phone}</td><td className="gs-number">{money(amounts.total)}</td><td className="gs-number">{money(order.advance)}</td><td className="gs-number gs-due">{money(amounts.balance)}</td><td><span className={`gs-status-badge gs-status-${normalizedStatus(order.status).toLowerCase()}`}>{statusLabel(order.status)}</span></td><td><OrderActions order={order} onOpen={openOrder} /></td></tr>;
+          return <tr key={order.id}><td data-label="Event"><button type="button" className="gs-order-link" onClick={() => openOrder(order, "view")}>{order.groupName}</button></td><td data-label="Customer">{order.customerName}</td><td data-label="Mobile">{order.phone}</td><td data-label="Total" className="gs-number">{money(amounts.total)}</td><td data-label="Advance" className="gs-number">{money(order.advance)}</td><td data-label="Balance" className="gs-number gs-due">{money(amounts.balance)}</td><td data-label="Status"><span className={`gs-status-badge gs-status-${normalizedStatus(order.status).toLowerCase()}`}>{statusLabel(order.status)}</span></td><td data-label="Actions"><OrderActions order={order} onOpen={openOrder} /></td></tr>;
         })}
         {!visibleOrders.length && <tr><td colSpan={8} className="gs-empty-row">{search || statusFilter !== "ALL" ? "No orders match this filter." : "No group shirt orders yet. Create your first order to get started."}</td></tr>}
         </tbody></table></div>}

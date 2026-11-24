@@ -70,3 +70,46 @@
 .group-shirts button:focus-visible,.group-shirts input:focus-visible{outline:2px solid #c31332;outline-offset:3px}
 @media(max-width:600px){.group-shirts .gs-header{align-items:flex-start}.group-shirts .gs-header h1{font-size:21px}.gs-list-toolbar{align-items:stretch;flex-direction:column}.gs-search-control{width:100%}.gs-list-page .gs-summary{gap:10px}.group-shirts.gs-list-page .gs-summary button{padding:12px}.gs-heading-icon{width:38px;height:38px}}
 .group-shirts .gs-dashboard-back{margin-bottom:18px;padding:8px 12px;font-size:12px;font-weight:600}
+
+/* Native Android only: compact size pickers and orders that fit the viewport. */
+@media(max-width:700px){
+.group-shirts.gs-android{padding:8px;min-width:0}
+.gs-android .gs-card{padding:12px;margin-bottom:16px}
+.gs-android .gs-card legend{font-size:13px;padding:0 6px}
+.group-shirts.gs-android .gs-compact{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.gs-android .gs-compact .gs-size{padding:8px 6px;gap:7px;border-radius:8px}
+.gs-android .gs-compact h3{font-size:11px;line-height:16px}
+.gs-android .gs-stepper{gap:3px}
+.group-shirts.gs-android .gs-stepper button{flex:0 0 30px;min-width:30px;min-height:36px;height:36px;padding:0;justify-content:center;font-size:18px}
+.group-shirts.gs-android .gs-stepper input{flex:1 1 0;width:0;min-width:0;height:36px;padding:4px 0;font-size:12px}
+.group-shirts.gs-android .gs-header h1{font-size:19px}
+.group-shirts.gs-android .gs-header p{font-size:11px}
+.gs-android .gs-heading-icon{width:34px;height:34px}
+.group-shirts.gs-android .gs-summary button{padding:10px 12px;gap:5px}
+.gs-android .gs-summary strong{font-size:22px}
+.gs-android .gs-summary{margin-bottom:16px}
+.gs-android .gs-list-toolbar{gap:10px}
+.gs-android .gs-table-wrap{border:1px solid #ead8b2;background:#fff;min-height:0;padding:0 0 60px;overflow:visible}
+.gs-android .gs-table{display:table;table-layout:fixed;min-width:0!important;width:100%!important;max-width:100%;box-sizing:border-box}
+.gs-android .gs-table thead{display:table-header-group}
+.gs-android .gs-table tbody{display:table-row-group}
+.gs-android .gs-table tr{display:table-row}
+.gs-android .gs-table th,.gs-android .gs-table td{padding:10px 6px!important;font-size:10px!important;white-space:normal!important;overflow-wrap:anywhere;text-align:left;box-sizing:border-box}
+.gs-android .gs-table th:nth-child(1){width:28%}
+.gs-android .gs-table th:nth-child(2){width:27%}
+.gs-android .gs-table th:nth-child(4){width:28%}
+.gs-android .gs-table th:nth-child(8){width:17%;font-size:8px!important;text-align:center}
+.gs-android .gs-table th{white-space:nowrap!important;vertical-align:middle;height:38px;letter-spacing:0;font-size:9px!important}
+.gs-android .gs-table th.gs-number{text-align:right}
+.gs-android .gs-table td[data-label="Actions"]{text-align:center}
+.gs-android .gs-table thead th:first-child{border-top-left-radius:10px}
+.gs-android .gs-table thead th:last-child{border-top-right-radius:10px}
+.gs-android .gs-table th:nth-child(3),.gs-android .gs-table th:nth-child(5),.gs-android .gs-table th:nth-child(6),.gs-android .gs-table th:nth-child(7),.gs-android .gs-table td[data-label="Mobile"],.gs-android .gs-table td[data-label="Advance"],.gs-android .gs-table td[data-label="Balance"],.gs-android .gs-table td[data-label="Status"]{display:none}
+.gs-android .gs-table td[data-label]::before{content:none}
+.gs-android .gs-table .gs-order-link{font-size:11px;line-height:1.4;text-align:left;overflow-wrap:anywhere;min-width:0}
+.gs-android .gs-table .gs-number{text-align:right}
+.gs-android .gs-table .gs-empty-row{padding:20px 10px!important;text-align:center;line-height:1.6}
+.gs-android .gs-actions>button{min-width:28px;min-height:36px;padding:0;justify-content:center}
+.gs-android .gs-action-menu{z-index:10}
+
+}
