@@ -485,6 +485,8 @@ model GroupShirtOrder {
   transportCost Float @default(0)
   stitchingQuantity Int @default(0)
   stitchingPrice Float @default(0)
+  vestiPurchaseQuantity Int @default(0)
+  vestiPurchaseRate Float @default(0)
   shirtRate Float?
   discount Float @default(0)
   vestiQuantity Int @default(0)
