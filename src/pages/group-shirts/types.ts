@@ -1,5 +1,5 @@
-export const adultSizes = ["M", "L", "XL", "XXL", "3XL", "4XL", "5XL", "6XL", "7XL"] as const;
-export const shirtSizes = ["6M", "20", "22", "24", "26", "28", "30", ...adultSizes] as const;
+export const adultSizes = ["S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL", "6XL", "7XL"] as const;
+export const shirtSizes = ["6M", "20", "22", "24", "26", "28", "30", "32", "34", ...adultSizes] as const;
 export type ShirtLine = { size: string; quantity: number; rate: number; photo: string };
 export type GroupShirtInput = {
   fabricSupplier?: string; fabricMetres?: number; fabricPrice?: number; transportCost?: number;
