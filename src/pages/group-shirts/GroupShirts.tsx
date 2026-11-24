@@ -37,10 +37,18 @@ function Photo({ value, onChange, label }: { value: string; onChange?: (value: s
 
 function OrderActions({ order, onOpen, onDelete, busy }: { order: GroupShirtOrder; onDelete: (order: GroupShirtOrder) => void; busy: boolean; onOpen: (order: GroupShirtOrder, mode: "view" | "edit") => void }) {
   const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => { window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); };
+  }, [open]);
   const ref = useDismissibleDropdown(open, () => setOpen(false));
   return <div className="gs-actions" ref={ref}>
-    <button type="button" disabled={busy} aria-label={`Actions for ${order.groupName}`} aria-expanded={open} onClick={() => setOpen(!open)}><MoreVertical size={20} /></button>
-    {open && <div className="gs-action-menu"><button type="button" onClick={() => { setOpen(false); onOpen(order, "view"); }}><Eye size={16} /> View</button><button type="button" onClick={() => { setOpen(false); onOpen(order, "edit"); }}><Pencil size={16} /> Edit</button><button type="button" style={{ color: "#c31332" }} onClick={() => { setOpen(false); onDelete(order); }}><Trash2 size={16} /> Delete</button></div>}
+    <button type="button" disabled={busy} aria-label={`Actions for ${order.groupName}`} aria-expanded={open} onClick={event => { const rect = event.currentTarget.getBoundingClientRect(); const height = 150; setPosition({ left: Math.max(8, Math.min(rect.right - 160, window.innerWidth - 168)), top: Math.max(8, rect.bottom + height + 8 <= window.innerHeight ? rect.bottom + 4 : rect.top - height - 4) }); setOpen(!open); }}><MoreVertical size={20} /></button>
+    {open && <div className="gs-action-menu" style={{ position: "fixed", top: position.top, left: position.left, right: "auto", width: 160, boxSizing: "border-box", zIndex: 1000 }}><button type="button" onClick={() => { setOpen(false); onOpen(order, "view"); }}><Eye size={16} /> View</button><button type="button" onClick={() => { setOpen(false); onOpen(order, "edit"); }}><Pencil size={16} /> Edit</button><button type="button" style={{ color: "#c31332" }} onClick={() => { setOpen(false); onDelete(order); }}><Trash2 size={16} /> Delete</button></div>}
   </div>;
 }
 
