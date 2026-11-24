@@ -1,6 +1,6 @@
 import { isAndroidApp } from "../../utils/mobileServer";
 import { useEffect, useState } from "react";
-import { Plus, Shirt, ArrowLeft, MoreVertical, Eye, Pencil, Search } from "lucide-react";
+import { Plus, Shirt, ArrowLeft, MoreVertical, Eye, Pencil, Trash2, Search } from "lucide-react";
 import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import { api } from "../../api";
 import { money } from "../../data";
@@ -36,12 +36,12 @@ function Photo({ value, onChange, label }: { value: string; onChange?: (value: s
   </div>;
 }
 
-function OrderActions({ order, onOpen }: { order: GroupShirtOrder; onOpen: (order: GroupShirtOrder, mode: "view" | "edit") => void }) {
+function OrderActions({ order, onOpen, onDelete, busy }: { order: GroupShirtOrder; onDelete: (order: GroupShirtOrder) => void; busy: boolean; onOpen: (order: GroupShirtOrder, mode: "view" | "edit") => void }) {
   const [open, setOpen] = useState(false);
   const ref = useDismissibleDropdown(open, () => setOpen(false));
   return <div className="gs-actions" ref={ref}>
-    <button type="button" aria-label={`Actions for ${order.groupName}`} aria-expanded={open} onClick={() => setOpen(!open)}><MoreVertical size={20} /></button>
-    {open && <div className="gs-action-menu"><button type="button" onClick={() => { setOpen(false); onOpen(order, "view"); }}><Eye size={16} /> View</button><button type="button" onClick={() => { setOpen(false); onOpen(order, "edit"); }}><Pencil size={16} /> Edit</button></div>}
+    <button type="button" disabled={busy} aria-label={`Actions for ${order.groupName}`} aria-expanded={open} onClick={() => setOpen(!open)}><MoreVertical size={20} /></button>
+    {open && <div className="gs-action-menu"><button type="button" onClick={() => { setOpen(false); onOpen(order, "view"); }}><Eye size={16} /> View</button><button type="button" onClick={() => { setOpen(false); onOpen(order, "edit"); }}><Pencil size={16} /> Edit</button><button type="button" style={{ color: "#c31332" }} onClick={() => { setOpen(false); onDelete(order); }}><Trash2 size={16} /> Delete</button></div>}
   </div>;
 }
 
@@ -55,13 +55,23 @@ export function GroupShirts({ onBack }: { onBack: () => void }) {
   const currentStatus = normalizedStatus(orders.find(order => order.id === editingId)?.status || "PROCESSING");
   const visibleOrders = orders.filter(order => (statusFilter === "ALL" || normalizedStatus(order.status) === statusFilter) && (order.groupName + " " + order.customerName + " " + order.phone).toLowerCase().includes(search.toLowerCase()));
   async function changeStatus(status: GroupShirtStatus) {
-    if (saving) return;
+    if (saving || mode !== "edit") return;
     setSaving(true); setError(""); setMessage("");
     try {
       const updated = await api.updateGroupShirtStatus(editingId, status);
       setOrders(rows => rows.map(row => row.id === updated.id ? updated : row));
       setMessage("Order status updated to " + statusLabel(updated.status) + ".");
     } catch (err) { setError(err instanceof Error ? err.message : "Unable to update status"); }
+    finally { setSaving(false); }
+  }
+  async function deleteOrder(order: GroupShirtOrder) {
+    if (saving || !window.confirm('Delete order "' + order.groupName + '" for ' + order.customerName + '? This cannot be undone.')) return;
+    setSaving(true); setError(""); setMessage("");
+    try {
+      await api.deleteGroupShirtOrder(order.id);
+      setOrders(rows => rows.filter(row => row.id !== order.id));
+      setMessage("Group shirt order deleted successfully.");
+    } catch (err) { setError(err instanceof Error ? err.message : "Unable to delete order"); }
     finally { setSaving(false); }
   }
   const [message, setMessage] = useState("");
@@ -84,7 +94,7 @@ export function GroupShirts({ onBack }: { onBack: () => void }) {
     </header>
     {mode !== "list" && <div className="gs-order-toolbar">
       <button type="button" disabled={saving} onClick={() => { setMode("list"); setError(""); setMessage(""); }}><ArrowLeft size={16} /> Back to orders</button>
-      {mode !== "create" && <label className={`gs-status-control gs-status-control-${currentStatus.toLowerCase()}`}><span>Order status</span><select value={currentStatus} disabled={saving} onChange={e => void changeStatus(e.target.value as GroupShirtStatus)}>{orderStatuses.map(status => <option key={status} value={status}>{statusLabel(status)}</option>)}</select></label>}
+      {mode !== "create" && <label className={`gs-status-control gs-status-control-${currentStatus.toLowerCase()}`}><span>Order status</span><select value={currentStatus} disabled={saving || readonly} onChange={e => void changeStatus(e.target.value as GroupShirtStatus)}>{orderStatuses.map(status => <option key={status} value={status}>{statusLabel(status)}</option>)}</select></label>}
     </div>}
     {error && <div className="gs-error" role="alert">{error}{mode === "list" && <button onClick={() => void load()}>Retry</button>}</div>}
     {message && <p role="status">{message}</p>}
@@ -97,7 +107,7 @@ export function GroupShirts({ onBack }: { onBack: () => void }) {
         <thead><tr><th>Event</th><th>{isAndroidApp() ? "Customer" : "Customer name"}</th><th>Mobile number</th><th className="gs-number">{isAndroidApp() ? "Total" : "Total amount"}</th><th className="gs-number">Advance amount</th><th className="gs-number">Remaining amount</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>{visibleOrders.map(order => {
           const amounts = orderAmounts(order);
-          return <tr key={order.id}><td data-label="Event"><button type="button" className="gs-order-link" onClick={() => openOrder(order, "view")}>{order.groupName}</button></td><td data-label="Customer">{order.customerName}</td><td data-label="Mobile">{order.phone}</td><td data-label="Total" className="gs-number">{money(amounts.total)}</td><td data-label="Advance" className="gs-number">{money(order.advance)}</td><td data-label="Balance" className="gs-number gs-due">{money(amounts.balance)}</td><td data-label="Status"><span className={`gs-status-badge gs-status-${normalizedStatus(order.status).toLowerCase()}`}>{statusLabel(order.status)}</span></td><td data-label="Actions"><OrderActions order={order} onOpen={openOrder} /></td></tr>;
+          return <tr key={order.id}><td data-label="Event"><button type="button" className="gs-order-link" onClick={() => openOrder(order, "view")}>{order.groupName}</button></td><td data-label="Customer">{order.customerName}</td><td data-label="Mobile">{order.phone}</td><td data-label="Total" className="gs-number">{money(amounts.total)}</td><td data-label="Advance" className="gs-number">{money(order.advance)}</td><td data-label="Balance" className="gs-number gs-due">{money(amounts.balance)}</td><td data-label="Status"><span className={`gs-status-badge gs-status-${normalizedStatus(order.status).toLowerCase()}`}>{statusLabel(order.status)}</span></td><td data-label="Actions"><OrderActions order={order} onOpen={openOrder} onDelete={order => void deleteOrder(order)} busy={saving} /></td></tr>;
         })}
         {!visibleOrders.length && <tr><td colSpan={8} className="gs-empty-row">{search || statusFilter !== "ALL" ? "No orders match this filter." : "No group shirt orders yet. Create your first order to get started."}</td></tr>}
         </tbody></table></div>}
@@ -161,8 +171,8 @@ export function GroupShirts({ onBack }: { onBack: () => void }) {
       <div className="gs-card gs-profit-card"><h2>Production cost & profit</h2><div className="gs-profit-row">
         <p>Fabric purchase total<strong>{money(costs.fabricPurchase)}</strong></p><p>Stitching total<strong>{money(costs.stitching)}</strong></p>
         <p className="gs-cost-total">Production cost<strong>{money(costs.production)}</strong></p>
-        <p>Order subtotal<strong>{money(subtotal)}</strong></p><p className={`gs-profit ${costs.profit < 0 ? "gs-loss" : ""}`}>Fabric profit amount<strong>{money(costs.profit)}</strong></p>
-      </div><small>Fabric profit = order subtotal (before discount, including vesti if added) − production cost. Advance does not change profit.</small></div>
+        <p>Order subtotal<strong>{money(subtotal)}</strong></p><p className={`gs-profit ${costs.profit < 0 ? "gs-loss" : ""}`}>Shirt profit amount<strong>{money(costs.profit)}</strong></p>
+      </div><small>Shirt profit = order subtotal (before discount, including vesti if added) − production cost. Advance does not change profit.</small></div>
       {!readonly && <button className="primary" type="submit" disabled={saving}>{saving ? "Saving order…" : mode === "edit" ? "Save Changes" : "Create Group Shirt Order"}</button>}
     </form>}
   </section>;

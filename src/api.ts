@@ -110,6 +110,7 @@ async function request<T>(path: string, options?: RequestInit, timeoutMs = 30000
 }
 
 export const api = {
+  deleteGroupShirtOrder: (id: string) => request<{ success: boolean }>(`/group-shirts/${encodeURIComponent(id)}`, { method: "DELETE" }),
   updateGroupShirtOrder: (id: string, input: import("./pages/group-shirts/types").GroupShirtInput) => request<import("./pages/group-shirts/types").GroupShirtOrder>(`/group-shirts/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) }),
   updateGroupShirtStatus: (id: string, status: import("./pages/group-shirts/types").GroupShirtStatus) => request<import("./pages/group-shirts/types").GroupShirtOrder>(`/group-shirts/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
   groupShirtOrders: () => request<import("./pages/group-shirts/types").GroupShirtOrder[]>("/group-shirts"),
