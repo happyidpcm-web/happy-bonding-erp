@@ -64,3 +64,11 @@ groupShirtsRouter.post("/", requirePermission("sales.write"), async (req, res) =
   const order = await db.groupShirtOrder.create({ data: { ...parsed.data, status: "PROCESSING", organizationId: req.session!.organizationId, branchId } });
   res.status(201).json(order);
 });
+
+// Scope deletion to the signed-in organization and selected branch.
+groupShirtsRouter.delete("/:id", requirePermission("sales.write"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  const result = await db.groupShirtOrder.deleteMany({ where: { id: String(req.params.id), organizationId: req.session!.organizationId, branchId } });
+  if (!result.count) return res.status(404).json({ error: "Order not found" });
+  res.json({ success: true });
+});
