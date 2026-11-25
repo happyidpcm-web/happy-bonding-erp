@@ -3,10 +3,10 @@ import { Plus, Shirt, ArrowLeft, MoreVertical, Eye, Pencil, Trash2, Search } fro
 import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import { api } from "../../api";
 import { money } from "../../data";
-import { orderStatuses, normalizedStatus, statusLabel, type GroupShirtStatus, adultSizes, shirtSizes, sizeLabel, orderAmounts, productionAmounts, type GroupShirtInput, type GroupShirtOrder } from "./types";
+import { orderStatuses, normalizedStatus, statusLabel, type GroupShirtStatus, adultSizes, shirtSizes, sizeLabel, sleeveQuantities, orderAmounts, productionAmounts, type GroupShirtInput, type GroupShirtOrder } from "./types";
 import "./group-shirts.css";
 
-const emptyOrder = (): GroupShirtInput => ({ groupName: "", customerName: "", phone: "", deliveryDate: "", fabric: "", colour: "", sleeve: "Half sleeve", printing: "", notes: "", photo: "", shirtRate: 0, discount: 0, vestiQuantity: 0, vestiRate: 0, vestiPurchaseQuantity: 0, vestiPurchaseRate: 0, advance: 0, lines: shirtSizes.map(size => ({ size, quantity: 0, rate: 0, photo: "" })) });
+const emptyOrder = (): GroupShirtInput => ({ groupName: "", customerName: "", phone: "", deliveryDate: "", fabric: "", colour: "", sleeve: "Half sleeve", printing: "", notes: "", photo: "", shirtRate: 0, discount: 0, vestiQuantity: 0, vestiRate: 0, vestiPurchaseQuantity: 0, vestiPurchaseRate: 0, advance: 0, lines: shirtSizes.map(size => ({ size, quantity: 0, halfSleeveQuantity: 0, fullSleeveQuantity: 0, rate: 0, photo: "" })) });
 
 async function readPhoto(file: File): Promise<string> {
   if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 10 * 1024 * 1024) throw new Error("Choose a JPG, PNG or WebP photo under 10 MB.");
@@ -85,12 +85,27 @@ export function GroupShirts({ onBack }: { onBack: () => void }) {
   async function load() { setLoading(true); setError(""); try { setOrders(await api.groupShirtOrders()); } catch (err) { setError(err instanceof Error ? err.message : "Unable to load orders"); } finally { setLoading(false); } }
   useEffect(() => { void load(); }, []);
   const { total, quantity, subtotal, shirts, vesti, balance } = orderAmounts(draft);
+  const sleeveTotals = sleeveQuantities(draft.lines);
   const costs = productionAmounts(draft);
   const [includeVesti, setIncludeVesti] = useState(false);
-  function setQuantity(size: string, value: number) { setDraft(d => ({ ...d, lines: d.lines.map(l => l.size === size ? { ...l, quantity: Math.max(0, Math.min(10000, value)) } : l) })); }
+  function setSleeveQuantity(size: string, sleeve: "halfSleeveQuantity" | "fullSleeveQuantity", value: number) {
+    setDraft(d => ({ ...d, lines: d.lines.map(line => {
+      if (line.size !== size) return line;
+      const half = line.halfSleeveQuantity ?? (line.fullSleeveQuantity == null ? line.quantity : 0);
+      const full = line.fullSleeveQuantity ?? 0;
+      const next = Math.max(0, Math.min(10000, value));
+      const nextHalf = sleeve === "halfSleeveQuantity" ? next : half;
+      const nextFull = sleeve === "fullSleeveQuantity" ? next : full;
+      return { ...line, halfSleeveQuantity: nextHalf, fullSleeveQuantity: nextFull, quantity: nextHalf + nextFull };
+    }) }));
+  }
   const readonly = mode === "view";
   function openOrder(order: GroupShirtOrder, nextMode: "view" | "edit") {
-    setDraft({ ...order, lines: shirtSizes.map(size => order.lines.find(line => line.size === size) || { size, quantity: 0, rate: 0, photo: "" }) });
+    setDraft({ ...order, lines: shirtSizes.map(size => {
+      const line = order.lines.find(item => item.size === size);
+      if (!line) return { size, quantity: 0, halfSleeveQuantity: 0, fullSleeveQuantity: 0, rate: 0, photo: "" };
+      return { ...line, halfSleeveQuantity: line.halfSleeveQuantity ?? (line.fullSleeveQuantity == null ? line.quantity : 0), fullSleeveQuantity: line.fullSleeveQuantity ?? 0 };
+    }) });
     setEditingId(order.id); setIncludeVesti(order.vestiQuantity > 0); setMode(nextMode); setError(""); setMessage("");
   }
   function field(key: keyof GroupShirtInput, value: string | number) { setDraft(d => ({ ...d, [key]: value })); }
@@ -125,11 +140,13 @@ export function GroupShirts({ onBack }: { onBack: () => void }) {
       if (draft.discount > subtotal) { setError("Discount cannot exceed subtotal."); return; }
       if (draft.advance > total) { setError("Advance cannot exceed order total."); return; }
       setSaving(true); setError("");
-      try { const order = mode === "edit" ? await api.updateGroupShirtOrder(editingId, draft) : await api.createGroupShirtOrder(draft); setOrders(rows => mode === "edit" ? rows.map(row => row.id === order.id ? order : row) : [order, ...rows]); setMode("list"); setMessage(mode === "edit" ? "Group shirt order updated successfully." : "Group shirt order created successfully."); } catch (err) { setError(err instanceof Error ? err.message : "Unable to save order"); } finally { setSaving(false); }
+      const sleeve = sleeveTotals.half && sleeveTotals.full ? "Mixed sleeve" : sleeveTotals.full ? "Full sleeve" : "Half sleeve";
+      const payload = { ...draft, sleeve };
+      try { const order = mode === "edit" ? await api.updateGroupShirtOrder(editingId, payload) : await api.createGroupShirtOrder(payload); setOrders(rows => mode === "edit" ? rows.map(row => row.id === order.id ? order : row) : [order, ...rows]); setMode("list"); setMessage(mode === "edit" ? "Group shirt order updated successfully." : "Group shirt order created successfully."); } catch (err) { setError(err instanceof Error ? err.message : "Unable to save order"); } finally { setSaving(false); }
     }}>
       <fieldset disabled={readonly || saving} className="gs-card"><legend>{readonly ? "Order details" : mode === "edit" ? "Edit Group Shirt Order" : "Create Group Shirt Order"}</legend><div className="gs-fields">
         {([ ["groupName", "Group / event name"], ["customerName", "Customer / contact name"], ["phone", "Phone number"], ["deliveryDate", "Delivery date"], ["fabric", "Fabric"], ["colour", "Shirt colour"] ] as const).map(([key, label]) => <label key={key}>{label}<input required={["groupName", "customerName", "phone", "deliveryDate"].includes(key)} maxLength={key === "phone" ? 20 : 150} type={key === "deliveryDate" ? "date" : key === "phone" ? "tel" : "text"} value={draft[key]} onChange={e => field(key, e.target.value)} /></label>)}
-        <label>Sleeve<select value={draft.sleeve} onChange={e => field("sleeve", e.target.value)}><option>Half sleeve</option><option>Full sleeve</option></select></label>
+        <label>Sleeve mix<input readOnly value={sleeveTotals.half && sleeveTotals.full ? "Half & full sleeve" : sleeveTotals.full ? "Full sleeve" : "Half sleeve"} /></label>
         <label>Printing / embroidery details<input maxLength={1000} placeholder="Logo, names, placement, print colour" value={draft.printing} onChange={e => field("printing", e.target.value)} /></label>
       </div><Photo value={draft.photo} label="Upload main shirt photo" onChange={readonly ? undefined : value => field("photo", value)} />
       <p>JPG, PNG or WebP, up to 10 MB. Photos are resized before saving.</p>
@@ -137,11 +154,11 @@ export function GroupShirts({ onBack }: { onBack: () => void }) {
 
       {["Kids sizes", "Adult sizes"].map((title, group) => <fieldset disabled={readonly || saving} className="gs-card" key={title}><legend>{title}</legend><div className="gs-sizes gs-compact">
         {draft.lines.filter(line => group === 0 ? !(adultSizes as readonly string[]).includes(line.size) : (adultSizes as readonly string[]).includes(line.size)).map(line => <div className="gs-size" key={line.size}>
-          <h3>{sizeLabel(line.size)}</h3><div className="gs-stepper">
-            <button type="button" aria-label={"Decrease " + sizeLabel(line.size) + " quantity"} disabled={line.quantity <= 0} onClick={() => setQuantity(line.size, line.quantity - 1)}>-</button>
-            <input aria-label={sizeLabel(line.size) + " quantity"} type="number" min={0} max={10000} step={1} required value={line.quantity} onChange={e => setQuantity(line.size, Number(e.target.value))} />
-            <button type="button" aria-label={"Increase " + sizeLabel(line.size) + " quantity"} disabled={line.quantity >= 10000} onClick={() => setQuantity(line.size, line.quantity + 1)}>+</button>
-          </div>
+          <h3>{sizeLabel(line.size)}</h3>{([ ["halfSleeveQuantity", "Half sleeve"], ["fullSleeveQuantity", "Full sleeve"] ] as const).map(([key, label]) => <div className="gs-sleeve-stepper" key={key}><span>{label}</span><div className="gs-stepper">
+            <button type="button" aria-label={"Decrease " + sizeLabel(line.size) + " " + label} disabled={(line[key] || 0) <= 0} onClick={() => setSleeveQuantity(line.size, key, (line[key] || 0) - 1)}>-</button>
+            <input aria-label={sizeLabel(line.size) + " " + label} type="number" min={0} max={10000} step={1} required value={line[key] || 0} onChange={e => setSleeveQuantity(line.size, key, Number(e.target.value))} />
+            <button type="button" aria-label={"Increase " + sizeLabel(line.size) + " " + label} disabled={(line[key] || 0) >= 10000} onClick={() => setSleeveQuantity(line.size, key, (line[key] || 0) + 1)}>+</button>
+          </div></div>)}
         </div>)}
       </div></fieldset>)}
       <fieldset disabled={readonly || saving} className="gs-card"><legend>Vesti (optional)</legend>
@@ -149,6 +166,8 @@ export function GroupShirts({ onBack }: { onBack: () => void }) {
         {includeVesti && <div className="gs-fields"><label>Vesti quantity<input type="number" min={1} max={10000} step={1} required value={draft.vestiQuantity} onChange={e => field("vestiQuantity", Number(e.target.value))} /></label><label>Selling price per vesti (INR)<input type="number" min={0} max={100000} step="0.01" required value={draft.vestiRate} onChange={e => field("vestiRate", Number(e.target.value))} /></label><p>Vesti sales total<strong>{money(vesti)}</strong></p></div>}
       </fieldset>
       <fieldset disabled={readonly || saving} className="gs-card"><legend>Amount & payment</legend><div className="gs-fields">
+        <label>Half sleeve quantity<input readOnly value={sleeveTotals.half} /></label>
+        <label>Full sleeve quantity<input readOnly value={sleeveTotals.full} /></label>
         <label>Total shirt quantity<input readOnly value={quantity} /></label>
         {draft.shirtRate != null ? <label>Shirt rate (INR)<input type="number" min={0} max={100000} step="0.01" required value={draft.shirtRate} onChange={e => field("shirtRate", Number(e.target.value))} /></label> : <p>Previous order: original size-wise pricing retained.</p>}
         <label>Discount amount (INR)<input type="number" min={0} max={subtotal} step="0.01" required value={draft.discount || 0} onChange={e => field("discount", Number(e.target.value))} /></label>

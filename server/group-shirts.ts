@@ -17,12 +17,13 @@ export const groupShirtInput = z.object({
   groupName: z.string().trim().min(1).max(150), customerName: z.string().trim().min(1).max(150),
   phone: z.string().trim().regex(/^[+\d ()-]{7,20}$/),
   deliveryDate: z.iso.date(), fabric: z.string().trim().max(150), colour: z.string().trim().max(100),
-  sleeve: z.enum(["Half sleeve", "Full sleeve"]), printing: z.string().trim().max(1000), notes: z.string().trim().max(2000),
+  sleeve: z.enum(["Half sleeve", "Full sleeve", "Mixed sleeve"]), printing: z.string().trim().max(1000), notes: z.string().trim().max(2000),
   shirtRate: z.number().min(0).max(100000), discount: z.number().min(0).max(100000000),
   vestiQuantity: z.number().int().min(0).max(10000), vestiRate: z.number().min(0).max(100000),
   photo, advance: z.number().min(0).max(100000000),
-  lines: z.array(z.object({ size: z.enum(shirtSizes), quantity: z.number().int().min(0).max(10000), rate: z.literal(0), photo: z.literal("") })).length(shirtSizes.length),
+  lines: z.array(z.object({ size: z.enum(shirtSizes), quantity: z.number().int().min(0).max(10000), halfSleeveQuantity: z.number().int().min(0).max(10000).optional(), fullSleeveQuantity: z.number().int().min(0).max(10000).optional(), rate: z.literal(0), photo: z.literal("") })).length(shirtSizes.length),
 }).refine(v => new Set(v.lines.map(l => l.size)).size === shirtSizes.length, "Sizes must be unique")
+  .refine(v => v.lines.every(line => line.halfSleeveQuantity === undefined && line.fullSleeveQuantity === undefined || line.quantity === (line.halfSleeveQuantity || 0) + (line.fullSleeveQuantity || 0)), "Each size total must equal its half and full sleeve quantities")
   .refine(v => v.lines.some(l => l.quantity > 0), "Enter at least one shirt quantity")
   .refine(v => v.discount <= orderAmounts(v).subtotal, "Discount cannot exceed subtotal")
   .refine(v => v.advance <= orderAmounts(v).total, "Advance cannot exceed order total");
@@ -41,8 +42,9 @@ groupShirtsRouter.patch("/:id/status", requirePermission("sales.write"), async (
 const legacyEditInput = z.object({
   ...groupShirtInput.shape,
   shirtRate: z.null(),
-  lines: z.array(z.object({ size: z.enum(shirtSizes), quantity: z.number().int().min(0).max(10000), rate: z.number().min(0).max(100000), photo })).length(shirtSizes.length),
+  lines: z.array(z.object({ size: z.enum(shirtSizes), quantity: z.number().int().min(0).max(10000), halfSleeveQuantity: z.number().int().min(0).max(10000).optional(), fullSleeveQuantity: z.number().int().min(0).max(10000).optional(), rate: z.number().min(0).max(100000), photo })).length(shirtSizes.length),
 }).refine(v => new Set(v.lines.map(l => l.size)).size === shirtSizes.length, "Sizes must be unique")
+  .refine(v => v.lines.every(line => line.halfSleeveQuantity === undefined && line.fullSleeveQuantity === undefined || line.quantity === (line.halfSleeveQuantity || 0) + (line.fullSleeveQuantity || 0)), "Each size total must equal its half and full sleeve quantities")
   .refine(v => v.lines.some(l => l.quantity > 0), "Enter at least one shirt quantity")
   .refine(v => v.discount <= orderAmounts(v).subtotal, "Discount cannot exceed subtotal")
   .refine(v => v.advance <= orderAmounts(v).total, "Advance cannot exceed order total");

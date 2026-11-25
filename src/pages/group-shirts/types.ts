@@ -1,6 +1,6 @@
 export const adultSizes = ["S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL", "6XL", "7XL"] as const;
 export const shirtSizes = ["6M", "20", "22", "24", "26", "28", "30", "32", "34", ...adultSizes] as const;
-export type ShirtLine = { size: string; quantity: number; rate: number; photo: string };
+export type ShirtLine = { size: string; quantity: number; halfSleeveQuantity?: number; fullSleeveQuantity?: number; rate: number; photo: string };
 export type GroupShirtInput = {
   fabricSupplier?: string; fabricMetres?: number; fabricPrice?: number; transportCost?: number;
   stitchingQuantity?: number; stitchingPrice?: number; vestiPurchaseQuantity: number; vestiPurchaseRate: number;
@@ -11,6 +11,14 @@ export type GroupShirtInput = {
 };
 export type GroupShirtOrder = GroupShirtInput & { id: string; createdAt: string; status: string };
 export const sizeLabel = (size: string) => size === "6M" ? "6 month baby" : ["20", "22", "24", "26", "28", "30"].includes(size) ? `${(Number(size) - 18) / 2} year / ${size}` : size;
+export function sleeveQuantities(lines: ShirtLine[]) {
+  return lines.reduce((totals, line) => {
+    // Orders created before sleeve-wise entry are treated as half sleeve orders.
+    const half = line.halfSleeveQuantity ?? (line.fullSleeveQuantity == null ? line.quantity : 0);
+    const full = line.fullSleeveQuantity ?? 0;
+    return { half: totals.half + half, full: totals.full + full };
+  }, { half: 0, full: 0 });
+}
 export function orderAmounts(order: GroupShirtInput) {
   const round = (n: number) => Math.round((n + Number.EPSILON * Math.max(1, Math.abs(n))) * 100) / 100;
   const quantity = order.lines.reduce((sum, line) => sum + line.quantity, 0);

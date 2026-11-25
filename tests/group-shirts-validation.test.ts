@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { groupShirtInput, groupShirtStatusInput } from "../server/group-shirts.js";
-import { orderAmounts, productionAmounts, shirtSizes, normalizedStatus } from "../src/pages/group-shirts/types.js";
+import { orderAmounts, productionAmounts, shirtSizes, sleeveQuantities, normalizedStatus } from "../src/pages/group-shirts/types.js";
 
 const valid = () => ({ groupName: "Family function", customerName: "Customer", phone: "9876543210", deliveryDate: "2026-12-10", fabric: "Cotton", colour: "Blue", sleeve: "Half sleeve", printing: "Logo on pocket", notes: "", photo: "", advance: 100, shirtRate: 200, discount: 0, vestiQuantity: 0, vestiRate: 0, lines: shirtSizes.map(size => ({ size, quantity: size === "20" ? 2 : 0, rate: 0, photo: "" })) });
 test("accepts kids and adult size breakdown", () => { assert.equal(groupShirtInput.safeParse(valid()).success, true); });
@@ -31,7 +31,7 @@ test("preserves legacy per-size totals and rounds currency", () => {
 });
 test("calculates fabric GST, transport, stitching and pre-discount profit", () => {
   const input = { ...valid(), shirtRate: 1000, fabricSupplier: "Fabric supplier", fabricMetres: 10, fabricPrice: 100, transportCost: 50, stitchingQuantity: 2, stitchingPrice: 150, discount: 200 };
-  assert.deepEqual(productionAmounts(input), { fabricTotal: 1000, gst: 50, fabricPurchase: 1100, stitching: 300, production: 1400, profit: 600 });
+  assert.deepEqual(productionAmounts(input), { fabricTotal: 1000, gst: 50, fabricPurchase: 1100, stitching: 300, vestiPurchase: 0, production: 1400, profit: 600 });
   const parsed = groupShirtInput.parse(input);
   assert.equal(parsed.fabricSupplier, "Fabric supplier");
   assert.equal(parsed.stitchingQuantity, 2);
@@ -71,4 +71,14 @@ test("includes legacy confirmed orders in pending and keeps completed and delive
   assert.equal(statuses.filter(status => status === "PROCESSING").length, 3);
   assert.equal(statuses.filter(status => status === "COMPLETED").length, 1);
   assert.equal(statuses.filter(status => status === "DELIVERED").length, 1);
+});
+test("stores independent half and full sleeve quantities for every size", () => {
+  const input = valid();
+  const size = input.lines.find(line => line.size === "M")!;
+  size.quantity = 5; size.halfSleeveQuantity = 2; size.fullSleeveQuantity = 3;
+  assert.equal(groupShirtInput.safeParse(input).success, true);
+  assert.deepEqual(sleeveQuantities(input.lines), { half: 4, full: 3 });
+  assert.equal(orderAmounts(input).quantity, 7);
+  size.quantity = 4;
+  assert.equal(groupShirtInput.safeParse(input).success, false);
 });
