@@ -103,7 +103,11 @@ async function request<T>(path: string, options?: RequestInit, timeoutMs = 30000
     if (!response.ok) throw new Error(formatApiError(body));
     return body as T;
   } catch (error) {
-    const failure = controller.signal.aborted ? new Error(`Backend request timed out (${path}). Check your connection and retry. If you were saving, check the records before saving again.`) : error;
+    const failure = controller.signal.aborted
+      ? new Error(`Backend request timed out (${path}). Check your connection and retry. If you were saving, check the records before saving again.`)
+      : error instanceof TypeError && /failed to fetch/i.test(error.message)
+        ? new Error("Can't reach the server. Check the app connection and try again.")
+        : error;
     window.dispatchEvent(new CustomEvent("hb-api-error", { detail: failure instanceof Error ? failure.message : "Backend request failed" }));
     throw failure;
   } finally { window.clearTimeout(timeout); }

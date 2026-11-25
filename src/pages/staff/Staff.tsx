@@ -453,6 +453,7 @@ function AttendanceModal({ value, checkIn, checkOut, notes, saving, onCheckIn, o
 
 function ClockTimePicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"HOUR" | "MINUTE">("HOUR");
   const parsed = /^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i.exec(value);
   const rawHour = parsed ? Number(parsed[1]) : 9;
   const minute = parsed ? Math.min(59, Number(parsed[2])) : 0;
@@ -464,8 +465,19 @@ function ClockTimePicker({ value, onChange }: { value: string; onChange: (value:
     const nextHour24 = (nextHour12 % 12) + (nextMeridiem === "PM" ? 12 : 0);
     onChange(`${String(nextHour24).padStart(2, "0")}:${String(nextMinute).padStart(2, "0")}`);
   };
-  const display = value ? `${String(hour12).padStart(2, "0")}:${String(minute).padStart(2, "0")} ${meridiem}` : "Select time";
-  return <div className="staff-clock-picker"><button type="button" className="staff-clock-trigger" aria-expanded={open} onClick={() => setOpen(current => !current)}><span>{display}</span><Clock3 size={17} /></button>{open && <div className="staff-clock-popover"><div className="staff-clock-heading"><Clock3 size={16} /> Select time</div><div className="staff-clock-hours">{Array.from({ length: 12 }, (_, index) => index + 1).map(hour => <button key={hour} type="button" className={hour === hour12 ? "active" : ""} onClick={() => save(hour, minute, meridiem)}>{hour}</button>)}</div><div className="staff-clock-footer"><label>Minutes<select value={minute} onChange={event => save(hour12, Number(event.target.value), meridiem)}>{Array.from({ length: 60 }, (_, index) => <option key={index} value={index}>{String(index).padStart(2, "0")}</option>)}</select></label><div className="staff-clock-meridiem"><button type="button" className={meridiem === "AM" ? "active" : ""} onClick={() => save(hour12, minute, "AM")}>AM</button><button type="button" className={meridiem === "PM" ? "active" : ""} onClick={() => save(hour12, minute, "PM")}>PM</button></div><button type="button" className="staff-clock-done" onClick={() => setOpen(false)}>Done</button></div></div>}</div>;
+  const openPicker = (nextMode: "HOUR" | "MINUTE") => { setMode(nextMode); setOpen(true); };
+  const clockValues = mode === "HOUR" ? Array.from({ length: 12 }, (_, index) => index + 1) : Array.from({ length: 12 }, (_, index) => index * 5);
+  const selectedValue = mode === "HOUR" ? hour12 : minute;
+  const selectValue = (nextValue: number) => {
+    if (mode === "HOUR") {
+      save(nextValue, minute, meridiem);
+      setMode("MINUTE");
+      return;
+    }
+    save(hour12, nextValue, meridiem);
+    setOpen(false);
+  };
+  return <div className="staff-clock-picker"><div className="staff-clock-trigger" aria-label="Select time"><button type="button" className={open && mode === "HOUR" ? "active" : ""} onClick={() => openPicker("HOUR")}>{String(hour12).padStart(2, "0")}</button><span>:</span><button type="button" className={open && mode === "MINUTE" ? "active" : ""} onClick={() => openPicker("MINUTE")}>{String(minute).padStart(2, "0")}</button><button type="button" className="staff-clock-meridiem-toggle" onClick={() => save(hour12, minute, meridiem === "AM" ? "PM" : "AM")}>{meridiem}</button><button type="button" className="staff-clock-icon" aria-label="Open time picker" aria-expanded={open} onClick={() => open ? setOpen(false) : openPicker("HOUR")}><Clock3 size={17} /></button></div>{open && <div className="staff-clock-popover"><div className="staff-clock-heading"><Clock3 size={16} /> <strong>{mode === "HOUR" ? "Select hour" : "Select minutes"}</strong><span>{mode === "HOUR" ? "Next: minutes" : "Tap a minute to finish"}</span></div><div className={`staff-clock-hours ${mode === "MINUTE" ? "minutes" : ""}`}>{clockValues.map(clockValue => <button key={clockValue} type="button" className={clockValue === selectedValue ? "active" : ""} onClick={() => selectValue(clockValue)}>{mode === "HOUR" ? clockValue : String(clockValue).padStart(2, "0")}</button>)}</div><div className="staff-clock-footer"><button type="button" className="staff-clock-step" onClick={() => setMode(current => current === "HOUR" ? "MINUTE" : "HOUR")}>{mode === "HOUR" ? "Minutes" : "Hours"}</button><div className="staff-clock-meridiem"><button type="button" className={meridiem === "AM" ? "active" : ""} onClick={() => save(hour12, minute, "AM")}>AM</button><button type="button" className={meridiem === "PM" ? "active" : ""} onClick={() => save(hour12, minute, "PM")}>PM</button></div><button type="button" className="staff-clock-done" onClick={() => setOpen(false)}>Done</button></div></div>}</div>;
 }
 
 function AttendanceStaffModal({ notify, onClose, onCreated }: { notify: (message: string) => void; onClose: () => void; onCreated: () => void }) {
