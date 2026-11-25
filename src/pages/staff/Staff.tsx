@@ -445,10 +445,27 @@ function AttendancePeriodControl({ mode, month, week, onModeChange, onMonthChang
 function AttendanceModal({ value, checkIn, checkOut, notes, saving, onCheckIn, onCheckOut, onNotes, onClose, onSave }: { value: { staff: AttendanceStaff; date: string; status: StaffAttendanceStatus }; checkIn: string; checkOut: string; notes: string; saving: boolean; onCheckIn: (value: string) => void; onCheckOut: (value: string) => void; onNotes: (value: string) => void; onClose: () => void; onSave: (event: React.FormEvent) => void }) {
   return <Modal title={`${attendanceLabels[value.status]} attendance — ${value.staff.name}`} onClose={onClose}><form className="staff-attendance-form" onSubmit={onSave}>
     <div className="staff-attendance-date"><CalendarDays size={19} /><div><strong>{new Date(`${value.date}T00:00:00`).toLocaleDateString("en-IN", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}</strong><span>Daily attendance entry</span></div><b className={`staff-status staff-status-${value.status.toLowerCase()}`}>{attendanceLabels[value.status]}</b></div>
-    {value.status === "PRESENT" ? <><p className="staff-attendance-helper">Enter the actual arrival and departure time for this staff member.</p><div className="staff-time-grid"><label>Check-in time<input type="time" required value={checkIn} onChange={event => onCheckIn(event.target.value)} /></label><label>Check-out time<input type="time" required value={checkOut} onChange={event => onCheckOut(event.target.value)} /></label></div></> : <p className="staff-attendance-helper">No working time is required for {attendanceLabels[value.status].toLowerCase()} attendance.</p>}
+    {value.status === "PRESENT" ? <><p className="staff-attendance-helper">Enter the actual arrival and departure time for this staff member.</p><div className="staff-time-grid"><label>Check-in time<ClockTimePicker value={checkIn} onChange={onCheckIn} /></label><label>Check-out time<ClockTimePicker value={checkOut} onChange={onCheckOut} /></label></div></> : <p className="staff-attendance-helper">No working time is required for {attendanceLabels[value.status].toLowerCase()} attendance.</p>}
     <label className="staff-notes">Notes <span>(optional)</span><input maxLength={500} value={notes} onChange={event => onNotes(event.target.value)} placeholder="Example: Half day, approved leave reason" /></label>
     <div className="modal-actions staff-attendance-actions"><button type="button" className="secondary" onClick={onClose} disabled={saving}>Cancel</button><button className="primary" disabled={saving}>{saving ? "Saving…" : "Save attendance"}</button></div>
   </form></Modal>;
+}
+
+function ClockTimePicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const parsed = /^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i.exec(value);
+  const rawHour = parsed ? Number(parsed[1]) : 9;
+  const minute = parsed ? Math.min(59, Number(parsed[2])) : 0;
+  const inferredPm = parsed?.[3] ? parsed[3].toUpperCase() === "PM" : rawHour >= 12;
+  const hour24 = parsed?.[3] ? (rawHour % 12) + (inferredPm ? 12 : 0) : rawHour % 24;
+  const hour12 = hour24 % 12 || 12;
+  const meridiem = hour24 >= 12 ? "PM" : "AM";
+  const save = (nextHour12: number, nextMinute: number, nextMeridiem: "AM" | "PM") => {
+    const nextHour24 = (nextHour12 % 12) + (nextMeridiem === "PM" ? 12 : 0);
+    onChange(`${String(nextHour24).padStart(2, "0")}:${String(nextMinute).padStart(2, "0")}`);
+  };
+  const display = value ? `${String(hour12).padStart(2, "0")}:${String(minute).padStart(2, "0")} ${meridiem}` : "Select time";
+  return <div className="staff-clock-picker"><button type="button" className="staff-clock-trigger" aria-expanded={open} onClick={() => setOpen(current => !current)}><span>{display}</span><Clock3 size={17} /></button>{open && <div className="staff-clock-popover"><div className="staff-clock-heading"><Clock3 size={16} /> Select time</div><div className="staff-clock-hours">{Array.from({ length: 12 }, (_, index) => index + 1).map(hour => <button key={hour} type="button" className={hour === hour12 ? "active" : ""} onClick={() => save(hour, minute, meridiem)}>{hour}</button>)}</div><div className="staff-clock-footer"><label>Minutes<select value={minute} onChange={event => save(hour12, Number(event.target.value), meridiem)}>{Array.from({ length: 60 }, (_, index) => <option key={index} value={index}>{String(index).padStart(2, "0")}</option>)}</select></label><div className="staff-clock-meridiem"><button type="button" className={meridiem === "AM" ? "active" : ""} onClick={() => save(hour12, minute, "AM")}>AM</button><button type="button" className={meridiem === "PM" ? "active" : ""} onClick={() => save(hour12, minute, "PM")}>PM</button></div><button type="button" className="staff-clock-done" onClick={() => setOpen(false)}>Done</button></div></div>}</div>;
 }
 
 function AttendanceStaffModal({ notify, onClose, onCreated }: { notify: (message: string) => void; onClose: () => void; onCreated: () => void }) {
