@@ -110,6 +110,9 @@ async function request<T>(path: string, options?: RequestInit, timeoutMs = 30000
 }
 
 export const api = {
+  groupShirtAmountTransactions: () => request<import("./pages/group-shirts/types").GroupShirtAmountSummary>("/group-shirts/amount-transactions"),
+  setGroupShirtOpeningAmount: (openingAmount: number) => request<import("./pages/group-shirts/types").GroupShirtAmountSummary>("/group-shirts/amount-transactions/opening", { method: "PUT", body: JSON.stringify({ openingAmount }) }),
+  updateGroupShirtCostStatus: (id: string, input: Pick<import("./pages/group-shirts/types").GroupShirtInput, "fabricPaymentStatus" | "vestiPaymentStatus" | "stitchingPaymentStatus">) => request<import("./pages/group-shirts/types").GroupShirtOrder>(`/group-shirts/${encodeURIComponent(id)}/cost-status`, { method: "PATCH", body: JSON.stringify(input) }),
   deleteGroupShirtOrder: (id: string) => request<{ success: boolean }>(`/group-shirts/${encodeURIComponent(id)}`, { method: "DELETE" }),
   updateGroupShirtOrder: (id: string, input: import("./pages/group-shirts/types").GroupShirtInput) => request<import("./pages/group-shirts/types").GroupShirtOrder>(`/group-shirts/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) }),
   updateGroupShirtStatus: (id: string, status: import("./pages/group-shirts/types").GroupShirtStatus) => request<import("./pages/group-shirts/types").GroupShirtOrder>(`/group-shirts/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
@@ -183,6 +186,12 @@ export const api = {
 
   async ownerSummary(): Promise<OwnerBranchSummary[]> { return request<OwnerBranchSummary[]>("/owner/summary"); },
   async staff(): Promise<StaffUser[]> { return request<StaffUser[]>("/staff"); },
+  async staffAttendance(month: string, staffId?: string): Promise<import("./types").StaffAttendance[]> { return request<import("./types").StaffAttendance[]>(`/staff/attendance?month=${encodeURIComponent(month)}${staffId ? `&staffId=${encodeURIComponent(staffId)}` : ""}`); },
+  async saveStaffAttendance(staffId: string, date: string, input: { status: import("./types").StaffAttendanceStatus; checkIn?: string | null; checkOut?: string | null; notes?: string }): Promise<import("./types").StaffAttendance> { return request<import("./types").StaffAttendance>(`/staff/${encodeURIComponent(staffId)}/attendance/${encodeURIComponent(date)}`, { method: "PUT", body: JSON.stringify(input) }); },
+  async attendanceStaff(): Promise<import("./types").AttendanceStaff[]> { return request<import("./types").AttendanceStaff[]>("/attendance-staff"); },
+  async createAttendanceStaff(input: { name: string; phone?: string; role?: string }): Promise<import("./types").AttendanceStaff> { return request<import("./types").AttendanceStaff>("/attendance-staff", { method: "POST", body: JSON.stringify(input) }); },
+  async attendanceEntries(month: string, staffId?: string): Promise<import("./types").StaffAttendance[]> { return request<import("./types").StaffAttendance[]>(`/attendance-staff/entries?month=${encodeURIComponent(month)}${staffId ? `&staffId=${encodeURIComponent(staffId)}` : ""}`); },
+  async saveAttendanceEntry(staffId: string, date: string, input: { status: import("./types").StaffAttendanceStatus; checkIn?: string | null; checkOut?: string | null; notes?: string }): Promise<import("./types").StaffAttendance> { return request<import("./types").StaffAttendance>(`/attendance-staff/${encodeURIComponent(staffId)}/attendance/${encodeURIComponent(date)}`, { method: "PUT", body: JSON.stringify(input) }); },
   async changePassword(currentPassword: string, newPassword: string): Promise<{ ok: boolean; message: string }> {
       return await request("/auth/change-password", { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) });
 

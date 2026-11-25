@@ -1,0 +1,4 @@
+ALTER TABLE "GroupShirtOrder"
+ADD COLUMN "fabricPaymentStatus" TEXT NOT NULL DEFAULT 'PENDING',
+ADD COLUMN "vestiPaymentStatus" TEXT NOT NULL DEFAULT 'PENDING',
+ADD COLUMN "stitchingPaymentStatus" TEXT NOT NULL DEFAULT 'PENDING';

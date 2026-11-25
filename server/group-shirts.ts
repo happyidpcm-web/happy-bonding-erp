@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { orderAmounts, shirtSizes, orderStatuses } from "../src/pages/group-shirts/types.js";
+import { groupShirtAmountTotals, orderAmounts, paidProductionAmounts, productionAmounts, productionPaymentStatuses, shirtSizes, orderStatuses, stitchingPaymentStatuses, type GroupShirtInput, type GroupShirtAmountSummary } from "../src/pages/group-shirts/types.js";
 import { z } from "zod";
 import { db } from "./db.js";
 import { requireBranch, requirePermission } from "./auth.js";
@@ -21,6 +21,9 @@ export const groupShirtInput = z.object({
   shirtRate: z.number().min(0).max(100000), discount: z.number().min(0).max(100000000),
   vestiQuantity: z.number().int().min(0).max(10000), vestiRate: z.number().min(0).max(100000),
   photo, advance: z.number().min(0).max(100000000),
+  fabricPaymentStatus: z.enum(productionPaymentStatuses).default("PENDING"),
+  vestiPaymentStatus: z.enum(productionPaymentStatuses).default("PENDING"),
+  stitchingPaymentStatus: z.enum(stitchingPaymentStatuses).default("PENDING"),
   lines: z.array(z.object({ size: z.enum(shirtSizes), quantity: z.number().int().min(0).max(10000), halfSleeveQuantity: z.number().int().min(0).max(10000).optional(), fullSleeveQuantity: z.number().int().min(0).max(10000).optional(), rate: z.literal(0), photo: z.literal("") })).length(shirtSizes.length),
 }).refine(v => new Set(v.lines.map(l => l.size)).size === shirtSizes.length, "Sizes must be unique")
   .refine(v => v.lines.every(line => line.halfSleeveQuantity === undefined && line.fullSleeveQuantity === undefined || line.quantity === (line.halfSleeveQuantity || 0) + (line.fullSleeveQuantity || 0)), "Each size total must equal its half and full sleeve quantities")
@@ -29,7 +32,61 @@ export const groupShirtInput = z.object({
   .refine(v => v.advance <= orderAmounts(v).total, "Advance cannot exceed order total");
 
 export const groupShirtStatusInput = z.object({ status: z.enum(orderStatuses) }).strict();
+export const groupShirtCostStatusInput = z.object({
+  fabricPaymentStatus: z.enum(productionPaymentStatuses),
+  vestiPaymentStatus: z.enum(productionPaymentStatuses),
+  stitchingPaymentStatus: z.enum(stitchingPaymentStatuses),
+}).strict();
+const groupShirtOpeningInput = z.object({ openingAmount: z.number().min(0).max(100000000) }).strict();
 export const groupShirtsRouter = Router();
+
+async function amountSummary(organizationId: string, branchId: string): Promise<GroupShirtAmountSummary> {
+  const [opening, orders] = await Promise.all([
+    db.groupShirtAmountOpening.findUnique({ where: { organizationId_branchId: { organizationId, branchId } } }),
+    db.groupShirtOrder.findMany({ where: { organizationId, branchId }, orderBy: { createdAt: "desc" } }),
+  ]);
+  const totals = groupShirtAmountTotals(orders as unknown as GroupShirtInput[], opening?.openingAmount ?? 0);
+  return {
+    ...totals,
+    transactions: orders.map(order => {
+      const input = order as unknown as GroupShirtInput;
+      const costs = paidProductionAmounts(input);
+      return {
+        id: order.id, createdAt: order.createdAt.toISOString(), groupName: order.groupName, customerName: order.customerName,
+        fabricPurchase: costs.fabricPurchase, vestiPurchase: costs.vestiPurchase, stitching: costs.stitching,
+        productionCost: costs.production, orderSubtotal: orderAmounts(input).subtotal, shirtProfit: productionAmounts(input).profit,
+      };
+    }),
+  };
+}
+
+groupShirtsRouter.get("/amount-transactions", async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  res.json(await amountSummary(req.session!.organizationId, branchId));
+});
+
+groupShirtsRouter.put("/amount-transactions/opening", requirePermission("sales.write"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  const parsed = groupShirtOpeningInput.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Opening amount must be between 0 and 10 crore." });
+  await db.groupShirtAmountOpening.upsert({
+    where: { organizationId_branchId: { organizationId: req.session!.organizationId, branchId } },
+    create: { organizationId: req.session!.organizationId, branchId, openingAmount: parsed.data.openingAmount },
+    update: { openingAmount: parsed.data.openingAmount },
+  });
+  res.json(await amountSummary(req.session!.organizationId, branchId));
+});
+
+groupShirtsRouter.patch("/:id/cost-status", requirePermission("sales.write"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  const parsed = groupShirtCostStatusInput.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Choose valid fabric, vesti and stitching payment statuses." });
+  const where = { id: String(req.params.id), organizationId: req.session!.organizationId, branchId };
+  const existing = await db.groupShirtOrder.findFirst({ where });
+  if (!existing) return res.status(404).json({ error: "Order not found" });
+  res.json(await db.groupShirtOrder.update({ where, data: parsed.data }));
+});
+
 groupShirtsRouter.patch("/:id/status", requirePermission("sales.write"), async (req, res) => {
   const branchId = requireBranch(req, res); if (!branchId) return;
   const parsed = groupShirtStatusInput.safeParse(req.body);

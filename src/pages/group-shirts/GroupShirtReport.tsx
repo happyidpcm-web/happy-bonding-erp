@@ -29,11 +29,15 @@ export function GroupShirtReport({ compact = false, onBack, onOpenOrders }: { co
     window.addEventListener("focus", refresh);
     return () => { active = false; window.removeEventListener("focus", refresh); };
   }, [branchId, reload]);
-  if (compact) return <button type="button" className="gsr-dashboard-card" onClick={onOpenOrders}>
-    <span className="gsr-dashboard-icon"><Shirt size={22} /></span>
-    <span className="gsr-dashboard-copy"><span>Group Shirt Orders</span><strong>{loading ? "Loading..." : error ? "View orders" : orders.length.toLocaleString("en-IN")}</strong><small>{error ? "Open orders to retry" : "View all orders"}</small></span>
-    <ArrowRight size={18} aria-hidden="true" />
-  </button>;
+  if (compact) {
+    const count = (value: string) => orders.filter(order => normalizedStatus(order.status) === value).length;
+    return <button type="button" className="gsr-dashboard-card" onClick={onOpenOrders}>
+      <span className="gsr-dashboard-icon"><Shirt size={23} /></span>
+      <span className="gsr-dashboard-copy"><span>Group Shirt Orders</span><strong>{loading ? "Loading…" : error ? "Open orders" : `${orders.length.toLocaleString("en-IN")} orders`}</strong><small>{error ? "Open orders to retry" : "Create, track and manage delivery status"}</small></span>
+      <span className="gsr-dashboard-counts" aria-label="Group shirt order status summary"><span><small>Processing</small><b>{loading ? "–" : count("PROCESSING")}</b></span><span><small>Completed</small><b>{loading ? "–" : count("COMPLETED")}</b></span><span><small>Delivered</small><b>{loading ? "–" : count("DELIVERED")}</b></span></span>
+      <span className="gsr-dashboard-open">Open orders <ArrowRight size={18} aria-hidden="true" /></span>
+    </button>;
+  }
   const orderDate = (date: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(date));
   const invalidRange = !!(from && to && from > to);
   const periodOrders = orders.filter(order => {

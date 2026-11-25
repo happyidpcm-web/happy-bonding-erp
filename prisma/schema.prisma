@@ -62,6 +62,10 @@ model Organization {
   invoiceSetting InvoiceSetting[]
   auditEvents AuditEvent[]
   groupShirtOrders GroupShirtOrder[]
+  groupShirtAmountOpenings GroupShirtAmountOpening[]
+  staffAttendances StaffAttendance[]
+  attendanceStaff AttendanceStaff[]
+  attendanceEntries AttendanceEntry[]
   syncQueue   OfflineSyncQueue[]
   creditNotes CreditNote[]
   expenses    Expense[]
@@ -80,6 +84,10 @@ model Branch {
   settings           InvoiceSetting[]
   allowNegativeStock Boolean         @default(false)
   groupShirtOrders GroupShirtOrder[]
+  groupShirtAmountOpenings GroupShirtAmountOpening[]
+  staffAttendances StaffAttendance[]
+  attendanceStaff AttendanceStaff[]
+  attendanceEntries AttendanceEntry[]
   organization       Organization    @relation(fields: [organizationId], references: [id])
   memberships        UserBranch[]
   balances           StockBalance[]
@@ -107,6 +115,7 @@ model User {
   role           Role         @relation(fields: [roleId], references: [id])
   branches       UserBranch[]
   auditEvents    AuditEvent[]
+  attendances    StaffAttendance[]
 
   @@index([organizationId])
 }
@@ -487,6 +496,9 @@ model GroupShirtOrder {
   stitchingPrice Float @default(0)
   vestiPurchaseQuantity Int @default(0)
   vestiPurchaseRate Float @default(0)
+  fabricPaymentStatus String @default("PENDING")
+  vestiPaymentStatus String @default("PENDING")
+  stitchingPaymentStatus String @default("PENDING")
   shirtRate Float?
   discount Float @default(0)
   vestiQuantity Int @default(0)
@@ -511,4 +523,78 @@ model GroupShirtOrder {
   status String @default("CONFIRMED")
   createdAt DateTime @default(now())
   @@index([organizationId, branchId, createdAt])
+}
+
+model GroupShirtAmountOpening {
+  id String @id @default(cuid())
+  organizationId String
+  branchId String
+  openingAmount Float @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id])
+  branch Branch @relation(fields: [branchId], references: [id])
+
+  @@unique([organizationId, branchId])
+  @@index([organizationId, branchId])
+}
+
+
+model StaffAttendance {
+  id String @id @default(cuid())
+  organizationId String
+  branchId String
+  staffId String
+  attendanceDate String
+  status String @default("PRESENT")
+  checkIn String?
+  checkOut String?
+  notes String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id])
+  branch Branch @relation(fields: [branchId], references: [id])
+  staff User @relation(fields: [staffId], references: [id])
+
+  @@unique([organizationId, branchId, staffId, attendanceDate])
+  @@index([organizationId, branchId, attendanceDate])
+  @@index([staffId, attendanceDate])
+}
+
+model AttendanceStaff {
+  id String @id @default(cuid())
+  organizationId String
+  branchId String
+  name String
+  phone String?
+  role String @default("Staff")
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id])
+  branch Branch @relation(fields: [branchId], references: [id])
+  entries AttendanceEntry[]
+
+  @@index([organizationId, branchId, active])
+}
+
+model AttendanceEntry {
+  id String @id @default(cuid())
+  organizationId String
+  branchId String
+  staffId String
+  attendanceDate String
+  status String @default("PRESENT")
+  checkIn String?
+  checkOut String?
+  notes String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id])
+  branch Branch @relation(fields: [branchId], references: [id])
+  staff AttendanceStaff @relation(fields: [staffId], references: [id])
+
+  @@unique([organizationId, branchId, staffId, attendanceDate])
+  @@index([organizationId, branchId, attendanceDate])
+  @@index([staffId, attendanceDate])
 }

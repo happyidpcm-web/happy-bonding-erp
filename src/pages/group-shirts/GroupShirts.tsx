@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus, Shirt, ArrowLeft, MoreVertical, Eye, Pencil, Trash2, Search } from "lucide-react";
 import { useDismissibleDropdown } from "../../hooks/useDismissibleDropdown";
 import { api } from "../../api";
 import { money } from "../../data";
-import { orderStatuses, normalizedStatus, statusLabel, type GroupShirtStatus, adultSizes, shirtSizes, sizeLabel, sleeveQuantities, orderAmounts, productionAmounts, type GroupShirtInput, type GroupShirtOrder } from "./types";
+import { orderStatuses, normalizedStatus, statusLabel, productionPaymentStatuses, productionPaymentStatusLabel, stitchingPaymentStatuses, stitchingPaymentStatusLabel, type GroupShirtStatus, type ProductionPaymentStatus, type StitchingPaymentStatus, adultSizes, shirtSizes, sizeLabel, sleeveQuantities, orderAmounts, productionAmounts, type GroupShirtInput, type GroupShirtOrder } from "./types";
 import "./group-shirts.css";
 
-const emptyOrder = (): GroupShirtInput => ({ groupName: "", customerName: "", phone: "", deliveryDate: "", fabric: "", colour: "", sleeve: "Half sleeve", printing: "", notes: "", photo: "", shirtRate: 0, discount: 0, vestiQuantity: 0, vestiRate: 0, vestiPurchaseQuantity: 0, vestiPurchaseRate: 0, advance: 0, lines: shirtSizes.map(size => ({ size, quantity: 0, halfSleeveQuantity: 0, fullSleeveQuantity: 0, rate: 0, photo: "" })) });
+const emptyOrder = (): GroupShirtInput => ({ groupName: "", customerName: "", phone: "", deliveryDate: "", fabric: "", colour: "", sleeve: "Half sleeve", printing: "", notes: "", photo: "", shirtRate: 0, discount: 0, vestiQuantity: 0, vestiRate: 0, vestiPurchaseQuantity: 0, vestiPurchaseRate: 0, fabricPaymentStatus: "PENDING", vestiPaymentStatus: "PENDING", stitchingPaymentStatus: "PENDING", advance: 0, lines: shirtSizes.map(size => ({ size, quantity: 0, halfSleeveQuantity: 0, fullSleeveQuantity: 0, rate: 0, photo: "" })) });
 
 async function readPhoto(file: File): Promise<string> {
   if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 10 * 1024 * 1024) throw new Error("Choose a JPG, PNG or WebP photo under 10 MB.");
@@ -52,14 +52,16 @@ function OrderActions({ order, onOpen, onDelete, busy }: { order: GroupShirtOrde
   </div>;
 }
 
-export function GroupShirts({ onBack }: { onBack: () => void }) {
+export function GroupShirts({ onBack, openOrderId, onInitialOrderOpened }: { onBack: () => void; openOrderId?: string; onInitialOrderOpened?: () => void }) {
   const [orders, setOrders] = useState<GroupShirtOrder[]>([]); const [loading, setLoading] = useState(true);
   const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState<"list" | "create" | "view" | "edit">("list");
   const [editingId, setEditingId] = useState("");
   const [draft, setDraft] = useState<GroupShirtInput>(emptyOrder); const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | GroupShirtStatus>("ALL");
-  const currentStatus = normalizedStatus(orders.find(order => order.id === editingId)?.status || "PROCESSING");
+  const activeOrder = orders.find(order => order.id === editingId);
+  const costStatusSource = activeOrder ?? draft;
+  const currentStatus = normalizedStatus(activeOrder?.status || "PROCESSING");
   const visibleOrders = orders.filter(order => (statusFilter === "ALL" || normalizedStatus(order.status) === statusFilter) && (order.groupName + " " + order.customerName + " " + order.phone).toLowerCase().includes(search.toLowerCase()));
   async function changeStatus(status: GroupShirtStatus) {
     if (saving || mode !== "edit") return;
@@ -69,6 +71,25 @@ export function GroupShirts({ onBack }: { onBack: () => void }) {
       setOrders(rows => rows.map(row => row.id === updated.id ? updated : row));
       setMessage("Order status updated to " + statusLabel(updated.status) + ".");
     } catch (err) { setError(err instanceof Error ? err.message : "Unable to update status"); }
+    finally { setSaving(false); }
+  }
+  async function changeCostStatus(field: "fabricPaymentStatus" | "vestiPaymentStatus" | "stitchingPaymentStatus", value: ProductionPaymentStatus | StitchingPaymentStatus) {
+    if (saving || mode === "view") return;
+    if (mode === "create") { setDraft(row => ({ ...row, [field]: value })); return; }
+    if (!activeOrder) return;
+    const next = {
+      fabricPaymentStatus: activeOrder.fabricPaymentStatus || "PENDING",
+      vestiPaymentStatus: activeOrder.vestiPaymentStatus || "PENDING",
+      stitchingPaymentStatus: activeOrder.stitchingPaymentStatus || "PENDING",
+      [field]: value,
+    };
+    setSaving(true); setError(""); setMessage("");
+    try {
+      const updated = await api.updateGroupShirtCostStatus(editingId, next);
+      setOrders(rows => rows.map(row => row.id === updated.id ? updated : row));
+      setDraft(row => ({ ...row, ...next }));
+      setMessage("Production payment status updated.");
+    } catch (err) { setError(err instanceof Error ? err.message : "Unable to update production payment status"); }
     finally { setSaving(false); }
   }
   async function deleteOrder(order: GroupShirtOrder) {
@@ -108,6 +129,15 @@ export function GroupShirts({ onBack }: { onBack: () => void }) {
     }) });
     setEditingId(order.id); setIncludeVesti(order.vestiQuantity > 0); setMode(nextMode); setError(""); setMessage("");
   }
+  const openedInitialOrder = useRef(false);
+  useEffect(() => {
+    if (!openOrderId || openedInitialOrder.current) return;
+    const order = orders.find(row => row.id === openOrderId);
+    if (!order) return;
+    openedInitialOrder.current = true;
+    openOrder(order, "view");
+    onInitialOrderOpened?.();
+  }, [openOrderId, orders, onInitialOrderOpened]);
   function field(key: keyof GroupShirtInput, value: string | number) { setDraft(d => ({ ...d, [key]: value })); }
   return <section className={`group-shirts ${mode === "list" ? "gs-list-page" : ""}`}>
     {mode === "list" && <button type="button" className="gs-dashboard-back" onClick={onBack}><ArrowLeft size={16} /> Back to Dashboard</button>}
@@ -116,7 +146,14 @@ export function GroupShirts({ onBack }: { onBack: () => void }) {
     </header>
     {mode !== "list" && <div className="gs-order-toolbar">
       <button type="button" disabled={saving} onClick={() => { setMode("list"); setError(""); setMessage(""); }}><ArrowLeft size={16} /> Back to orders</button>
-      {mode !== "create" && <label className={`gs-status-control gs-status-control-${currentStatus.toLowerCase()}`}><span>Order status</span><select value={currentStatus} disabled={saving || readonly} onChange={e => void changeStatus(e.target.value as GroupShirtStatus)}>{orderStatuses.map(status => <option key={status} value={status}>{statusLabel(status)}</option>)}</select></label>}
+      <div className="gs-status-controls">
+        <div className="gs-cost-statuses" aria-label="Production payment status">
+          <label><span>Fabric</span><select value={costStatusSource.fabricPaymentStatus || "PENDING"} disabled={saving || readonly} onChange={e => void changeCostStatus("fabricPaymentStatus", e.target.value as ProductionPaymentStatus)}>{productionPaymentStatuses.map(status => <option key={status} value={status}>{productionPaymentStatusLabel(status)}</option>)}</select></label>
+          <label><span>Vesti</span><select value={costStatusSource.vestiPaymentStatus || "PENDING"} disabled={saving || readonly} onChange={e => void changeCostStatus("vestiPaymentStatus", e.target.value as ProductionPaymentStatus)}>{productionPaymentStatuses.map(status => <option key={status} value={status}>{productionPaymentStatusLabel(status)}</option>)}</select></label>
+          <label><span>Stitching</span><select value={costStatusSource.stitchingPaymentStatus || "PENDING"} disabled={saving || readonly} onChange={e => void changeCostStatus("stitchingPaymentStatus", e.target.value as StitchingPaymentStatus)}>{stitchingPaymentStatuses.map(status => <option key={status} value={status}>{stitchingPaymentStatusLabel(status)}</option>)}</select></label>
+        </div>
+        <label className={`gs-status-control gs-status-control-${currentStatus.toLowerCase()}`}><span>Order status</span><select value={currentStatus} disabled={saving || readonly || mode === "create"} onChange={e => void changeStatus(e.target.value as GroupShirtStatus)}>{orderStatuses.map(status => <option key={status} value={status}>{statusLabel(status)}</option>)}</select></label>
+      </div>
     </div>}
     {error && <div className="gs-error" role="alert">{error}{mode === "list" && <button onClick={() => void load()}>Retry</button>}</div>}
     {message && <p role="status">{message}</p>}
@@ -129,11 +166,14 @@ export function GroupShirts({ onBack }: { onBack: () => void }) {
         <thead><tr><th>Event</th><th>Customer name</th><th>Mobile number</th><th className="gs-number">Total amount</th><th className="gs-number">Advance amount</th><th className="gs-number">Remaining amount</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>{visibleOrders.map(order => {
           const amounts = orderAmounts(order);
-          return <tr key={order.id}><td><button type="button" className="gs-order-link" onClick={() => openOrder(order, "view")}>{order.groupName}</button></td><td>{order.customerName}</td><td>{order.phone}</td><td className="gs-number">{money(amounts.total)}</td><td className="gs-number">{money(order.advance)}</td><td className="gs-number gs-due">{money(amounts.balance)}</td><td><span className={`gs-status-badge gs-status-${normalizedStatus(order.status).toLowerCase()}`}>{statusLabel(order.status)}</span></td><td><OrderActions order={order} onOpen={openOrder} onDelete={order => void deleteOrder(order)} busy={saving} /></td></tr>;
+          return <tr key={order.id} className="gs-view-row" tabIndex={0} role="button" aria-label={`View ${order.groupName} order`} onClick={() => openOrder(order, "view")} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openOrder(order, "view"); } }}><td><span className="gs-order-link">{order.groupName}</span></td><td>{order.customerName}</td><td>{order.phone}</td><td className="gs-number">{money(amounts.total)}</td><td className="gs-number">{money(order.advance)}</td><td className="gs-number gs-due">{money(amounts.balance)}</td><td><span className={`gs-status-badge gs-status-${normalizedStatus(order.status).toLowerCase()}`}>{statusLabel(order.status)}</span></td><td onClick={event => event.stopPropagation()}><OrderActions order={order} onOpen={openOrder} onDelete={order => void deleteOrder(order)} busy={saving} /></td></tr>;
         })}
         {!visibleOrders.length && <tr><td colSpan={8} className="gs-empty-row">{search || statusFilter !== "ALL" ? "No orders match this filter." : "No group shirt orders yet. Create your first order to get started."}</td></tr>}
         </tbody></table></div>}
-    </> : <form onSubmit={async e => {
+    </> : <form onFocusCapture={event => {
+      const input = event.target;
+      if (input instanceof HTMLInputElement && input.type === "number" && Number(input.value) === 0) input.select();
+    }} onSubmit={async e => {
       e.preventDefault(); if (saving || readonly) return;
       if (e.currentTarget.querySelector('input[type="file"]:disabled')) { setError("Please wait until the photo finishes processing."); return; }
       if (!quantity) { setError("Enter quantity for at least one size."); return; }

@@ -29,7 +29,7 @@ import { GARMENT_HSN_CODES } from "./data/hsnCodes";
 import { ThermalReceiptTemplate } from "./components/ThermalReceiptTemplate";
 import { BarcodeGeneratorModal } from "./components/BarcodeGeneratorModal";
 import { RemindersModule } from "./pages/reminders/RemindersModule";
-import { GroupShirts } from "./pages/group-shirts/GroupShirts";
+import { GroupShirtWorkspace } from "./pages/group-shirts/GroupShirtWorkspace";
 import { ExpensesModule } from "./pages/expenses/ExpensesModule";
 import { CashBank } from "./pages/cash-bank/CashBank";
 import { Staff, StaffManagementModal } from "./pages/staff/Staff";
@@ -543,12 +543,12 @@ export default function App() {
         {page === "expenses" && <ExpensesModule notify={notify} currentBranchId={currentBranchId} />}
 
         {page === "reminders" && <RemindersModule parties={partyRows} invoices={invoiceRows} notify={notify} />}
-        {page === "group_shirts" && <GroupShirts key={currentBranchId} onBack={() => go("dashboard")} />}
+        {page === "group_shirts" && <GroupShirtWorkspace key={currentBranchId} onBack={() => go("dashboard")} />}
 
         {page === "reports" && <Reports onOpenInvoice={async id => { const invoice = await api.sale(id); setActiveInvoiceModal(invoice); }} key={currentBranchId} products={productRows} invoices={invoiceRows} notify={notify} initialReport={activeReportSubScreen} initialDateSelection={reportDateSelection}/>}
         {page === "cash" && <CashBank notify={notify}/>} 
         {page === "pos" && <Sales rows={invoiceRows} products={productRows} parties={partyRows} setting={invoiceSetting} setSetting={setInvoiceSetting} setRows={setInvoiceRows} setParties={setPartyRows} setProducts={setProductRows} notify={notify} key="pos" initialCreate={true} onSelectInvoice={openInvoiceDetail} onNavigateReports={handleNavigateReportsFromSales}/>}
-        {page === "staff" && <Staff/>} 
+        {page === "staff" && <Staff branches={branchRows} notify={notify} />}
         {page === "settings" && <SettingsPage notify={notify} branches={branchRows} currentBranchId={currentBranchId} onSwitchBranch={handleBranchChange} onRefreshData={refreshAppData} onStaff={() => setStaffModalOpen(true)} />}
 
       </section>
