@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Users, Banknote } from "lucide-react";
+import { ArrowLeft, CalendarDays, Clock3, Users, Banknote } from "lucide-react";
 import { money } from "../../data";
 import { api } from "../../api";
-import type { Branch, StaffUser } from "../../types";
+import type { AttendanceStaff, Branch, StaffAttendance, StaffAttendanceStatus, StaffUser } from "../../types";
 import { PageHeading, Metric, Modal } from "../../App";
+import "./staff-attendance.css";
 
-export function StaffManagementModal({ branches, onClose, notify }: { branches: Branch[]; onClose: () => void; notify: (msg: string) => void }) {
+export function StaffManagementModal({ branches, onClose, notify, mode = "manage", onCreated }: { branches: Branch[]; onClose: () => void; notify: (msg: string) => void; mode?: "manage" | "create"; onCreated?: () => void }) {
   const [staffRows, setStaffRows] = useState<StaffUser[]>([]);
   const [saving, setSaving] = useState(false);
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
@@ -47,6 +48,7 @@ export function StaffManagementModal({ branches, onClose, notify }: { branches: 
       setStaffRows(prev => [row, ...prev]);
       notify("Staff login created with custom password");
       event.currentTarget.reset();
+      onCreated?.();
     } catch (error) {
       notify(error instanceof Error ? error.message : "Staff save failed");
     } finally {
@@ -55,8 +57,9 @@ export function StaffManagementModal({ branches, onClose, notify }: { branches: 
   };
 
   return (
-    <Modal title="Staff Login & Password Control" onClose={onClose} wide>
-      <div className="table-scroll" style={{ maxHeight: 220, marginBottom: 16 }}>
+    <Modal title={mode === "create" ? "Add Staff Member" : "Staff Login & Password Control"} onClose={onClose} wide={mode === "manage"}>
+      {mode === "create" && <p style={{ margin: "0 0 18px", color: "#64748b", fontSize: 13, lineHeight: 1.55 }}>Create the staff login first. Once saved, the member will appear in Staff Attendance & Payroll.</p>}
+      {mode === "manage" && <div className="table-scroll" style={{ maxHeight: 220, marginBottom: 16 }}>
         <table>
           <thead>
             <tr>
@@ -97,14 +100,14 @@ export function StaffManagementModal({ branches, onClose, notify }: { branches: 
             ))}
           </tbody>
         </table>
-      </div>
+      </div>}
       <form className="form-grid" onSubmit={handleSubmit}>
         <label>Name<input name="name" required placeholder="Staff name" /></label>
         <label>Email<input name="email" type="email" required placeholder="staff@happybonding.in" /></label>
         <label>Phone<input name="phone" placeholder="Phone number" /></label>
-        <label>Initial Password<input name="password" type="password" minLength={6} required placeholder="Set password (min 6 chars)" /></label>
+        <label>Initial Password<input name="password" type="password" minLength={8} required placeholder="Set password (minimum 8 characters)" /></label>
         <div className="full" style={{ display: "grid", gap: 8 }}>
-          <span style={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Branch Access</span>
+          <span style={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Branch Access <span style={{ fontWeight: 400 }}>(select at least one)</span></span>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
             {branches.map(branch => (
               <label key={branch.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -131,7 +134,7 @@ export interface StaffMember {
   status: "Present" | "Absent" | "On Leave";
 }
 
-export function Staff() {
+function StaffLegacy() {
   const [attendanceFilter, setAttendanceFilter] = useState<StaffMember["status"] | "All">("All");
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [addStaffModal, setAddStaffModal] = useState(false);
@@ -315,4 +318,158 @@ export function Staff() {
       )}
     </>
   );
+}
+
+const attendanceLabels: Record<StaffAttendanceStatus, string> = { PRESENT: "Present", ABSENT: "Absent", LEAVE: "On leave" };
+const localDate = () => { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; };
+const currentMonth = () => localDate().slice(0, 7);
+const currentWeek = () => {
+  const date = new Date(`${localDate()}T00:00:00`);
+  const day = (date.getDay() + 6) % 7;
+  date.setDate(date.getDate() - day + 3);
+  const firstThursday = new Date(date.getFullYear(), 0, 4);
+  const week = 1 + Math.round(((date.getTime() - firstThursday.getTime()) / 86400000 - 3 + ((firstThursday.getDay() + 6) % 7)) / 7);
+  return `${date.getFullYear()}-W${String(week).padStart(2, "0")}`;
+};
+const monthDates = (month: string) => {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const total = new Date(year, monthNumber, 0).getDate();
+  return Array.from({ length: total }, (_, index) => `${month}-${String(index + 1).padStart(2, "0")}`);
+};
+const weekDates = (weekValue: string) => {
+  const match = /^(\d{4})-W(\d{2})$/.exec(weekValue);
+  if (!match) return [];
+  const year = Number(match[1]); const week = Number(match[2]);
+  const januaryFourth = new Date(year, 0, 4);
+  const monday = new Date(januaryFourth);
+  monday.setDate(januaryFourth.getDate() - ((januaryFourth.getDay() + 6) % 7) + (week - 1) * 7);
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(monday); date.setDate(monday.getDate() + index);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  });
+};
+
+function statusStyle(status: StaffAttendanceStatus) {
+  return status === "PRESENT" ? { borderColor: "#16a34a", color: "#15803d", background: "#f0fdf4" } : status === "ABSENT" ? { borderColor: "#dc2626", color: "#b91c1c", background: "#fef2f2" } : { borderColor: "#2563eb", color: "#1d4ed8", background: "#eff6ff" };
+}
+
+export function Staff({ notify }: { branches: Branch[]; notify: (message: string) => void }) {
+  const [staffList, setStaffList] = useState<AttendanceStaff[]>([]);
+  const [attendance, setAttendance] = useState<StaffAttendance[]>([]);
+  const [month, setMonth] = useState(currentMonth);
+  const [periodMode, setPeriodMode] = useState<"MONTH" | "WEEK">("MONTH");
+  const [week, setWeek] = useState(currentWeek);
+  const [selectedStaff, setSelectedStaff] = useState<AttendanceStaff | null>(null);
+  const [attendanceModal, setAttendanceModal] = useState<{ staff: AttendanceStaff; date: string; status: StaffAttendanceStatus } | null>(null);
+  const [checkIn, setCheckIn] = useState("");
+  const [checkOut, setCheckOut] = useState("");
+  const [notes, setNotes] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [addStaffOpen, setAddStaffOpen] = useState(false);
+  const [attendanceFilter, setAttendanceFilter] = useState<StaffAttendanceStatus | "ALL">("ALL");
+
+  async function load() {
+    setLoading(true); setError("");
+    try {
+      const [staff, rows] = await Promise.all([api.attendanceStaff(), api.attendanceEntries(month)]);
+      setStaffList(staff); setAttendance(rows);
+    } catch (err) { setError(err instanceof Error ? err.message : "Unable to load staff attendance."); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { void load(); }, [month]);
+
+  const today = localDate();
+  const todayStatus = (staffId: string) => attendance.find(row => row.staffId === staffId && row.attendanceDate === today)?.status;
+  const presentCount = staffList.filter(staff => todayStatus(staff.id) === "PRESENT").length;
+  const absentCount = staffList.filter(staff => todayStatus(staff.id) === "ABSENT").length;
+  const leaveCount = staffList.filter(staff => todayStatus(staff.id) === "LEAVE").length;
+  const visibleStaff = staffList.filter(staff => attendanceFilter === "ALL" || todayStatus(staff.id) === attendanceFilter);
+  const selectedRows = selectedStaff ? attendance.filter(row => row.staffId === selectedStaff.id) : [];
+  const activeDates = periodMode === "WEEK" ? weekDates(week) : monthDates(month);
+  const selectedPeriodRows = selectedRows.filter(row => activeDates.includes(row.attendanceDate));
+  const presentDays = selectedPeriodRows.filter(row => row.status === "PRESENT").length;
+  const periodLabel = periodMode === "WEEK" ? `Week ${week.slice(-2)}, ${week.slice(0, 4)}` : new Date(`${month}-01T00:00:00`).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  function changeWeek(value: string) {
+    setWeek(value);
+    const firstDate = weekDates(value)[0];
+    if (firstDate) setMonth(firstDate.slice(0, 7));
+  }
+
+  function recordFor(staffId: string, date: string) { return attendance.find(row => row.staffId === staffId && row.attendanceDate === date); }
+  function openAttendance(staff: AttendanceStaff, status: StaffAttendanceStatus, date = today) {
+    const record = recordFor(staff.id, date);
+    setAttendanceModal({ staff, date, status }); setCheckIn(record?.checkIn || ""); setCheckOut(record?.checkOut || ""); setNotes(record?.notes || "");
+  }
+  async function saveAttendance(event: React.FormEvent) {
+    event.preventDefault(); if (!attendanceModal) return;
+    setSaving(true); setError("");
+    try {
+      const row = await api.saveAttendanceEntry(attendanceModal.staff.id, attendanceModal.date, { status: attendanceModal.status, checkIn: attendanceModal.status === "PRESENT" ? checkIn : null, checkOut: attendanceModal.status === "PRESENT" ? checkOut : null, notes });
+      setAttendance(rows => [row, ...rows.filter(item => item.id !== row.id)]);
+      setAttendanceModal(null);
+    } catch (err) { setError(err instanceof Error ? err.message : "Unable to save attendance."); }
+    finally { setSaving(false); }
+  }
+
+  if (selectedStaff) return <>
+    <PageHeading title={`${selectedStaff.name} — Attendance`} subtitle="Date-wise attendance and work timing records. Select any date to add or update the entry." />
+    <div style={{ display: "flex", gap: 12, justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", marginBottom: 18 }}>
+      <button className="secondary" type="button" onClick={() => setSelectedStaff(null)}><ArrowLeft size={16} /> Back to staff</button>
+      <AttendancePeriodControl mode={periodMode} month={month} week={week} onModeChange={setPeriodMode} onMonthChange={setMonth} onWeekChange={changeWeek} />
+    </div>
+    <div className="metrics-grid"><Metric label="Present days" value={String(presentDays)} icon={Users} tone="green" /><Metric label="Absent days" value={String(selectedPeriodRows.filter(row => row.status === "ABSENT").length)} icon={Users} tone="red" /><Metric label="Leave days" value={String(selectedPeriodRows.filter(row => row.status === "LEAVE").length)} icon={Users} tone="blue" /><Metric label={periodMode === "WEEK" ? "Selected week" : "Selected month"} value={periodLabel} icon={CalendarDays} /></div>
+    {error && <p className="error" role="alert">{error}</p>}
+    <article className="card table-card" style={{ marginTop: 20 }}><div className="card-title"><div><h2>{periodMode === "WEEK" ? "Weekly attendance register" : "Monthly attendance register"}</h2><p>Present entries require both check-in and check-out time.</p></div><span className="staff-period-caption">{periodLabel}</span></div><div className="table-scroll"><table><thead><tr><th>Date</th><th>Status</th><th>Check in</th><th>Check out</th><th>Working time</th><th style={{ textAlign: "right" }}>Action</th></tr></thead><tbody>{activeDates.map(date => {
+      const row = recordFor(selectedStaff.id, date); const status = row?.status;
+      return <tr key={date}><td><strong>{new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short" })}</strong></td><td>{status ? <span className="pill" style={statusStyle(status)}>{attendanceLabels[status]}</span> : <span style={{ color: "#64748b" }}>Not marked</span>}</td><td>{row?.checkIn || "—"}</td><td>{row?.checkOut || "—"}</td><td>{row?.checkIn && row?.checkOut ? `${row.checkIn} – ${row.checkOut}` : "—"}</td><td style={{ textAlign: "right", whiteSpace: "nowrap" }}><button className="primary compact" type="button" onClick={() => openAttendance(selectedStaff, "PRESENT", date)}>Present</button><button className="secondary compact" type="button" onClick={() => openAttendance(selectedStaff, "ABSENT", date)} style={{ marginLeft: 6 }}>Absent</button><button className="secondary compact" type="button" onClick={() => openAttendance(selectedStaff, "LEAVE", date)} style={{ marginLeft: 6 }}>Leave</button></td></tr>;
+    })}</tbody></table></div></article>
+    {attendanceModal && <AttendanceModal value={attendanceModal} checkIn={checkIn} checkOut={checkOut} notes={notes} saving={saving} onCheckIn={setCheckIn} onCheckOut={setCheckOut} onNotes={setNotes} onClose={() => setAttendanceModal(null)} onSave={saveAttendance} />}
+  </>;
+
+  return <>
+    <PageHeading title="Staff Attendance" subtitle="Attendance-only staff profiles. Click a name to maintain date-wise attendance and monthly work timing." action="+ Add Staff" onAction={() => setAddStaffOpen(true)} />
+    <div className="metrics-grid staff-summary-grid"><Metric onClick={() => setAttendanceFilter("PRESENT")} selected={attendanceFilter === "PRESENT"} label="Present Today" value={`${presentCount} Staff`} icon={Users} tone="green" /><Metric onClick={() => setAttendanceFilter("ABSENT")} selected={attendanceFilter === "ABSENT"} label="Absent Today" value={`${absentCount} Staff`} icon={Users} tone="red" /><Metric onClick={() => setAttendanceFilter("LEAVE")} selected={attendanceFilter === "LEAVE"} label="On Leave Today" value={`${leaveCount} Staff`} icon={Users} tone="blue" /><Metric onClick={() => setAttendanceFilter("ALL")} selected={attendanceFilter === "ALL"} label="Staffs" value={`${staffList.length} Staff`} icon={Users} /><Metric label={periodMode === "WEEK" ? "Selected week" : "Selected month"} value={periodMode === "WEEK" ? `Week ${week.slice(-2)}` : new Date(`${month}-01T00:00:00`).toLocaleDateString("en-IN", { month: "short", year: "numeric" })} icon={Clock3} /></div>
+    <article className="card table-card" style={{ marginTop: 20 }}><div className="card-title staff-directory-head"><div><h2>{attendanceFilter === "ALL" ? "Staff directory" : `${attendanceLabels[attendanceFilter]} staff today`}</h2><p>{attendanceFilter === "ALL" ? "Click any staff name to see monthly or weekly attendance details." : `${visibleStaff.length} staff marked ${attendanceLabels[attendanceFilter].toLowerCase()} today. Click Staffs to show all staff.`}</p></div><AttendancePeriodControl mode={periodMode} month={month} week={week} onModeChange={setPeriodMode} onMonthChange={setMonth} onWeekChange={changeWeek} /></div>
+      {error && <p className="error" role="alert">{error}</p>}<div className="table-scroll"><table><thead><tr><th>Staff name</th><th>Phone number</th><th>Store role</th><th>Today's attendance</th><th style={{ textAlign: "right" }}>Quick action</th></tr></thead><tbody>{loading ? <tr><td colSpan={5}>Loading staff…</td></tr> : staffList.length === 0 ? <tr><td colSpan={5}>No attendance staff yet. Use Add Staff to create a profile.</td></tr> : visibleStaff.length === 0 ? <tr><td colSpan={5} style={{ textAlign: "center", color: "#64748b" }}>No staff marked {attendanceFilter === "ALL" ? "for this view" : attendanceLabels[attendanceFilter].toLowerCase()} today.</td></tr> : visibleStaff.map(staff => { const status = todayStatus(staff.id); return <tr key={staff.id}><td><button type="button" className="text-button" style={{ fontWeight: 700 }} onClick={() => setSelectedStaff(staff)}>{staff.name}</button></td><td>{staff.phone || "—"}</td><td><span className="pill neutral">{staff.role}</span></td><td>{status ? <span className="pill" style={statusStyle(status)}>{attendanceLabels[status]}</span> : <span style={{ color: "#64748b" }}>Not marked</span>}</td><td style={{ textAlign: "right" }}><div className="staff-quick-actions">{status ? <button type="button" className="staff-edit-button" onClick={() => openAttendance(staff, status)}>Edit attendance</button> : <><button type="button" className="staff-present-button" onClick={() => openAttendance(staff, "PRESENT")}>Present</button><button type="button" className="staff-absent-button" onClick={() => openAttendance(staff, "ABSENT")}>Absent</button><button type="button" className="staff-leave-button" onClick={() => openAttendance(staff, "LEAVE")}>Leave</button></>}</div></td></tr>; })}</tbody></table></div></article>
+    {attendanceModal && <AttendanceModal value={attendanceModal} checkIn={checkIn} checkOut={checkOut} notes={notes} saving={saving} onCheckIn={setCheckIn} onCheckOut={setCheckOut} onNotes={setNotes} onClose={() => setAttendanceModal(null)} onSave={saveAttendance} />}
+    {addStaffOpen && <AttendanceStaffModal notify={notify} onCreated={() => { setAddStaffOpen(false); void load(); }} onClose={() => setAddStaffOpen(false)} />}
+  </>;
+}
+
+function AttendancePeriodControl({ mode, month, week, onModeChange, onMonthChange, onWeekChange }: { mode: "MONTH" | "WEEK"; month: string; week: string; onModeChange: (mode: "MONTH" | "WEEK") => void; onMonthChange: (month: string) => void; onWeekChange: (week: string) => void }) {
+  return <div className="attendance-period-control" aria-label="Attendance period filter"><div className="attendance-period-tabs"><button type="button" className={mode === "MONTH" ? "active" : ""} onClick={() => onModeChange("MONTH")}>Monthly</button><button type="button" className={mode === "WEEK" ? "active" : ""} onClick={() => onModeChange("WEEK")}>Weekly</button></div><label><CalendarDays size={15} /><span>{mode === "MONTH" ? "Month" : "Week"}</span><input type={mode === "MONTH" ? "month" : "week"} value={mode === "MONTH" ? month : week} onChange={event => mode === "MONTH" ? onMonthChange(event.target.value) : onWeekChange(event.target.value)} /></label></div>;
+}
+
+function AttendanceModal({ value, checkIn, checkOut, notes, saving, onCheckIn, onCheckOut, onNotes, onClose, onSave }: { value: { staff: AttendanceStaff; date: string; status: StaffAttendanceStatus }; checkIn: string; checkOut: string; notes: string; saving: boolean; onCheckIn: (value: string) => void; onCheckOut: (value: string) => void; onNotes: (value: string) => void; onClose: () => void; onSave: (event: React.FormEvent) => void }) {
+  return <Modal title={`${attendanceLabels[value.status]} attendance — ${value.staff.name}`} onClose={onClose}><form className="staff-attendance-form" onSubmit={onSave}>
+    <div className="staff-attendance-date"><CalendarDays size={19} /><div><strong>{new Date(`${value.date}T00:00:00`).toLocaleDateString("en-IN", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}</strong><span>Daily attendance entry</span></div><b className={`staff-status staff-status-${value.status.toLowerCase()}`}>{attendanceLabels[value.status]}</b></div>
+    {value.status === "PRESENT" ? <><p className="staff-attendance-helper">Enter the actual arrival and departure time for this staff member.</p><div className="staff-time-grid"><label>Check-in time<input type="time" required value={checkIn} onChange={event => onCheckIn(event.target.value)} /></label><label>Check-out time<input type="time" required value={checkOut} onChange={event => onCheckOut(event.target.value)} /></label></div></> : <p className="staff-attendance-helper">No working time is required for {attendanceLabels[value.status].toLowerCase()} attendance.</p>}
+    <label className="staff-notes">Notes <span>(optional)</span><input maxLength={500} value={notes} onChange={event => onNotes(event.target.value)} placeholder="Example: Half day, approved leave reason" /></label>
+    <div className="modal-actions staff-attendance-actions"><button type="button" className="secondary" onClick={onClose} disabled={saving}>Cancel</button><button className="primary" disabled={saving}>{saving ? "Saving…" : "Save attendance"}</button></div>
+  </form></Modal>;
+}
+
+function AttendanceStaffModal({ notify, onClose, onCreated }: { notify: (message: string) => void; onClose: () => void; onCreated: () => void }) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [role, setRole] = useState("Staff");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  async function submit(event: React.FormEvent) {
+    event.preventDefault(); setSaving(true); setError("");
+    try {
+      await api.createAttendanceStaff({ name, phone, role });
+      notify("Attendance staff added."); onCreated();
+    } catch (err) { setError(err instanceof Error ? err.message : "Unable to add staff."); }
+    finally { setSaving(false); }
+  }
+  return <Modal title="Add attendance staff" onClose={onClose}><form className="staff-attendance-form staff-add-form" onSubmit={submit}>
+    <p className="staff-attendance-helper">This profile is only for attendance. It does not create a login, email account, or password.</p>
+    {error && <p className="error" role="alert">{error}</p>}
+    <div className="staff-time-grid"><label><span className="staff-field-label">Staff name</span><input required autoFocus value={name} onChange={event => setName(event.target.value)} placeholder="Enter staff name" /></label><label><span className="staff-field-label">Phone number <em>(optional)</em></span><input value={phone} onChange={event => setPhone(event.target.value)} placeholder="Enter phone number" /></label></div>
+    <label className="staff-notes">Role<select value={role} onChange={event => setRole(event.target.value)}><option value="Staff">Staff</option><option value="Manager">Manager</option><option value="Owner">Owner</option></select></label>
+    <div className="modal-actions staff-attendance-actions"><button type="button" className="secondary" onClick={onClose} disabled={saving}>Cancel</button><button className="primary" disabled={saving}>{saving ? "Adding…" : "Add staff"}</button></div>
+  </form></Modal>;
 }

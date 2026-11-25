@@ -1,5 +1,5 @@
 import { useAndroidBack } from "./hooks/useAndroidBack";
-import { flushSync } from "react-dom";
+import { getMobileServer, isAndroidApp, saveMobileServer } from "./utils/mobileServer";
 import ownerSignatureUrl from "./assets/owner-signature.png";
 import { findInvoiceParty } from "./utils/invoiceParty";
 import { matchesItemSearch } from "./utils/itemSearch";
@@ -7,7 +7,7 @@ import { indexParties, searchParties } from "./utils/partySearch";
 import { useDismissibleDropdown } from "./hooks/useDismissibleDropdown";
 import { timeFilterRange, isInvoiceInDateRange, isValidCustomDateRange, type CustomDateRange, type DateRangeSelection } from "./utils/invoiceDateRange";
 export { isInvoiceInDateRange, type CustomDateRange } from "./utils/invoiceDateRange";
-import { memo, startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft, BarChart3, Banknote, Boxes, Building2, Calendar, CheckSquare, ChevronDown, ExternalLink, Eye, EyeOff, Gift, IndianRupee as CircleIndianRupee,
   ClipboardList, CreditCard, Download, FileSpreadsheet, FileText, Keyboard, LayoutDashboard, Mail, Menu, MessageCircle, MessageSquare, MoreVertical, PackagePlus,
@@ -29,7 +29,7 @@ import { GARMENT_HSN_CODES } from "./data/hsnCodes";
 import { ThermalReceiptTemplate } from "./components/ThermalReceiptTemplate";
 import { BarcodeGeneratorModal } from "./components/BarcodeGeneratorModal";
 import { RemindersModule } from "./pages/reminders/RemindersModule";
-import { GroupShirts } from "./pages/group-shirts/GroupShirts";
+import { GroupShirtWorkspace } from "./pages/group-shirts/GroupShirtWorkspace";
 import { ExpensesModule } from "./pages/expenses/ExpensesModule";
 import { CashBank } from "./pages/cash-bank/CashBank";
 import { Staff, StaffManagementModal } from "./pages/staff/Staff";
@@ -104,14 +104,6 @@ export default function App() {
   const [authenticated, setAuthenticated] = useState(api.hasSession());
   const [page, setPage] = useState<Page>("dashboard");
   const [sidebar, setSidebar] = useState(false);
-  const returnToDashboard = useCallback(() => {
-    setSidebar(false);
-    setActiveInvoiceModal(null);
-    setActiveReportSubScreen(null);
-    setReportDateSelection(undefined);
-    setPage("dashboard");
-  }, []);
-  useAndroidBack(sidebar, () => setSidebar(false), page === "dashboard", returnToDashboard);
   const [productRows, setProductRows] = useState<Product[]>([]);
   const [partyRows, setPartyRows] = useState<Party[]>([]);
   const [invoiceRows, setInvoiceRows] = useState<Invoice[]>([]);
@@ -202,31 +194,20 @@ export default function App() {
   };
 
   const go = (id: Page) => {
-    const navigate = () => {
-      if (id === "reports") setReportDateSelection(undefined);
-      if (id === "sales") setSalesView(view => ({ key: view.key + 1, create: false }));
-      setPage(id);
-      if (id === "parties") {
-        setExpandedNav("parties");
-      } else if (["sales", "quotation", "payment_in", "sales_return", "credit_note", "delivery_challan", "proforma_invoice"].includes(id)) {
-        setExpandedNav("sales");
-      } else if (["purchases", "payment_out", "purchase_return", "debit_note", "purchase_orders", "expenses"].includes(id)) {
-        setExpandedNav("purchases");
-      }
-    };
-
-    // Commit drawer dismissal and navigation together so a submenu tap feels instant.
-    if (sidebar) {
-      flushSync(() => {
-        setSidebar(false);
-        setCreateDropdownOpen(false);
-        navigate();
-      });
-      return;
-    }
+    if (id === "reports") setReportDateSelection(undefined);
+    if (id === "sales") setSalesView(view => ({ key: view.key + 1, create: false }));
+    setPage(id);
+    setSidebar(false);
     setCreateDropdownOpen(false);
-    navigate();
+    if (id === "parties") {
+      setExpandedNav("parties");
+    } else if (["sales", "quotation", "payment_in", "sales_return", "credit_note", "delivery_challan", "proforma_invoice"].includes(id)) {
+      setExpandedNav("sales");
+    } else if (["purchases", "payment_out", "purchase_return", "debit_note", "purchase_orders", "expenses"].includes(id)) {
+      setExpandedNav("purchases");
+    }
   };
+  useAndroidBack(sidebar, () => setSidebar(false), page === "dashboard", () => go("dashboard"));
   const openSalesInvoice = () => {
     setPage("sales");
     setSalesView(view => ({ key: view.key + 1, create: true }));
@@ -348,10 +329,7 @@ export default function App() {
 
   if (!authenticated) return <LoginScreen onLogin={() => { setDataLoading(true); setDataError(""); setCurrentBranchId(api.currentBranchId()); setAuthenticated(true); }}/>;
   if (dataLoading) return <div className="erp-startup" role="status" aria-live="polite" aria-busy="true">
-    <div className="erp-startup-card">
-      <div className="erp-startup-logo-wrap"><img src={happyBondingLogo} alt="Happy Bonding" className="erp-startup-logo" /></div>
-      <span className="erp-startup-spinner" aria-hidden="true" />
-    </div>
+    <div className="erp-startup-card"><span className="erp-startup-spinner" aria-hidden="true" /><h1>Happy Bonding ERP</h1><p>Loading your workspace…</p></div>
   </div>;
   if (dataError) return <div className="erp-startup"><div className="erp-startup-card"><h1>Unable to load your workspace</h1><p role="alert">{dataError}</p><div className="erp-startup-actions"><button className="primary" onClick={() => void refreshAppData()}>Retry</button><button className="secondary" onClick={handleLogout}>Sign out</button></div></div></div>;
 
@@ -442,11 +420,20 @@ export default function App() {
               className={page === item.id || (item.id === "parties" && page === "parties") || (item.id === "sales" && ["sales", "quotation", "payment_in", "sales_return", "credit_note", "delivery_challan", "proforma_invoice"].includes(page)) || (item.id === "purchases" && ["purchases", "payment_out", "purchase_return", "debit_note", "purchase_orders", "expenses"].includes(page)) ? "active" : ""}
               onClick={() => {
                 if (item.id === "parties") {
-                  setExpandedNav(current => current === "parties" ? null : "parties");
+                  setExpandedNav(expandedNav === "parties" ? null : "parties");
+                  if (page !== "parties") {
+                    go("parties");
+                  }
                 } else if (item.id === "sales") {
-                  setExpandedNav(current => current === "sales" ? null : "sales");
+                  setExpandedNav(expandedNav === "sales" ? null : "sales");
+                  if (!["sales", "quotation", "payment_in", "sales_return", "credit_note", "delivery_challan", "proforma_invoice"].includes(page)) {
+                    go("sales");
+                  }
                 } else if (item.id === "purchases") {
-                  setExpandedNav(current => current === "purchases" ? null : "purchases");
+                  setExpandedNav(expandedNav === "purchases" ? null : "purchases");
+                  if (!["purchases", "payment_out", "purchase_return", "debit_note", "purchase_orders", "expenses"].includes(page)) {
+                    go("purchases");
+                  }
                 } else {
                   go(item.id);
                 }
@@ -517,7 +504,7 @@ export default function App() {
     <main>
       <header className="topbar">
         <button aria-label="Open navigation" className="icon-button menu-button" onClick={() => setSidebar(true)}><Menu/></button>
-        <div><strong>Happy Bonding My Billbook</strong><span>{new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"long",year:"numeric",weekday:"long"})} · {currentBranch?.name || "Branch"} Store</span></div>
+        <div><strong>Happy Bonding ERP</strong><span>{new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"long",year:"numeric",weekday:"long"})} · {currentBranch?.name || "Branch"} Store</span></div>
         <div className="top-actions">
           <button className="icon-button" title="Sync Offline Changes" onClick={handleSyncNow}><CheckSquare size={19}/></button>
           <button className="icon-button" title="Search ERP"><Search size={19}/></button>
@@ -556,12 +543,12 @@ export default function App() {
         {page === "expenses" && <ExpensesModule notify={notify} currentBranchId={currentBranchId} />}
 
         {page === "reminders" && <RemindersModule parties={partyRows} invoices={invoiceRows} notify={notify} />}
-        {page === "group_shirts" && <GroupShirts key={currentBranchId} onBack={() => go("dashboard")} />}
+        {page === "group_shirts" && <GroupShirtWorkspace key={currentBranchId} onBack={() => go("dashboard")} />}
 
         {page === "reports" && <Reports onOpenInvoice={async id => { const invoice = await api.sale(id); setActiveInvoiceModal(invoice); }} key={currentBranchId} products={productRows} invoices={invoiceRows} notify={notify} initialReport={activeReportSubScreen} initialDateSelection={reportDateSelection}/>}
         {page === "cash" && <CashBank notify={notify}/>} 
         {page === "pos" && <Sales rows={invoiceRows} products={productRows} parties={partyRows} setting={invoiceSetting} setSetting={setInvoiceSetting} setRows={setInvoiceRows} setParties={setPartyRows} setProducts={setProductRows} notify={notify} key="pos" initialCreate={true} onSelectInvoice={openInvoiceDetail} onNavigateReports={handleNavigateReportsFromSales}/>}
-        {page === "staff" && <Staff/>} 
+        {page === "staff" && <Staff branches={branchRows} notify={notify} />}
         {page === "settings" && <SettingsPage notify={notify} branches={branchRows} currentBranchId={currentBranchId} onSwitchBranch={handleBranchChange} onRefreshData={refreshAppData} onStaff={() => setStaffModalOpen(true)} />}
 
       </section>
@@ -830,6 +817,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
     const passVal = String(form.get("password")).trim();
 
     try {
+      if (isAndroidApp()) saveMobileServer(String(form.get("serverUrl") || ""));
       const loginRes = await api.login(emailVal, passVal);
       if (loginRes?.branchIds?.[0]) {
         api.setCurrentBranch(loginRes.branchIds[0]);
@@ -853,6 +841,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
           <p>Sign in to Happy Bonding ERP</p>
         </div>
         <form onSubmit={submit}>
+          {isAndroidApp() && <details className="mobile-server-settings"><summary>Connection settings</summary><label>Store website address<input name="serverUrl" type="url" defaultValue={getMobileServer()} placeholder="https://billing.yourdomain.com" autoCapitalize="none" autoCorrect="off" required /><small>Use the secure website address provided by your store admin.</small></label></details>}
           <label>
             Email address
             <input name="email" type="email" placeholder="e.g. admin@happybonding.in" required />
@@ -889,7 +878,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
               </button>
             </div>
           </label>
-          {error && <div className="login-error" role="alert">{error}</div>}
+          {error && <div className="login-error">{error}</div>}
           <button className="primary" disabled={busy}>
             {busy ? "Signing in..." : "Sign in"}
           </button>
@@ -1071,70 +1060,6 @@ function InvoiceDetailModal({
   onClose: () => void;
 }) {
   const documentRef = useRef<HTMLDivElement>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
-  const [previewSize, setPreviewSize] = useState({ available: 0, width: 800, height: 980 });
-  const [previewZoom, setPreviewZoom] = useState(1);
-  const zoomValue = useRef(1);
-  useEffect(() => {
-    const wrapper = previewRef.current;
-    if (!wrapper) return;
-    let pinch: { distance: number; zoom: number; x: number; y: number } | null = null;
-    const distance = (touches: TouchList) => Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
-    const start = (event: TouchEvent) => {
-      if (event.touches.length !== 2) return;
-      event.preventDefault();
-      const rect = documentRef.current?.getBoundingClientRect();
-      if (!rect?.width || !rect.height) return;
-      pinch = {
-        distance: Math.max(1, distance(event.touches)), zoom: zoomValue.current,
-        x: ((event.touches[0].clientX + event.touches[1].clientX) / 2 - rect.left) / rect.width,
-        y: ((event.touches[0].clientY + event.touches[1].clientY) / 2 - rect.top) / rect.height,
-      };
-    };
-    const move = (event: TouchEvent) => {
-      if (!pinch || event.touches.length !== 2) return;
-      event.preventDefault();
-      const zoom = Math.min(4, Math.max(1, pinch.zoom * distance(event.touches) / pinch.distance));
-      zoomValue.current = zoom;
-      // Commit the new dimensions before correcting scroll: keep the bill point
-      // beneath the fingers fixed, including when the midpoint moves during pinch.
-      flushSync(() => setPreviewZoom(zoom));
-      const rect = documentRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const midpointX = (event.touches[0].clientX + event.touches[1].clientX) / 2;
-      const midpointY = (event.touches[0].clientY + event.touches[1].clientY) / 2;
-      wrapper.scrollLeft += rect.left + pinch.x * rect.width - midpointX;
-      const verticalScroller = wrapper.scrollHeight > wrapper.clientHeight + 1
-        ? wrapper : wrapper.closest<HTMLElement>('.full-invoice-content-grid');
-      if (verticalScroller) verticalScroller.scrollTop += rect.top + pinch.y * rect.height - midpointY;
-    };
-    const end = () => { pinch = null; };
-    wrapper.addEventListener('touchstart', start, { passive: false });
-    wrapper.addEventListener('touchmove', move, { passive: false });
-    wrapper.addEventListener('touchend', end);
-    wrapper.addEventListener('touchcancel', end);
-    return () => {
-      wrapper.removeEventListener('touchstart', start);
-      wrapper.removeEventListener('touchmove', move);
-      wrapper.removeEventListener('touchend', end);
-      wrapper.removeEventListener('touchcancel', end);
-    };
-  }, []);
-  useEffect(() => {
-    const wrapper = previewRef.current;
-    const bill = documentRef.current;
-    if (!wrapper || !bill) return;
-    const measure = () => {
-      const style = getComputedStyle(wrapper);
-      setPreviewSize({ available: wrapper.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight), width: bill.offsetWidth, height: bill.offsetHeight });
-    };
-    const observer = new ResizeObserver(measure);
-    observer.observe(wrapper);
-    observer.observe(bill);
-    measure();
-    return () => observer.disconnect();
-  }, []);
-  const previewScale = Math.min(1, previewSize.available / previewSize.width || 1) * previewZoom;
   const [downloading, setDownloading] = useState(false);
   const [pdfShareOpen, setPdfShareOpen] = useState(false);
   const [savingPayment, setSavingPayment] = useState(false);
@@ -1204,7 +1129,7 @@ function InvoiceDetailModal({
       <div className="full-invoice-view-container card">
         <div className="full-invoice-top-bar">
           <div className="title-left">
-            <button type="button" data-native-back className="icon-button" onClick={onClose} aria-label="Back to Sales Invoices" title="Back to Sales Invoices"><ArrowLeft size={18} /></button><span>Sales Invoice {invoice.number}</span>
+            <button type="button" className="icon-button" onClick={onClose} aria-label="Back to Sales Invoices" title="Back to Sales Invoices"><ArrowLeft size={18} /></button><span>Sales Invoice {invoice.number}</span>
             <span className={`pill ${invoice.status === "Paid" ? "success" : "danger"}`}>{invoice.status}</span>
           </div>
           <div className="actions-right">
@@ -1225,7 +1150,7 @@ function InvoiceDetailModal({
                 <CreditCard size={15} /> {savingPayment ? "Saving..." : `Receive ${money(balance)}`}
               </button>
             )}
-            <button data-native-back className="icon-button" onClick={onClose} aria-label="Close invoice details">
+            <button className="icon-button" onClick={onClose}>
               <X size={20} />
             </button>
           </div>
@@ -1233,14 +1158,8 @@ function InvoiceDetailModal({
 
         {pdfShareOpen && documentRef.current && <InvoicePdfShare invoice={invoice} businessName={setting.business?.name || "Happy Bonding"} element={documentRef.current} onClose={() => setPdfShareOpen(false)} />}
         <div className="full-invoice-content-grid">
-          <div className="bill-preview-panel">
-          <div className="bill-document-preview-wrapper" ref={previewRef} aria-label="Invoice preview. Pinch with two fingers to zoom.">
-            <div className="bill-preview-size" style={{ width: previewSize.width * previewScale, height: previewSize.height * previewScale }}>
-              <div className="bill-preview-scale" style={{ transform: `scale(${previewScale})`, width: previewSize.width }}>
-                <BillOfSupplyTemplate ref={documentRef} invoice={invoice} setting={setting} seasonalTheme />
-              </div>
-            </div>
-          </div>
+          <div className="bill-document-preview-wrapper">
+            <BillOfSupplyTemplate ref={documentRef} invoice={invoice} setting={setting} seasonalTheme />
           </div>
 
           <aside className="payment-history-drawer card">
@@ -1403,25 +1322,6 @@ export function customRangeLabel(range: CustomDateRange) {
   const timed = Boolean(range.fromTime || range.toTime);
   return `${fmt(range.from)}${timed ? ` ${range.fromTime || "00:00"}` : ""} - ${fmt(range.to)}${timed ? ` ${range.toTime || "23:59"} IST` : ""}`;
 }
-
-const InvoiceRowCheckbox = memo(function InvoiceRowCheckbox({ invoiceId, onToggle }: {
-  invoiceId: string | number;
-  onToggle: (id: string | number, checked: boolean) => void;
-}) {
-  const [checked, setChecked] = useState(false);
-  return <input
-    type="checkbox"
-    checked={checked}
-    onClick={event => event.stopPropagation()}
-    onChange={event => {
-      event.stopPropagation();
-      const next = event.target.checked;
-      // Update this small control first; the invoice list can refresh afterwards.
-      setChecked(next);
-      onToggle(invoiceId, next);
-    }}
-  />;
-});
 
 function SalesInvoicesListView({
   rows,
@@ -1605,23 +1505,17 @@ function SalesInvoicesListView({
   };
 
   const toggleSelectAll = () => {
-    setSelectedIds(current => {
-      if (filtered.every(row => current.has(row.id))) return new Set();
-      return new Set(filtered.map(x => x.id));
-    });
+    if (filtered.every(row => selectedIds.has(row.id))) setSelectedIds(new Set());
+    else setSelectedIds(new Set(filtered.map(x => x.id)));
   };
 
-  const toggleSelect = useCallback((id: string | number, checked: boolean) => {
-    // Keep selection bookkeeping out of the urgent touch update on Android.
-    startTransition(() => {
-      setSelectedIds(current => {
-        const next = new Set(current);
-        if (checked) next.add(id);
-        else next.delete(id);
-        return next;
-      });
-    });
-  }, []);
+  const toggleSelect = (id: string | number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
 
   return (
     <div className="sales-invoices-screen-wrap">
@@ -1718,7 +1612,7 @@ function SalesInvoicesListView({
             <span>Total Sales</span>
           </div>
           <h2 className="sales-summary-card-val">
-            ₹ {totalSalesVal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ₹ {totalSalesVal.toLocaleString("en-IN")}
           </h2>
         </button>
 
@@ -1729,7 +1623,7 @@ function SalesInvoicesListView({
             <span>Paid</span>
           </div>
           <h2 className="sales-summary-card-val">
-            ₹ {paidSalesVal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ₹ {paidSalesVal.toLocaleString("en-IN")}
           </h2>
         </button>
 
@@ -1740,7 +1634,7 @@ function SalesInvoicesListView({
             <span>Unpaid</span>
           </div>
           <h2 className="sales-summary-card-val">
-            ₹ {unpaidSalesVal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ₹ {unpaidSalesVal.toLocaleString("en-IN")}
           </h2>
         </button>
 
@@ -1751,7 +1645,7 @@ function SalesInvoicesListView({
             <span>Cancelled</span>
           </div>
           <h2 className="sales-summary-card-val" style={{ color: "#64748b" }}>
-            {cancelledSalesVal > 0 ? `₹ ${cancelledSalesVal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
+            {cancelledSalesVal > 0 ? `₹ ${cancelledSalesVal.toLocaleString("en-IN")}` : "-"}
           </h2>
         </button>
       </div>
@@ -1842,7 +1736,7 @@ function SalesInvoicesListView({
       </div>
 
       {/* Sales Invoices Main Table matching reference image */}
-      <article className="card table-card sales-invoices-table-card">
+      <article className="card table-card">
         <div className="table-scroll">
           <table className="sales-invoices-main-table">
             <thead>
@@ -1873,14 +1767,18 @@ function SalesInvoicesListView({
                   onClick={() => onSelectInvoice(inv)}
                 >
                   <td style={{ textAlign: "center" }} onClick={e => e.stopPropagation()}>
-                    <InvoiceRowCheckbox invoiceId={inv.id} onToggle={toggleSelect} />
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(inv.id)}
+                      onChange={e => toggleSelect(inv.id, e as unknown as React.MouseEvent)}
+                    />
                   </td>
                   <td>{inv.date}</td>
                   <td className="mono" style={{ fontWeight: 600, color: "#1e293b", whiteSpace: "nowrap" }}>
                     {inv.number}
                   </td>
-                  <td className="sales-invoice-party">
-                    <strong>{inv.party || "Walk-in Customer"}</strong>
+                  <td>
+                    <strong>{inv.party}</strong>
                   </td>
                   <td style={{ color: "#64748b" }}>-</td>
                   <td className="right">
@@ -3936,25 +3834,10 @@ export function AddItemModal({ products: initialProducts, priceMode = "sales", d
                 const qty = qtyMap[String(prod.id)] || 0;
                 const isOutOfStock = priceMode !== "purchase" && prod.stock <= 0;
                 return (
-                  <tr key={prod.id} className={`add-items-product-row ${qty > 0 ? "is-selected" : ""}`}>
+                  <tr key={prod.id}>
                     <td>
                       <strong style={{ display: "block", color: "#0f172a" }}>{prod.name}</strong>
                       {isOutOfStock && <span className="insufficient-stock-badge">Insufficient stock</span>}
-                      <div className="mobile-item-selection-row">
-                        <div className="mobile-item-meta">
-                          <span>{prod.sku || "No item code"}</span>
-                          <span>{prod.stock} {prod.unit || "PCS"} available</span>
-                        </div>
-                        {qty === 0 ? (
-                          <button type="button" className="mobile-item-add-btn" onClick={() => setQty(prod.id, 1)}><Plus size={15} /> Add</button>
-                        ) : (
-                          <div className="mobile-item-stepper">
-                            <button type="button" aria-label={`Reduce ${prod.name} quantity`} onClick={() => setQty(prod.id, qty - 1)}>−</button>
-                            <strong>{qty}</strong>
-                            <button type="button" aria-label={`Increase ${prod.name} quantity`} onClick={() => setQty(prod.id, qty + 1)}>+</button>
-                          </div>
-                        )}
-                      </div>
                     </td>
                     <td style={{ color: "#64748b" }}>{prod.sku}</td>
                     <td><span className="add-items-unit-tag">{prod.stock} {prod.unit || "PCS"}</span></td>
@@ -3991,31 +3874,6 @@ export function AddItemModal({ products: initialProducts, priceMode = "sales", d
               )}
             </tbody>
           </table>
-          <div className="mobile-add-items-list">
-            {filteredProducts.map(prod => {
-              const qty = qtyMap[String(prod.id)] || 0;
-              const isOutOfStock = priceMode !== "purchase" && prod.stock <= 0;
-              return (
-                <article className={`mobile-add-item-card ${qty > 0 ? "is-selected" : ""}`} key={`mobile-${prod.id}`}>
-                  <div className="mobile-add-item-info">
-                    <strong title={prod.name}>{prod.name}</strong>
-                    <span>{prod.sku || "No item code"}</span>
-                    <small className={isOutOfStock ? "is-empty" : ""}>{prod.stock} {prod.unit || "PCS"} available</small>
-                  </div>
-                  {qty === 0 ? (
-                    <button type="button" className="mobile-add-item-button" disabled={isOutOfStock} onClick={() => setQty(prod.id, 1)}><Plus size={16} /> Add</button>
-                  ) : (
-                    <div className="mobile-add-item-stepper">
-                      <button type="button" aria-label={`Reduce ${prod.name} quantity`} onClick={() => setQty(prod.id, qty - 1)}>−</button>
-                      <strong>{qty}</strong>
-                      <button type="button" aria-label={`Increase ${prod.name} quantity`} onClick={() => setQty(prod.id, qty + 1)}>+</button>
-                    </div>
-                  )}
-                </article>
-              );
-            })}
-            {!filteredProducts.length && <div className="mobile-add-items-empty">No items found matching “{searchQuery}”.</div>}
-          </div>
         </div>
 
         {/* Selected Items Summary Strip */}
@@ -4038,7 +3896,7 @@ export function AddItemModal({ products: initialProducts, priceMode = "sales", d
           </div>
           <div className="add-items-footer-actions">
             <button type="button" className="secondary" onClick={onClose}>Cancel [ESC]</button>
-            <button type="button" className="add-items-btn-primary" disabled={selectedCount === 0} onClick={handleAddItemsToBill}>Add to Bill [F7]</button>
+            <button type="button" className="add-items-btn-primary" onClick={handleAddItemsToBill}>Add to Bill [F7]</button>
           </div>
         </div>
       </div>

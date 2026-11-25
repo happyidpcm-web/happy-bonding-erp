@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { groupShirtInput, groupShirtStatusInput } from "../server/group-shirts.js";
-import { orderAmounts, productionAmounts, shirtSizes, normalizedStatus } from "../src/pages/group-shirts/types.js";
+import { groupShirtAmountTotals, orderAmounts, productionAmounts, shirtSizes, sleeveQuantities, normalizedStatus } from "../src/pages/group-shirts/types.js";
 
 const valid = () => ({ groupName: "Family function", customerName: "Customer", phone: "9876543210", deliveryDate: "2026-12-10", fabric: "Cotton", colour: "Blue", sleeve: "Half sleeve", printing: "Logo on pocket", notes: "", photo: "", advance: 100, shirtRate: 200, discount: 0, vestiQuantity: 0, vestiRate: 0, lines: shirtSizes.map(size => ({ size, quantity: size === "20" ? 2 : 0, rate: 0, photo: "" })) });
 test("accepts kids and adult size breakdown", () => { assert.equal(groupShirtInput.safeParse(valid()).success, true); });
@@ -31,7 +31,7 @@ test("preserves legacy per-size totals and rounds currency", () => {
 });
 test("calculates fabric GST, transport, stitching and pre-discount profit", () => {
   const input = { ...valid(), shirtRate: 1000, fabricSupplier: "Fabric supplier", fabricMetres: 10, fabricPrice: 100, transportCost: 50, stitchingQuantity: 2, stitchingPrice: 150, discount: 200 };
-  assert.deepEqual(productionAmounts(input), { fabricTotal: 1000, gst: 50, fabricPurchase: 1100, stitching: 300, production: 1400, profit: 600 });
+  assert.deepEqual(productionAmounts(input), { fabricTotal: 1000, gst: 50, fabricPurchase: 1100, stitching: 300, vestiPurchase: 0, production: 1400, profit: 600 });
   const parsed = groupShirtInput.parse(input);
   assert.equal(parsed.fabricSupplier, "Fabric supplier");
   assert.equal(parsed.stitchingQuantity, 2);
@@ -71,4 +71,31 @@ test("includes legacy confirmed orders in pending and keeps completed and delive
   assert.equal(statuses.filter(status => status === "PROCESSING").length, 3);
   assert.equal(statuses.filter(status => status === "COMPLETED").length, 1);
   assert.equal(statuses.filter(status => status === "DELIVERED").length, 1);
+});
+test("stores independent half and full sleeve quantities for every size", () => {
+  const input = valid();
+  const size = input.lines.find(line => line.size === "M")!;
+  size.quantity = 5; size.halfSleeveQuantity = 2; size.fullSleeveQuantity = 3;
+  assert.equal(groupShirtInput.safeParse(input).success, true);
+  assert.deepEqual(sleeveQuantities(input.lines), { half: 4, full: 3 });
+  assert.equal(orderAmounts(input).quantity, 7);
+  size.quantity = 4;
+  assert.equal(groupShirtInput.safeParse(input).success, false);
+});
+
+test("totals Group Shirt opening amount, production costs and profit from orders", () => {
+  const first = { ...valid(), shirtRate: 1000, fabricMetres: 10, fabricPrice: 100, stitchingQuantity: 2, stitchingPrice: 100, vestiPurchaseQuantity: 2, vestiPurchaseRate: 50, fabricPaymentStatus: "PAID" as const, vestiPaymentStatus: "PAID" as const, stitchingPaymentStatus: "PAID" as const };
+  const second = { ...valid(), shirtRate: 500, fabricMetres: 2, fabricPrice: 100, transportCost: 20, stitchingQuantity: 1, stitchingPrice: 75, fabricPaymentStatus: "PURCHASED" as const, vestiPaymentStatus: "PENDING" as const, stitchingPaymentStatus: "PENDING" as const };
+  assert.deepEqual(groupShirtAmountTotals([first, second], 5000), {
+    openingAmount: 5000, availableAmount: 3650,
+    fabricPurchase: 1050, vestiPurchase: 100, stitching: 200, productionCost: 1350, shirtProfit: 1345,
+  });
+});
+
+test("only paid production stages reduce the available Group Shirt amount", () => {
+  const order = { ...valid(), shirtRate: 1000, fabricMetres: 10, fabricPrice: 100, stitchingQuantity: 2, stitchingPrice: 100, fabricPaymentStatus: "PURCHASED" as const, vestiPaymentStatus: "PENDING" as const, stitchingPaymentStatus: "PAID" as const };
+  assert.deepEqual(groupShirtAmountTotals([order], 2000), {
+    openingAmount: 2000, availableAmount: 1800,
+    fabricPurchase: 0, vestiPurchase: 0, stitching: 200, productionCost: 200, shirtProfit: 750,
+  });
 });

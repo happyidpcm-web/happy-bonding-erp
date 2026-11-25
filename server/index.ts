@@ -314,6 +314,105 @@ app.get("/api/staff", requirePermission("*"), async (req, res) => {
   res.json(rows.map(user => ({ id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role.name, branches: user.branches.map(x => x.branch) })));
 });
 
+const attendanceDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid attendance date").refine(value => {
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
+}, "Use a valid attendance date");
+const attendanceTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a valid time");
+const staffAttendanceInput = z.object({
+  status: z.enum(["PRESENT", "ABSENT", "LEAVE"]),
+  checkIn: attendanceTime.optional().nullable(),
+  checkOut: attendanceTime.optional().nullable(),
+  notes: z.string().trim().max(500).optional().default(""),
+}).strict().superRefine((value, context) => {
+  if (value.status === "PRESENT" && (!value.checkIn || !value.checkOut)) context.addIssue({ code: "custom", message: "Enter both check-in and check-out time for present attendance." });
+  if (value.checkIn && value.checkOut && value.checkOut < value.checkIn) context.addIssue({ code: "custom", message: "Check-out time must be after check-in time." });
+});
+
+const attendanceStaffInput = z.object({
+  name: z.string().trim().min(1, "Enter the staff name").max(150),
+  phone: z.string().trim().max(25).optional().default(""),
+  role: z.string().trim().min(1, "Enter the staff role").max(80).optional().default("Staff"),
+}).strict();
+
+app.get("/api/attendance-staff", requirePermission("*"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  const rows = await db.attendanceStaff.findMany({
+    where: { organizationId: req.session!.organizationId, branchId, active: true },
+    orderBy: { name: "asc" },
+  });
+  res.json(rows);
+});
+
+app.post("/api/attendance-staff", requirePermission("*"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  const input = attendanceStaffInput.safeParse(req.body);
+  if (!input.success) return res.status(400).json({ error: input.error.issues[0].message });
+  const row = await db.attendanceStaff.create({
+    data: { organizationId: req.session!.organizationId, branchId, ...input.data },
+  });
+  await audit(req, "attendance_staff.created", "AttendanceStaff", row.id, { name: row.name, role: row.role });
+  res.status(201).json(row);
+});
+
+app.get("/api/attendance-staff/entries", requirePermission("*"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  const month = String(req.query.month || new Date().toISOString().slice(0, 7));
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return res.status(400).json({ error: "Use month in YYYY-MM format" });
+  const staffId = req.query.staffId ? String(req.query.staffId) : undefined;
+  const rows = await db.attendanceEntry.findMany({
+    where: { organizationId: req.session!.organizationId, branchId, attendanceDate: { startsWith: `${month}-` }, ...(staffId ? { staffId } : {}) },
+    orderBy: { attendanceDate: "desc" },
+  });
+  res.json(rows);
+});
+
+app.put("/api/attendance-staff/:id/attendance/:date", requirePermission("*"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  const dateResult = attendanceDate.safeParse(String(req.params.date));
+  const input = staffAttendanceInput.safeParse(req.body);
+  if (!dateResult.success || !input.success) return res.status(400).json({ error: input.success ? dateResult.error.issues[0].message : input.error.issues[0].message });
+  const staff = await db.attendanceStaff.findFirst({ where: { id: String(req.params.id), organizationId: req.session!.organizationId, branchId, active: true }, select: { id: true } });
+  if (!staff) return res.status(404).json({ error: "Attendance staff member not found" });
+  const values = { ...input.data, checkIn: input.data.status === "PRESENT" ? input.data.checkIn : null, checkOut: input.data.status === "PRESENT" ? input.data.checkOut : null };
+  const row = await db.attendanceEntry.upsert({
+    where: { organizationId_branchId_staffId_attendanceDate: { organizationId: req.session!.organizationId, branchId, staffId: staff.id, attendanceDate: dateResult.data } },
+    create: { organizationId: req.session!.organizationId, branchId, staffId: staff.id, attendanceDate: dateResult.data, ...values },
+    update: values,
+  });
+  await audit(req, "attendance_entry.saved", "AttendanceEntry", row.id, { staffId: staff.id, date: dateResult.data, status: values.status });
+  res.json(row);
+});
+
+app.get("/api/staff/attendance", requirePermission("*"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  const month = String(req.query.month || new Date().toISOString().slice(0, 7));
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return res.status(400).json({ error: "Use month in YYYY-MM format" });
+  const staffId = req.query.staffId ? String(req.query.staffId) : undefined;
+  const rows = await db.staffAttendance.findMany({
+    where: { organizationId: req.session!.organizationId, branchId, attendanceDate: { startsWith: `${month}-` }, ...(staffId ? { staffId } : {}) },
+    orderBy: { attendanceDate: "desc" },
+  });
+  res.json(rows);
+});
+
+app.put("/api/staff/:id/attendance/:date", requirePermission("*"), async (req, res) => {
+  const branchId = requireBranch(req, res); if (!branchId) return;
+  const dateResult = attendanceDate.safeParse(String(req.params.date));
+  const input = staffAttendanceInput.safeParse(req.body);
+  if (!dateResult.success || !input.success) return res.status(400).json({ error: input.success ? dateResult.error.issues[0].message : input.error.issues[0].message });
+  const staff = await db.user.findFirst({ where: { id: String(req.params.id), organizationId: req.session!.organizationId, active: true }, select: { id: true } });
+  if (!staff) return res.status(404).json({ error: "Staff member not found" });
+  const values = { ...input.data, checkIn: input.data.status === "PRESENT" ? input.data.checkIn : null, checkOut: input.data.status === "PRESENT" ? input.data.checkOut : null };
+  const row = await db.staffAttendance.upsert({
+    where: { organizationId_branchId_staffId_attendanceDate: { organizationId: req.session!.organizationId, branchId, staffId: staff.id, attendanceDate: dateResult.data } },
+    create: { organizationId: req.session!.organizationId, branchId, staffId: staff.id, attendanceDate: dateResult.data, ...values },
+    update: values,
+  });
+  await audit(req, "staff.attendance_saved", "StaffAttendance", row.id, { staffId: staff.id, date: dateResult.data, status: values.status });
+  res.json(row);
+});
+
 app.post("/api/staff", requirePermission("*"), async (req, res) => {
   const organizationId = req.session!.organizationId;
   const name = String(req.body?.name ?? "").trim();

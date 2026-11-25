@@ -128,3 +128,23 @@ export interface StaffUser {
   role: string;
   branches: Branch[];
 }
+
+/** A staff profile used exclusively for attendance; it cannot sign in. */
+export interface AttendanceStaff {
+  id: string;
+  name: string;
+  phone?: string | null;
+  role: string;
+  active: boolean;
+}
+
+export type StaffAttendanceStatus = "PRESENT" | "ABSENT" | "LEAVE";
+export interface StaffAttendance {
+  id: string;
+  staffId: string;
+  attendanceDate: string;
+  status: StaffAttendanceStatus;
+  checkIn?: string | null;
+  checkOut?: string | null;
+  notes?: string | null;
+}
