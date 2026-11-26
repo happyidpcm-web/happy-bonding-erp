@@ -32,3 +32,5 @@
   .staff-add-form .staff-attendance-actions{position:sticky;bottom:-14px;z-index:2;margin:0 -14px -14px!important;padding:10px 14px calc(10px + env(safe-area-inset-bottom))!important;background:#fff}
   .staff-add-form .staff-attendance-actions button{min-height:40px!important;padding:7px 12px!important}
 }
+.staff-week-range{flex-basis:100%;display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:9px;background:#fff8e8;color:#654d2c;font-size:12px;min-width:0;overflow-wrap:anywhere}.staff-week-range span{font-size:11px;color:#817567}.attendance-period-control:has(.staff-week-range){flex-wrap:wrap;min-width:0}.staff-week-range{grid-column:1 / -1}
+@media(max-width:768px){main:has(.staff-summary-grid) .staff-summary-grid .metric:last-child strong{font-size:14px!important;line-height:1.4!important;white-space:normal!important}.staff-week-range strong{font-size:12px}.staff-week-range span{font-size:10px}}
