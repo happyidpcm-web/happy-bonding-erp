@@ -1,3 +1,4 @@
+import { staffAttendanceInput } from "./attendance-validation.js";
 import "dotenv/config";
 import express from "express";
 import path from "path";
@@ -318,17 +319,6 @@ const attendanceDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid atte
   const parsed = new Date(`${value}T00:00:00Z`);
   return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
 }, "Use a valid attendance date");
-const attendanceTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a valid time");
-const staffAttendanceInput = z.object({
-  status: z.enum(["PRESENT", "ABSENT", "LEAVE"]),
-  checkIn: attendanceTime.optional().nullable(),
-  checkOut: attendanceTime.optional().nullable(),
-  notes: z.string().trim().max(500).optional().default(""),
-}).strict().superRefine((value, context) => {
-  if (value.status === "PRESENT" && (!value.checkIn || !value.checkOut)) context.addIssue({ code: "custom", message: "Enter both check-in and check-out time for present attendance." });
-  if (value.checkIn && value.checkOut && value.checkOut < value.checkIn) context.addIssue({ code: "custom", message: "Check-out time must be after check-in time." });
-});
-
 const attendanceStaffInput = z.object({
   name: z.string().trim().min(1, "Enter the staff name").max(150),
   phone: z.string().trim().max(25).optional().default(""),
@@ -371,10 +361,11 @@ app.put("/api/attendance-staff/:id/attendance/:date", requirePermission("*"), as
   const branchId = requireBranch(req, res); if (!branchId) return;
   const dateResult = attendanceDate.safeParse(String(req.params.date));
   const input = staffAttendanceInput.safeParse(req.body);
-  if (!dateResult.success || !input.success) return res.status(400).json({ error: input.success ? dateResult.error.issues[0].message : input.error.issues[0].message });
+  if (!dateResult.success) return res.status(400).json({ error: dateResult.error.issues[0].message });
+  if (!input.success) return res.status(400).json({ error: input.error.issues[0].message });
   const staff = await db.attendanceStaff.findFirst({ where: { id: String(req.params.id), organizationId: req.session!.organizationId, branchId, active: true }, select: { id: true } });
   if (!staff) return res.status(404).json({ error: "Attendance staff member not found" });
-  const values = { ...input.data, checkIn: input.data.status === "PRESENT" ? input.data.checkIn : null, checkOut: input.data.status === "PRESENT" ? input.data.checkOut : null };
+  const values = { ...input.data, checkIn: (input.data.status === "PRESENT" || input.data.status === "HALF_DAY") ? input.data.checkIn : null, checkOut: (input.data.status === "PRESENT" || input.data.status === "HALF_DAY") ? input.data.checkOut : null };
   const row = await db.attendanceEntry.upsert({
     where: { organizationId_branchId_staffId_attendanceDate: { organizationId: req.session!.organizationId, branchId, staffId: staff.id, attendanceDate: dateResult.data } },
     create: { organizationId: req.session!.organizationId, branchId, staffId: staff.id, attendanceDate: dateResult.data, ...values },
@@ -400,10 +391,11 @@ app.put("/api/staff/:id/attendance/:date", requirePermission("*"), async (req, r
   const branchId = requireBranch(req, res); if (!branchId) return;
   const dateResult = attendanceDate.safeParse(String(req.params.date));
   const input = staffAttendanceInput.safeParse(req.body);
-  if (!dateResult.success || !input.success) return res.status(400).json({ error: input.success ? dateResult.error.issues[0].message : input.error.issues[0].message });
+  if (!dateResult.success) return res.status(400).json({ error: dateResult.error.issues[0].message });
+  if (!input.success) return res.status(400).json({ error: input.error.issues[0].message });
   const staff = await db.user.findFirst({ where: { id: String(req.params.id), organizationId: req.session!.organizationId, active: true }, select: { id: true } });
   if (!staff) return res.status(404).json({ error: "Staff member not found" });
-  const values = { ...input.data, checkIn: input.data.status === "PRESENT" ? input.data.checkIn : null, checkOut: input.data.status === "PRESENT" ? input.data.checkOut : null };
+  const values = { ...input.data, checkIn: (input.data.status === "PRESENT" || input.data.status === "HALF_DAY") ? input.data.checkIn : null, checkOut: (input.data.status === "PRESENT" || input.data.status === "HALF_DAY") ? input.data.checkOut : null };
   const row = await db.staffAttendance.upsert({
     where: { organizationId_branchId_staffId_attendanceDate: { organizationId: req.session!.organizationId, branchId, staffId: staff.id, attendanceDate: dateResult.data } },
     create: { organizationId: req.session!.organizationId, branchId, staffId: staff.id, attendanceDate: dateResult.data, ...values },
