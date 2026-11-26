@@ -138,7 +138,7 @@ export interface AttendanceStaff {
   active: boolean;
 }
 
-export type StaffAttendanceStatus = "PRESENT" | "ABSENT" | "LEAVE";
+export type StaffAttendanceStatus = "PRESENT" | "ABSENT" | "LEAVE" | "HALF_DAY";
 export interface StaffAttendance {
   id: string;
   staffId: string;
