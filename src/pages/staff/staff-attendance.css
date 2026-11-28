@@ -34,3 +34,10 @@
 }
 .staff-week-range{flex-basis:100%;display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:9px;background:#fff8e8;color:#654d2c;font-size:12px;min-width:0;overflow-wrap:anywhere}.staff-week-range span{font-size:11px;color:#817567}.attendance-period-control:has(.staff-week-range){flex-wrap:wrap;min-width:0}.staff-week-range{grid-column:1 / -1}
 @media(max-width:768px){main:has(.staff-summary-grid) .staff-summary-grid .metric:last-child strong{font-size:14px!important;line-height:1.4!important;white-space:normal!important}.staff-week-range strong{font-size:12px}.staff-week-range span{font-size:10px}}
+.attendance-range-control{flex-wrap:wrap;max-width:100%;min-width:0}.staff-range-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:100%;grid-column:1 / -1}.attendance-period-control .staff-range-fields label{display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:0;font-size:12px}.attendance-period-control .staff-range-fields input{width:100%;min-width:0;border-left:0;padding:0;font-size:13px}.staff-range-fields input[readonly]{color:#817567;background:#f7f4ee}.attendance-range-control .attendance-period-tabs{grid-column:1 / -1}.attendance-range-control .staff-week-range{width:100%}
+/* Keep the month and year together on a full-width row on phones. */
+@media(max-width:768px){
+  .attendance-range-control > label{grid-column:1 / -1!important;width:100%!important;box-sizing:border-box;min-width:0}
+  .attendance-range-control > label > svg{flex-shrink:0}
+  .attendance-range-control > label > input{flex:1;min-width:0!important;width:100%!important}
+}

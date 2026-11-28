@@ -3,6 +3,10 @@
 .gs-sleeve-stepper{display:flex;flex-direction:column;gap:4px}.gs-sleeve-stepper>span{font-size:11px;color:#817567;font-weight:600}.gs-sleeve-stepper .gs-stepper{gap:4px}.group-shirts .gs-sleeve-stepper .gs-stepper button{padding:4px 8px;font-size:16px}.group-shirts .gs-sleeve-stepper .gs-stepper input{padding:6px 2px;font-size:13px}
 .gs-table-wrap{border:1px solid #efd18a;border-radius:14px;background:white;overflow-x:auto;min-height:230px;padding-bottom:80px}.gs-table{width:100%;border-collapse:collapse;min-width:900px;text-align:left}.gs-table th{background:#fff9ed;color:#92711f;text-transform:uppercase;font-size:11px;letter-spacing:.04em;padding:18px 20px;white-space:nowrap}.gs-table td{padding:20px;border-bottom:1px solid #edf0f4;font-size:14px}.gs-table td:first-child{color:#d31335;max-width:240px;overflow-wrap:anywhere}.gs-table .gs-number{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}.gs-table .gs-due{font-weight:700}.gs-actions{position:relative;display:flex;justify-content:center}.group-shirts .gs-actions>button{border:0;padding:6px;background:transparent}.gs-action-menu{position:absolute;right:0;top:100%;z-index:5;min-width:130px;background:white;border:1px solid #eadcc4;box-shadow:0 8px 24px #0002;border-radius:8px;padding:5px}.group-shirts .gs-action-menu button{width:100%;border:0;text-align:left}.gs-action-menu button:hover{background:#fff5dc}.gs-table .gs-empty-row{text-align:center;color:#80786a;padding:40px}
 .gs-production{margin-top:28px}.gs-totals .gs-cost-total{border-top:1px solid #e3ca9b;font-weight:700;margin-top:12px;padding-top:14px}.gs-totals .gs-profit{border-top:1px solid #e3ca9b;margin-top:12px;padding:16px 0;color:#167343;font-size:19px;font-weight:700}.gs-totals .gs-loss{color:#c41332}
+.group-shirts .gs-actions .gs-action-menu { display: flex; flex-direction: column; align-items: stretch; gap: 2px; white-space: normal; padding: 5px; }
+.group-shirts .gs-actions .gs-action-menu > button { display: flex; flex: 0 0 auto; justify-content: flex-start; width: 100%; min-height: 44px; padding: 10px 12px; gap: 10px; font-size: 13px; border-radius: 6px; }
+.gs-save-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
+.group-shirts .gs-save-actions > button { width: auto; min-width: 88px; justify-content: center; padding: 10px 22px; }
 /* Compact production costing layout. */
 .group-shirts .gs-production,.group-shirts .gs-stitching,.group-shirts .gs-profit-card{padding:14px 18px;margin-bottom:14px}
 .gs-fabric-row{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:16px;align-items:end}
@@ -75,6 +79,21 @@
 @media(max-width:600px){.group-shirts .gs-header{align-items:flex-start}.group-shirts .gs-header h1{font-size:21px}.gs-list-toolbar{align-items:stretch;flex-direction:column}.gs-search-control{width:100%}.gs-list-page .gs-summary{gap:10px}.group-shirts.gs-list-page .gs-summary button{padding:12px}.gs-heading-icon{width:38px;height:38px}}
 .group-shirts .gs-dashboard-back{margin-bottom:18px;padding:8px 12px;font-size:12px;font-weight:600}
 
+.gs-workspace .gs-workspace-arrow { color: #998774; flex-shrink: 0; }
+@media(max-width:768px) {
+  .group-shirts.gs-workspace { padding: 4px; }
+  .group-shirts.gs-workspace .gs-dashboard-back { border: 0; background: transparent; padding: 6px 0; min-height: 36px; margin-bottom: 14px; color: #817567; font-size: 11px; }
+  .group-shirts.gs-workspace .gs-header { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid #eee5d5; }
+  .group-shirts.gs-workspace .gs-header h1 { font-size: 20px; letter-spacing: -.4px; }
+  .group-shirts.gs-workspace .gs-header p { font-size: 11px; line-height: 1.5; margin-top: 5px; }
+  .gs-workspace .gs-heading-icon { display: none; }
+  .group-shirts.gs-workspace .gs-workspace-options { grid-template-columns: 1fr; gap: 10px; }
+  .group-shirts.gs-workspace .gs-workspace-option { padding: 15px 12px; gap: 12px; border-radius: 12px; border-color: #e9e2d6; background: #fff; min-height: 86px; box-shadow: 0 2px 6px #33210b04; }
+  .gs-workspace .gs-workspace-icon { width: 36px; height: 36px; border-radius: 10px; background: #fff3e6; }
+  .gs-workspace .gs-workspace-icon svg { width: 21px; height: 21px; }
+  .gs-workspace .gs-workspace-option strong { font-size: 14px; line-height: 1.4; }
+  .gs-workspace .gs-workspace-option small { font-size: 11px; line-height: 1.5; color: #8a8175; }
+}
 /* Group Shirts landing page and amount transactions. */
 .gs-workspace-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;max-width:950px}
 .group-shirts .gs-workspace-option{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:16px;text-align:left;padding:22px;border-radius:14px;background:#fffdf8;border:1px solid #ead8b2;transition:transform .15s,box-shadow .15s,border-color .15s}
@@ -83,3 +102,61 @@
 .gs-amount-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:12px}.gs-amount-card{min-width:0;padding:15px;border:1px solid #ead8b2;border-radius:12px;background:white;display:flex;flex-direction:column;gap:8px;color:#786247}.gs-amount-card>svg{color:#a87518}.gs-amount-card span{font-size:12px;font-weight:600}.gs-amount-card strong{font-size:18px;line-height:1.2;color:#49351f;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.gs-amount-available{border-color:#d31335;background:#fff7f7}.gs-amount-available>svg,.gs-amount-available strong{color:#c31332}.gs-amount-profit{border-color:#c5e5d0;background:#f1f9f4}.gs-amount-profit>svg,.gs-amount-profit strong{color:#167343}.gs-amount-loss{border-color:#f1c5cb;background:#fff0f1}.gs-amount-loss>svg,.gs-amount-loss strong{color:#c31332}.gs-amount-note{margin:0 0 22px;font-size:11px;color:#817567}.gs-transaction-section{margin-top:20px}.gs-transaction-section .gs-list-toolbar>strong{font-size:12px;font-variant-numeric:tabular-nums}.gs-transaction-table{min-width:800px}.gs-transaction-table td small{display:block;margin-top:4px;color:#817567}.gs-profit-text{color:#167343;font-weight:700}.gs-loss-text{color:#c31332;font-weight:700}.gs-success{color:#167343;background:#eff9f1;padding:13px 16px;margin-bottom:16px;border-radius:8px}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 @media(max-width:1000px){.gs-amount-summary{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:700px){.gs-workspace-options{grid-template-columns:1fr}.group-shirts .gs-workspace-option{padding:17px;gap:12px}.gs-opening-card{grid-template-columns:1fr;gap:12px}.gs-amount-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.gs-amount-card{padding:13px}.gs-amount-card strong{font-size:16px}}
+
+/* Branded status choices and photo sources. */
+.gs-status-picker { min-width:0; display:flex; flex-direction:column; gap:5px; font-size:11px; color:#81705b; }
+.group-shirts .gs-status-picker > button { width:100%; justify-content:space-between; padding:7px; gap:5px; font-size:11px; min-height:38px; white-space:normal; text-align:left; }
+.gs-status-picker > button > span:first-child { overflow-wrap:anywhere; }
+.gs-status-control > .gs-status-picker { width:100%; flex-direction:row; align-items:center; justify-content:space-between; }
+.gs-status-control > .gs-status-picker > button { width:150px; background:var(--status-bg); color:var(--status-ink); border-color:var(--status-border); }
+.gs-status-dialog { width:min(360px,calc(100vw - 32px)); max-height:80dvh; border:1px solid #eee3d1; border-radius:16px; padding:16px; color:#342b20; background:#fff; box-shadow:0 20px 60px #0003; }
+.gs-status-dialog::backdrop { background:#17203370; }
+.gs-status-dialog header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.gs-status-dialog h2 { font-size:16px; margin:0; }
+.group-shirts .gs-status-dialog header button { border:0; padding:8px; background:#f7f4ef; }
+.gs-status-options { display:grid; gap:8px; }
+.group-shirts .gs-status-options button { width:100%; justify-content:space-between; padding:12px; min-height:46px; font-size:13px; text-align:left; border-color:#ece5d8; }
+.group-shirts .gs-status-options button[aria-pressed=true] { background:#fff4f5; border-color:#c31332; color:#b51230; }
+.gs-choice-dot { width:16px; height:16px; border:1px solid #bcb4a8; border-radius:50%; flex-shrink:0; }
+[aria-pressed=true] > .gs-choice-dot { border:5px solid #c31332; }
+.gs-photo-options { display:flex; gap:8px; }
+.group-shirts .gs-photo-source { position:relative; display:flex; align-items:center; justify-content:center; width:auto; padding:10px 16px; border:1px solid #ddcfb5; border-radius:8px; font-size:12px; cursor:pointer; overflow:hidden; }
+.gs-photo-source input { position:absolute; inset:0; opacity:0; cursor:pointer; }
+.gs-photo-source:focus-within { outline:2px solid #c31332; }
+.gs-photo-title { font-size:12px; font-weight:600; }
+@media(max-width:768px) {
+ .group-shirts.gs-editor-page .gs-cost-statuses { gap:6px; padding:8px; }
+ .group-shirts.gs-editor-page .gs-cost-statuses .gs-status-picker > button { font-size:10px; padding:6px; min-height:44px; }
+ .group-shirts.gs-editor-page .gs-compact { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+ .group-shirts.gs-editor-page .gs-compact .gs-size { padding:8px; gap:6px; }
+ .group-shirts.gs-editor-page .gs-compact h3 { font-size:12px; }
+ .group-shirts.gs-editor-page .gs-sleeve-stepper > span { font-size:9px; }
+ .group-shirts.gs-editor-page .gs-sleeve-stepper .gs-stepper { gap:3px; }
+ .group-shirts.gs-editor-page .gs-sleeve-stepper .gs-stepper button { padding:3px; width:28px; min-height:32px; flex-shrink:0; justify-content:center; font-size:16px; }
+ .group-shirts.gs-editor-page .gs-sleeve-stepper .gs-stepper input { height:32px; padding:3px 0; font-size:12px; }
+ .group-shirts.gs-editor-page .gs-photo + p { font-size:10px; line-height:1.5; }
+}
+
+.gs-outstanding { margin-bottom:18px; padding:12px; border:1px solid #eadfca; border-radius:12px; background:#fff; }
+.gs-outstanding header { display:flex; justify-content:space-between; gap:8px; align-items:center; margin-bottom:10px; }
+.gs-outstanding header strong { font-size:13px; }
+.gs-outstanding header small { font-size:10px; color:#817567; }
+.gs-outstanding-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.gs-outstanding article { padding:10px; border-radius:8px; background:#fffaf0; min-width:0; }
+.gs-outstanding h3 { margin:0 0 8px; font-size:12px; }
+.gs-outstanding article span { display:flex; justify-content:space-between; gap:8px; font-size:11px; margin-top:6px; color:#817567; }
+.gs-outstanding article strong { color:#9f4821; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.gs-outstanding article .gs-paid-total { color:#167343; }
+.gs-outstanding article span + span { padding-top:6px; border-top:1px solid #eee5d5; }
+@media(max-width:768px) {
+ .gs-outstanding { padding:10px; }
+ .gs-outstanding-grid { gap:6px; }
+ .gs-outstanding article { padding:8px 6px; }
+ .gs-outstanding article span { flex-direction:column; gap:3px; font-size:9px; }
+ .gs-outstanding article strong { font-size:11px; }
+ .gs-outstanding header strong { font-size:11px; }
+ .gs-amount-page .gs-transaction-table tr { grid-template-columns:minmax(0,1fr) minmax(0,.85fr) minmax(0,.85fr) 60px; gap:5px; padding:9px 7px; }
+ .gs-amount-page .gs-transaction-table th:nth-child(8), .gs-amount-page .gs-transaction-table td:nth-child(8) { display:block; text-align:center; }
+ .gs-amount-page .gs-transaction-table .gs-status-badge { font-size:9px; padding:4px 3px; }
+ .gs-amount-page .gs-transaction-table .gs-number { font-size:10px; }
+}

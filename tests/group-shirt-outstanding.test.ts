@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import { outstandingProductionAmounts } from '../src/pages/group-shirts/types.ts';
+const order = { fabricMetres: 10, fabricPrice: 100, transportCost: 50, vestiPurchaseQuantity: 2, vestiPurchaseRate: 200, stitchingQuantity: 10, stitchingPrice: 50, lines: [], shirtRate: 0, discount: 0, vestiQuantity: 0, vestiRate: 0 } as any;
+assert.deepEqual(outstandingProductionAmounts([order]), { fabricPurchased: 0, fabricPaid: 0, vestiPurchased: 0, vestiPaid: 0, stitchingPaid: 0, fabricToPurchase: 1100, fabricToPay: 0, vestiToPurchase: 400, vestiToPay: 0, stitchingToPay: 500 });
+const purchased = { ...order, fabricPaymentStatus: 'PURCHASED', vestiPaymentStatus: 'PURCHASED' };
+assert.deepEqual(outstandingProductionAmounts([purchased]), { fabricPurchased: 1100, fabricPaid: 0, vestiPurchased: 400, vestiPaid: 0, stitchingPaid: 0, fabricToPurchase: 0, fabricToPay: 1100, vestiToPurchase: 0, vestiToPay: 400, stitchingToPay: 500 });
+const paid = { ...order, fabricPaymentStatus: 'PAID', vestiPaymentStatus: 'PAID', stitchingPaymentStatus: 'PAID' };
+assert.deepEqual(outstandingProductionAmounts([paid]), { fabricPurchased: 1100, fabricPaid: 1100, vestiPurchased: 400, vestiPaid: 400, stitchingPaid: 500, fabricToPurchase: 0, fabricToPay: 0, vestiToPurchase: 0, vestiToPay: 0, stitchingToPay: 0 });
+assert.deepEqual(outstandingProductionAmounts([order, purchased, paid]), { fabricPurchased: 2200, fabricPaid: 1100, vestiPurchased: 800, vestiPaid: 400, stitchingPaid: 500, fabricToPurchase: 1100, fabricToPay: 1100, vestiToPurchase: 400, vestiToPay: 400, stitchingToPay: 1000 });
+assert.deepEqual(outstandingProductionAmounts([]), { fabricPurchased: 0, fabricPaid: 0, vestiPurchased: 0, vestiPaid: 0, stitchingPaid: 0, fabricToPurchase: 0, fabricToPay: 0, vestiToPurchase: 0, vestiToPay: 0, stitchingToPay: 0 });
+console.log('Outstanding production: pending, purchased, paid, aggregate and empty checks passed');

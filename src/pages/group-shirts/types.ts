@@ -94,3 +94,22 @@ export const orderStatuses = ["PROCESSING", "COMPLETED", "DELIVERED"] as const;
 export type GroupShirtStatus = typeof orderStatuses[number];
 export const normalizedStatus = (status: string): GroupShirtStatus => status === "COMPLETED" || status === "DELIVERED" ? status : "PROCESSING";
 export const statusLabel = (status: string) => ({ PROCESSING: "Processing", COMPLETED: "Completed", DELIVERED: "Delivered" })[normalizedStatus(status)];
+
+/** Outstanding commitments across all orders, independent of list filters. */
+export function outstandingProductionAmounts(orders: GroupShirtInput[]) {
+  const totals = { fabricPurchased: 0, fabricPaid: 0, vestiPurchased: 0, vestiPaid: 0, stitchingPaid: 0, fabricToPurchase: 0, fabricToPay: 0, vestiToPurchase: 0, vestiToPay: 0, stitchingToPay: 0 };
+  for (const order of orders) {
+    const cost = productionAmounts(order);
+    if (order.fabricPaymentStatus === 'PURCHASED' || order.fabricPaymentStatus === 'PAID') totals.fabricPurchased += cost.fabricPurchase;
+    if (order.fabricPaymentStatus === 'PAID') totals.fabricPaid += cost.fabricPurchase;
+    if (order.vestiPaymentStatus === 'PURCHASED' || order.vestiPaymentStatus === 'PAID') totals.vestiPurchased += cost.vestiPurchase;
+    if (order.vestiPaymentStatus === 'PAID') totals.vestiPaid += cost.vestiPurchase;
+    if (order.stitchingPaymentStatus === 'PAID') totals.stitchingPaid += cost.stitching;
+    if (!order.fabricPaymentStatus || order.fabricPaymentStatus === 'PENDING') totals.fabricToPurchase += cost.fabricPurchase;
+    if (order.fabricPaymentStatus === 'PURCHASED') totals.fabricToPay += cost.fabricPurchase;
+    if (!order.vestiPaymentStatus || order.vestiPaymentStatus === 'PENDING') totals.vestiToPurchase += cost.vestiPurchase;
+    if (order.vestiPaymentStatus === 'PURCHASED') totals.vestiToPay += cost.vestiPurchase;
+    if (order.stitchingPaymentStatus !== 'PAID') totals.stitchingToPay += cost.stitching;
+  }
+  return Object.fromEntries(Object.entries(totals).map(([key, value]) => [key, Math.round((value + Number.EPSILON) * 100) / 100])) as typeof totals;
+}

@@ -1,4 +1,133 @@
 /* Loaded after desktop styles; wide tables scroll within their own containers. */
+.gs-transaction-mobile-date { display: none !important; }
+@media (max-width: 768px) {
+  .group-shirts.gs-amount-page { padding: 4px; min-width: 0; }
+  .group-shirts.gs-amount-page .gs-dashboard-back { font-size: 11px; padding: 6px 0; border: 0; background: transparent; color: #817567; min-height: 36px; margin-bottom: 12px; }
+  .group-shirts.gs-amount-page .gs-header { margin-bottom: 16px; }
+  .group-shirts.gs-amount-page .gs-header h1 { font-size: 19px; }
+  .group-shirts.gs-amount-page .gs-header p { font-size: 11px; }
+  .gs-amount-page .gs-heading-icon { display: none; }
+  .gs-amount-page .gs-opening-card { grid-template-columns: minmax(0,1fr) auto; gap: 10px; padding: 12px; margin-bottom: 12px; background: #fff; }
+  .gs-amount-page .gs-opening-card > div { grid-column: 1/-1; }
+  .gs-amount-page .gs-opening-card > div > span { font-size: 13px; }
+  .gs-amount-page .gs-opening-card small { font-size: 10px; line-height: 1.5; }
+  .group-shirts.gs-amount-page .gs-opening-card button { font-size: 10px; padding: 8px; }
+  .gs-amount-page .gs-amount-summary { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+  .gs-amount-page .gs-amount-card { padding: 10px; gap: 5px; border-radius: 10px; }
+  .gs-amount-page .gs-amount-card > svg { display: none; }
+  .gs-amount-page .gs-amount-card span { font-size: 10px; }
+  .gs-amount-page .gs-amount-card strong { font-size: 16px; }
+  .gs-amount-page .gs-amount-card:last-child { grid-column: 1/-1; flex-direction: row; justify-content: space-between; align-items: center; }
+  .gs-amount-page .gs-amount-note { font-size: 10px; line-height: 1.5; margin: 10px 0 16px; }
+  .gs-amount-page .gs-list-toolbar { gap: 8px; margin-bottom: 12px; }
+  .gs-amount-page .gs-list-toolbar h2 { font-size: 14px; }
+  .gs-amount-page .gs-list-toolbar > strong { font-size: 11px; color: #817567; }
+  .gs-amount-page .gs-table-wrap { min-height: 0; padding: 0; border-color: #e9e1d2; border-radius: 10px; overflow: hidden; }
+  .gs-amount-page .gs-transaction-table { width: 100% !important; min-width: 0 !important; display: block; }
+  .gs-amount-page .gs-transaction-table thead, .gs-amount-page .gs-transaction-table tbody { display: block; }
+  .gs-amount-page .gs-transaction-table tr { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,.85fr) minmax(0,.85fr) 60px; gap: 5px; padding: 9px 7px; align-items: center; border-bottom: 1px solid #eee8df; }
+  .gs-amount-page .gs-transaction-table tr:last-child { border-bottom: 0; }
+  .gs-amount-page .gs-transaction-table thead { background: #fff9ed; }
+  .gs-amount-page .gs-transaction-table th, .gs-amount-page .gs-transaction-table td { display: none; min-width: 0; padding: 0 !important; border: 0; font-size: 11px; }
+  .gs-amount-page .gs-transaction-table th:nth-child(2), .gs-amount-page .gs-transaction-table th:nth-child(6), .gs-amount-page .gs-transaction-table th:nth-child(7),
+  .gs-amount-page .gs-transaction-table td:nth-child(2), .gs-amount-page .gs-transaction-table td:nth-child(6), .gs-amount-page .gs-transaction-table td:nth-child(7) { display: block; }
+  .gs-amount-page .gs-transaction-table th { font-size: 10px; text-transform: none; }
+  .gs-amount-page .gs-transaction-table th:nth-child(n+6) { text-align: right; }
+  .gs-amount-page .gs-transaction-table td strong, .gs-amount-page .gs-transaction-table td small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gs-amount-page .gs-transaction-table td small { font-size: 10px; margin-top: 3px; }
+  .gs-amount-page .gs-transaction-table .gs-number { white-space: normal; overflow-wrap: anywhere; }
+  .gs-amount-page .gs-transaction-table .gs-transaction-mobile-date { display: block !important; font-size: 9px; color: #9a9082; }
+  .gs-amount-page .gs-transaction-table .gs-empty-row { display: block; grid-column: 1/-1; padding: 24px 8px !important; }
+}
+@media (max-width: 768px) {
+  .group-shirts.gs-editor-page .gs-payment-card .gs-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .gs-editor-page .gs-payment-card .gs-fields > label { min-width: 0; }
+  .gs-editor-page .gs-payment-card .gs-fields > label:has(textarea) { grid-column: 1 / -1; }
+  .group-shirts.gs-editor-page .gs-payment-card .gs-fields input { min-height: 34px; height: 34px; padding: 6px 8px; font-size: 12px; }
+  .group-shirts.gs-editor-page .gs-payment-card textarea { min-height: 54px; height: 54px; padding: 8px; font-size: 12px; resize: vertical; }
+  .gs-editor-page .gs-payment-card .gs-totals { margin-top: 12px; padding: 8px 10px; border: 1px solid #eee5d5; border-radius: 8px; background: #fffdf8; }
+  .gs-editor-page .gs-payment-card .gs-totals p { font-size: 12px; padding: 5px 0; gap: 10px; }
+  .gs-editor-page .gs-payment-card .gs-totals .gs-balance { font-size: 14px; margin-top: 5px; padding-top: 10px; }
+  .gs-editor-page .gs-payment-card > small { display: block; font-size: 10px; line-height: 1.5; margin-top: 10px; color: #817567; }
+  .group-shirts.gs-editor-page .gs-fabric-row, .group-shirts.gs-editor-page .gs-stitching-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .group-shirts.gs-editor-page .gs-fabric-row > label:first-child { grid-column: 1 / -1; }
+  .group-shirts.gs-editor-page .gs-production label, .group-shirts.gs-editor-page .gs-stitching label { min-width: 0; font-size: 11px; gap: 5px; }
+  .group-shirts.gs-editor-page .gs-production input, .group-shirts.gs-editor-page .gs-stitching input { width: 100%; max-width: none; height: 34px; padding: 6px 8px; font-size: 12px; }
+  .gs-editor-page .gs-fabric-row .gs-inline-total, .gs-editor-page .gs-stitching-row .gs-inline-total { grid-column: 1 / -1; display: flex; flex-direction: row; justify-content: space-between; align-items: center; border-top: 1px solid #eee5d5; padding-top: 8px; gap: 8px; }
+  .gs-editor-page .gs-inline-total span { font-size: 11px; }
+  .gs-editor-page .gs-inline-total strong { font-size: 13px; min-height: 24px; }
+  .group-shirts.gs-editor-page .gs-fabric-extras { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 8px; padding-top: 8px; }
+  .group-shirts.gs-editor-page .gs-fabric-extras p, .group-shirts.gs-editor-page .gs-fabric-extras label { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 11px; }
+  .group-shirts.gs-editor-page .gs-fabric-extras input { width: 96px; }
+  .gs-editor-page .gs-fabric-extras strong { font-size: 13px; }
+}
+@media (max-width: 768px) {
+  .group-shirts.gs-editor-page { padding: 4px; min-width: 0; }
+  .group-shirts.gs-editor-page .gs-header { margin-bottom: 12px; }
+  .group-shirts.gs-editor-page .gs-header h1 { font-size: 17px; line-height: 1.3; }
+  .group-shirts.gs-editor-page .gs-header p { font-size: 10px; margin-top: 4px; }
+  .gs-editor-page .gs-heading-content { gap: 8px; }
+  .gs-editor-page .gs-heading-icon { width: 30px; height: 30px; border-radius: 8px; }
+  .gs-editor-page .gs-heading-icon svg { width: 18px; height: 18px; }
+  .group-shirts.gs-editor-page .gs-order-toolbar { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 16px; }
+  .group-shirts.gs-editor-page .gs-order-toolbar > button { align-self: flex-start; min-height: 34px; padding: 5px 8px; gap: 6px; font-size: 11px; border-radius: 7px; }
+  .gs-editor-page .gs-order-toolbar > button svg { width: 14px; height: 14px; }
+  .gs-editor-page .gs-status-controls { display: grid; gap: 8px; width: 100%; margin: 0; }
+  .group-shirts.gs-editor-page .gs-cost-statuses { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 10px; border-color: #ece4d5; border-radius: 10px; background: #fff; }
+  .group-shirts.gs-editor-page .gs-cost-statuses label { display: flex; flex-direction: column; align-items: stretch; gap: 5px; min-width: 0; font-size: 10px; }
+  .group-shirts.gs-editor-page .gs-cost-statuses select { flex: none; width: 100%; min-width: 0; height: 34px; padding: 5px 3px; font-size: 10px; }
+  .group-shirts.gs-editor-page .gs-status-control { display: flex; justify-content: space-between; width: 100%; margin: 0; padding: 6px 10px; gap: 10px; border-color: #ece4d5; }
+  .gs-editor-page .gs-status-control > span { font-size: 11px; }
+  .group-shirts.gs-editor-page .gs-status-control select { width: 140px; height: 34px; font-size: 11px; padding: 5px 8px; }
+  .group-shirts.gs-editor-page .gs-card { padding: 12px; margin-bottom: 14px; border-radius: 10px; }
+  .gs-editor-page .gs-card legend { font-size: 13px; padding: 0 6px; }
+  .group-shirts.gs-editor-page .gs-fields { gap: 12px; margin-bottom: 12px; }
+  .group-shirts.gs-editor-page .gs-fields label { font-size: 11px; gap: 5px; }
+  .group-shirts.gs-editor-page .gs-fields input, .group-shirts.gs-editor-page .gs-fields select { padding: 8px 10px; min-height: 38px; font-size: 13px; }
+}
+/* Group orders fit the phone as a shared heading and single-line rows. */
+@media (max-width: 768px) {
+  .group-shirts.gs-list-page { padding: 4px; min-width: 0; }
+  .group-shirts.gs-list-page .gs-dashboard-back { margin-bottom: 10px; min-height: 36px; font-size: 11px; padding: 6px 0; border: 0; background: transparent; color: #776852; }
+  .group-shirts.gs-list-page .gs-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid #eee5d5; }
+  .group-shirts.gs-list-page .gs-header h1 { font-size: 16px; line-height: 1.35; letter-spacing: -.3px; }
+  .group-shirts.gs-list-page .gs-header p { font-size: 10px; line-height: 1.5; margin-top: 4px; color: #8a8175; }
+  .gs-list-page .gs-heading-content { gap: 8px; }
+  .gs-list-page .gs-heading-icon { display: none; }
+  .gs-list-page .gs-heading-icon svg { width: 18px; height: 18px; }
+  .group-shirts.gs-list-page .gs-header > button { padding: 8px 10px; min-height: 40px; font-size: 11px; gap: 5px; border-radius: 9px; box-shadow: none; }
+  .group-shirts.gs-list-page .gs-header > button svg { width: 15px; height: 15px; }
+  .gs-list-page .gs-summary { gap: 8px; margin-bottom: 16px; }
+  .group-shirts.gs-list-page .gs-summary button { padding: 9px 11px; gap: 4px; }
+  .gs-list-page .gs-summary span { font-size: 11px; }
+  .gs-list-page .gs-summary strong { font-size: 21px; }
+
+  .gs-list-page .gs-summary { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 5px; margin-bottom: 12px; }
+  .group-shirts.gs-list-page .gs-summary button { padding: 10px 6px; gap: 5px; border-radius: 9px; border-color: #ebe3d5; box-shadow: none; }
+  .gs-list-page .gs-summary span { font-size: 9px; white-space: nowrap; }
+  .gs-list-page .gs-summary strong { font-size: 19px; }
+  .gs-list-page .gs-table-wrap { padding: 0; min-height: 0; overflow: visible; border: 1px solid #ead8b2; border-radius: 10px; background: white; }
+  .gs-list-page .gs-table { display: block; width: 100% !important; min-width: 0 !important; }
+  .gs-list-page .gs-table thead, .gs-list-page .gs-table tbody { display: block; }
+  .gs-list-page .gs-table tr { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(68px,.9fr) 62px 28px; align-items: center; gap: 4px; padding: 5px 6px; border-bottom: 1px solid #eee7da; }
+  .gs-list-page .gs-table thead tr { background: #fff9ed; border-radius: 10px 10px 0 0; min-height: 36px; }
+  .gs-list-page .gs-table tbody tr { min-height: 48px; }
+  .gs-list-page .gs-table tbody tr:last-child { border-bottom: 0; }
+  .gs-list-page .gs-table th, .gs-list-page .gs-table td { display: none; padding: 0 !important; border: 0; min-width: 0; max-width: none; }
+  .gs-list-page .gs-table th:nth-child(1), .gs-list-page .gs-table th:nth-child(2), .gs-list-page .gs-table th:nth-child(6), .gs-list-page .gs-table th:nth-child(8),
+  .gs-list-page .gs-table td:nth-child(1), .gs-list-page .gs-table td:nth-child(2), .gs-list-page .gs-table td:nth-child(6), .gs-list-page .gs-table td:nth-child(8) { display: block; white-space: nowrap; }
+  .gs-list-page .gs-table th { font-size: 9px; letter-spacing: 0; text-transform: none; }
+  .gs-list-page .gs-table td { font-size: 11px; }
+  .gs-list-page .gs-table th:nth-child(7), .gs-list-page .gs-table td:nth-child(7) { display: block; text-align: center; white-space: nowrap; }
+  .gs-list-page .gs-table .gs-status-badge { font-size: 9px; padding: 4px; border-radius: 5px; }
+  .gs-list-page .gs-table th:nth-child(8) .gs-mobile-column-label { display: none; }
+  .gs-list-page .gs-table td:nth-child(1), .gs-list-page .gs-table td:nth-child(2) { overflow: hidden; text-overflow: ellipsis; }
+  .gs-list-page .gs-table .gs-order-link { font-size: 11px; }
+  .gs-list-page .gs-table .gs-actions > button { width: 28px; min-height: 40px; padding: 4px; justify-content: center; }
+  .gs-list-page .gs-table .gs-empty-row { display: block; grid-column: 1/-1; white-space: normal; padding: 20px 8px; }
+  .gs-desktop-column-label { display: none; }
+}
+@media (min-width: 769px) { .gs-mobile-column-label { display: none; } }
 .bill-preview-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
 .bill-preview-panel .bill-document-preview-wrapper { touch-action: pan-x pan-y; }
 .full-invoice-content-grid, .bill-document-preview-wrapper { overflow-anchor: none; }
@@ -691,7 +820,7 @@
   .party-metric-box { min-width: 0 !important; flex: 1 1 100% !important; }
   .table-scroll { max-width: 100% !important; overscroll-behavior-x: contain; }
   .search-input-wrap input, .login-panel input { font-size: 16px !important; }
-  .login-panel { min-width: 0; padding: 28px 20px; }
+  .login-panel { min-width: 0; justify-content: flex-start; padding: clamp(48px, 8dvh, 72px) 20px 28px; }
   .login-page { min-height: 100dvh; }
   .modal-backdrop { padding: 8px !important; }
   .modal, .modal.wide { max-height: calc(100dvh - 16px) !important; border-radius: 14px !important; }
@@ -2074,3 +2203,108 @@
     padding-bottom: 2px !important;
   }
 }
+
+/* Compact phone invoice editor, keeping all fields and actions available. */
+@media screen and (max-width: 768px) {
+  .full-screen-invoice-page .ref-top-header-bar { padding: 8px 0 !important; gap: 8px !important; }
+  .full-screen-invoice-page .top-title-left { gap: 6px !important; }
+  .full-screen-invoice-page .top-title-left h2 { font-size: 16px !important; line-height: 1.35 !important; margin: 0 !important; overflow-wrap: anywhere; }
+  .full-screen-invoice-page .top-header-actions { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px !important; width: 100%; }
+  .full-screen-invoice-page .top-header-actions button { min-width: 0; min-height: 40px !important; padding: 7px 5px !important; font-size: 11px !important; border-radius: 9px !important; gap: 4px !important; }
+  .full-screen-invoice-page .invoice-builder-full-width { margin: 8px 0 !important; }
+  .full-screen-invoice-page .bill-panel-col,
+  .full-screen-invoice-page .ship-panel-col,
+  .full-screen-invoice-page .invoice-meta-box { padding: 10px !important; }
+  .full-screen-invoice-page .panel-head-strip { margin-bottom: 6px !important; gap: 5px !important; }
+  .full-screen-invoice-page .panel-head-strip h3 { font-size: 13px !important; }
+  .full-screen-invoice-page .cash-default-lbl { order: 3; flex-basis: 100%; font-size: 11px !important; }
+  .full-screen-invoice-page .party-details-card { padding: 0 !important; margin: 0 !important; }
+  .full-screen-invoice-page .party-bold-name { font-size: 14px !important; }
+  .full-screen-invoice-page .party-phone-line,
+  .full-screen-invoice-page .party-addr-line { margin: 3px 0 !important; font-size: 12px !important; }
+  .full-screen-invoice-page .place-supply-row { margin-top: 7px !important; gap: 8px !important; font-size: 11px !important; }
+  .full-screen-invoice-page .meta-box-inner { padding: 8px !important; }
+  .full-screen-invoice-page .meta-box-inner label { font-size: 11px !important; gap: 3px !important; }
+  .full-screen-invoice-page .meta-terms-grid { margin-top: 7px !important; }
+  .full-screen-invoice-page .meta-box-inner input { height: 34px !important; font-size: 13px !important; padding: 5px 7px !important; }
+  .full-screen-invoice-page .invoice-items-table tbody tr { grid-template-columns: 18px minmax(0, 1fr) minmax(0, 1fr) 32px !important; gap: 6px !important; padding: 10px !important; }
+  .full-screen-invoice-page .invoice-items-table tbody td:nth-child(3),
+  .full-screen-invoice-page .invoice-items-table tbody td:nth-child(5),
+  .full-screen-invoice-page .invoice-items-table tbody td:nth-child(7) { grid-column: 1 / 3 !important; }
+  .full-screen-invoice-page .invoice-items-table tbody td:nth-child(4),
+  .full-screen-invoice-page .invoice-items-table tbody td:nth-child(6),
+  .full-screen-invoice-page .invoice-items-table tbody td:nth-child(8) { grid-column: 3 / 5 !important; }
+  .full-screen-invoice-page .invoice-items-table tbody td:nth-child(9) { grid-column: 1 / -1 !important; }
+  .full-screen-invoice-page .item-title-name { font-size: 13px !important; line-height: 1.3 !important; }
+  .full-screen-invoice-page .item-cell-wrap { gap: 4px !important; }
+  .full-screen-invoice-page .item-desc-input { height: 32px !important; font-size: 11px !important; padding: 5px 7px !important; }
+  .full-screen-invoice-page .invoice-items-table td::before { font-size: 9px !important; margin-bottom: 3px !important; }
+  .full-screen-invoice-page .invoice-number-display,
+  .full-screen-invoice-page .invoice-number-editor,
+  .full-screen-invoice-page .unit-select,
+  .full-screen-invoice-page .tax-select { min-height: 36px !important; height: 36px !important; padding: 5px 7px !important; font-size: 13px !important; }
+  .full-screen-invoice-page .mrp-cell-wrap { display: flex !important; flex-direction: row !important; align-items: center; gap: 4px !important; }
+  .full-screen-invoice-page .mrp-cell-wrap > button { flex: 1; min-width: 0; }
+  .full-screen-invoice-page .discount-badge-off { font-size: 9px !important; white-space: nowrap; }
+  .full-screen-invoice-page .gray-amount-box { padding: 7px !important; font-size: 14px !important; }
+  .full-screen-invoice-page .tax-sub-amt { font-size: 10px !important; margin-top: 2px !important; }
+  .full-screen-invoice-page .ref-left-section,
+  .full-screen-invoice-page .ref-right-section { padding: 10px !important; }
+}
+
+/* Balanced phone item cards with comfortable spacing. */
+@media screen and (max-width: 768px) {
+  .full-screen-invoice-page .invoice-items-table tbody tr { grid-template-columns: repeat(12, minmax(0, 1fr)) !important; gap: 9px 8px !important; padding: 12px !important; margin-bottom: 10px; border: 1px solid #e2e8f0 !important; border-radius: 12px; background: #fff; }
+  .full-screen-invoice-page .invoice-items-table tbody td:nth-child(1) { grid-column: 1 !important; }
+  .full-screen-invoice-page .invoice-items-table tbody td:nth-child(2) { grid-column: 2 / 12 !important; }
+  .full-screen-invoice-page .invoice-items-table tbody td:nth-child(10) { grid-column: 12 !important; overflow: visible !important; }
+  .full-screen-invoice-page .invoice-items-table tbody td:nth-child(3) { grid-column: 1 / 5 !important; display: flex !important; align-items: center; gap: 5px; font-size: 11px !important; }
+  .full-screen-invoice-page .invoice-items-table tbody td:nth-child(4) { grid-column: 5 / 13 !important; display: flex !important; align-items: center; gap: 5px; }
+  .full-screen-invoice-page .invoice-items-table tbody td:nth-child(5) { grid-column: 1 / 5 !important; }
+  .full-screen-invoice-page .invoice-items-table tbody td:nth-child(6) { grid-column: 5 / 9 !important; }
+  .full-screen-invoice-page .invoice-items-table tbody td:nth-child(9) { grid-column: 9 / 13 !important; grid-row: 3 !important; }
+  .full-screen-invoice-page .invoice-items-table tbody td:nth-child(9)::before { content: 'AMOUNT'; display: block; color: #64748b; font-weight: 800; }
+  .full-screen-invoice-page .invoice-items-table tbody td:nth-child(7) { grid-column: 1 / 7 !important; }
+  .full-screen-invoice-page .invoice-items-table tbody td:nth-child(8) { grid-column: 7 / 13 !important; }
+  .full-screen-invoice-page .item-desc-input { height: 38px !important; min-height: 38px !important; padding: 5px 7px !important; font-size: 13px !important; }
+  .full-screen-invoice-page .invoice-number-display,
+  .full-screen-invoice-page .invoice-number-editor,
+  .full-screen-invoice-page .unit-select,
+  .full-screen-invoice-page .tax-select { min-height: 38px !important; height: 38px !important; padding: 4px !important; font-size: 13px !important; }
+  .full-screen-invoice-page .qty-cell-wrap { gap: 3px !important; }
+  .full-screen-invoice-page .qty-cell-wrap > * { min-width: 0 !important; width: 50% !important; }
+  .full-screen-invoice-page .unit-select { font-size: 11px !important; padding: 0 !important; }
+  .full-screen-invoice-page .gray-amount-box { min-height: 38px; padding: 9px 2px !important; background: #eef2ff !important; color: #3730a3 !important; border-radius: 7px !important; font-size: 13px !important; box-sizing: border-box; }
+  .full-screen-invoice-page .discount-cell-wrap { flex-direction: row !important; gap: 4px !important; }
+  .full-screen-invoice-page .disc-input-row { min-width: 0; flex: 1; height: 38px !important; }
+  .full-screen-invoice-page .disc-input-row input { min-width: 0; width: 100%; height: 38px !important; font-size: 13px !important; }
+  .full-screen-invoice-page .tax-cell-wrap { flex-direction: row !important; align-items: center; gap: 4px !important; }
+  .full-screen-invoice-page .tax-select { min-width: 0; flex: 1; width: 70%; }
+  .full-screen-invoice-page .tax-sub-amt { white-space: nowrap; font-size: 9px !important; }
+  .full-screen-invoice-page .mrp-cell-wrap { flex: 1; min-width: 0; }
+}
+@media screen and (max-width: 768px) {
+  .full-screen-invoice-page .invoice-items-table tbody { padding: 8px !important; box-sizing: border-box; background: #f8fafc; }
+  .full-screen-invoice-page .item-title-name { font-size: 14px !important; line-height: 1.4 !important; }
+  .full-screen-invoice-page .invoice-items-table td::before { font-size: 10px !important; margin-bottom: 5px !important; }
+  .full-screen-invoice-page .invoice-number-display,
+  .full-screen-invoice-page .unit-select,
+  .full-screen-invoice-page .tax-select,
+  .full-screen-invoice-page .disc-input-row { background: #f8fafc !important; border: 1px solid #dbe2ea !important; border-radius: 7px !important; }
+  .full-screen-invoice-page .invoice-items-table tbody td:nth-child(10) { justify-self: end; }
+  .full-screen-invoice-page .trash-icon-btn { width: 32px; height: 36px; }
+}
+
+@media screen and (max-width: 768px) {
+  .full-screen-modal-backdrop:has(.full-invoice-view-container) { padding: 0 !important; inset: 0 !important; align-items: stretch !important; }
+  .full-invoice-view-container.card { width: 100% !important; max-width: none !important; height: 100dvh !important; max-height: none !important; margin: 0 !important; border: 0 !important; border-radius: 0 !important; }
+  .full-invoice-view-container .full-invoice-content-grid { flex: 1; min-height: 0; }
+  .full-invoice-view-container .bill-document-preview-wrapper { padding: 6px !important; overflow: hidden !important; box-sizing: border-box; }
+  .full-invoice-top-bar .actions-right { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .full-invoice-top-bar .actions-right > .icon-button { display: none; }
+}
+@media screen and (max-width: 768px) {
+  .full-screen-modal-backdrop:has(.full-invoice-view-container) { position: fixed !important; z-index: 5000 !important; }
+}
+.invoice-list-pagination { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding: 12px; font-size: 12px; }
+.invoice-list-pagination > span { margin-right: auto; }

@@ -329,7 +329,11 @@ export default function App() {
 
   if (!authenticated) return <LoginScreen onLogin={() => { setDataLoading(true); setDataError(""); setCurrentBranchId(api.currentBranchId()); setAuthenticated(true); }}/>;
   if (dataLoading) return <div className="erp-startup" role="status" aria-live="polite" aria-busy="true">
-    <div className="erp-startup-card"><span className="erp-startup-spinner" aria-hidden="true" /><h1>Happy Bonding ERP</h1><p>Loading your workspace…</p></div>
+    <div className="erp-startup-card">
+      <div className="erp-startup-logo-wrap"><img className="erp-startup-logo" src={happyBondingLogo} alt="Happy Bonding logo" /></div>
+      <span className="erp-startup-spinner" aria-hidden="true" />
+      <p>Loading your workspace…</p>
+    </div>
   </div>;
   if (dataError) return <div className="erp-startup"><div className="erp-startup-card"><h1>Unable to load your workspace</h1><p role="alert">{dataError}</p><div className="erp-startup-actions"><button className="primary" onClick={() => void refreshAppData()}>Retry</button><button className="secondary" onClick={handleLogout}>Sign out</button></div></div></div>;
 
@@ -1060,6 +1064,24 @@ function InvoiceDetailModal({
   onClose: () => void;
 }) {
   const documentRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [previewSize, setPreviewSize] = useState({ scale: 1, width: 794, height: 1123 });
+  useEffect(() => {
+    const wrapper = previewRef.current;
+    const document = documentRef.current;
+    if (!wrapper || !document) return;
+    const resize = () => {
+      const style = getComputedStyle(wrapper);
+      const available = wrapper.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      const width = document.offsetWidth;
+      if (width && available) setPreviewSize({ scale: Math.min(1, available / width), width, height: document.offsetHeight });
+    };
+    const observer = new ResizeObserver(resize);
+    observer.observe(wrapper);
+    observer.observe(document);
+    resize();
+    return () => observer.disconnect();
+  }, []);
   const [downloading, setDownloading] = useState(false);
   const [pdfShareOpen, setPdfShareOpen] = useState(false);
   const [savingPayment, setSavingPayment] = useState(false);
@@ -1158,8 +1180,12 @@ function InvoiceDetailModal({
 
         {pdfShareOpen && documentRef.current && <InvoicePdfShare invoice={invoice} businessName={setting.business?.name || "Happy Bonding"} element={documentRef.current} onClose={() => setPdfShareOpen(false)} />}
         <div className="full-invoice-content-grid">
-          <div className="bill-document-preview-wrapper">
-            <BillOfSupplyTemplate ref={documentRef} invoice={invoice} setting={setting} seasonalTheme />
+          <div className="bill-document-preview-wrapper" ref={previewRef}>
+            <div className="bill-preview-size" style={{ width: previewSize.width * previewSize.scale, height: previewSize.height * previewSize.scale }}>
+              <div className="bill-preview-scale" style={{ width: previewSize.width, transform: `scale(${previewSize.scale})` }}>
+                <BillOfSupplyTemplate ref={documentRef} invoice={invoice} setting={setting} seasonalTheme />
+              </div>
+            </div>
           </div>
 
           <aside className="payment-history-drawer card">
@@ -1469,6 +1495,13 @@ function SalesInvoicesListView({
     return statusFilter === "paid" ? balance === 0 : balance > 0;
   }), [matchingRows, statusFilter]);
 
+  const [invoicePage, setInvoicePage] = useState(0);
+  const invoicePageSize = 50;
+  const invoicePageCount = Math.max(1, Math.ceil(filtered.length / invoicePageSize));
+  const currentInvoicePage = Math.min(invoicePage, invoicePageCount - 1);
+  useEffect(() => { setInvoicePage(0); setOpenMenuId(null); }, [query, statusFilter, dateFilter, customDateRange]);
+  const visibleInvoices = filtered.slice(currentInvoicePage * invoicePageSize, (currentInvoicePage + 1) * invoicePageSize);
+
   const selectStatus = (status: typeof statusFilter) => {
     setStatusFilter(status);
     setSelectedIds(new Set());
@@ -1736,7 +1769,7 @@ function SalesInvoicesListView({
       </div>
 
       {/* Sales Invoices Main Table matching reference image */}
-      <article className="card table-card">
+      <article className="card table-card sales-invoices-table-card">
         <div className="table-scroll">
           <table className="sales-invoices-main-table">
             <thead>
@@ -1760,7 +1793,7 @@ function SalesInvoicesListView({
               </tr>
             </thead>
             <tbody>
-              {filtered.map(inv => (
+              {visibleInvoices.map(inv => (
                 <tr
                   key={inv.id}
                   className="clickable-row"
@@ -1777,7 +1810,7 @@ function SalesInvoicesListView({
                   <td className="mono" style={{ fontWeight: 600, color: "#1e293b", whiteSpace: "nowrap" }}>
                     {inv.number}
                   </td>
-                  <td>
+                  <td className="sales-invoice-party">
                     <strong>{inv.party}</strong>
                   </td>
                   <td style={{ color: "#64748b" }}>-</td>
@@ -1929,6 +1962,13 @@ function SalesInvoicesListView({
             </tbody>
           </table>
         </div>
+        {filtered.length > invoicePageSize && (
+          <nav className="invoice-list-pagination" aria-label="Invoice pages">
+            <span>{currentInvoicePage * invoicePageSize + 1}–{Math.min((currentInvoicePage + 1) * invoicePageSize, filtered.length)} of {filtered.length}</span>
+            <button type="button" className="secondary compact" disabled={currentInvoicePage === 0} onClick={() => { setInvoicePage(currentInvoicePage - 1); setOpenMenuId(null); }}>Previous</button>
+            <button type="button" className="secondary compact" disabled={currentInvoicePage + 1 >= invoicePageCount} onClick={() => { setInvoicePage(currentInvoicePage + 1); setOpenMenuId(null); }}>Next</button>
+          </nav>
+        )}
       </article>
     </div>
   );
